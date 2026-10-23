@@ -6,14 +6,92 @@
 	objectVersion = 90;
 	objects = {
 
+/* Begin PBXContainerItemProxy section */
+		000000000000000250000000 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 000000000000000100000000;
+			remoteInfo = StrumMeng;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		000000000000000000000120 /* StrumMeng.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StrumMeng.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000000220 /* StrumMengTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = StrumMengTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A5A3008D308B245700F31946 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
+		A5A30086308B244400F31946 /* CLAUDE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CLAUDE.md; sourceTree = "<group>"; };
+		A5A30087308B244400F31946 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		A5A3008A308B245700F31946 /* ARCHITECTURE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ARCHITECTURE.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		000000000000000000000011 /* Exceptions for StrumMeng */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Core/Data/.gitkeep,
+				Core/DesignSystem/.gitkeep,
+				Core/Models/.gitkeep,
+				Core/Services/Audio/.gitkeep,
+				Core/Services/Connectivity/.gitkeep,
+				Core/Services/Practice/.gitkeep,
+				Core/Services/Settings/.gitkeep,
+				Features/Controller/Connection/.gitkeep,
+				Features/Controller/Touchpad/.gitkeep,
+				Features/Guidebook/.gitkeep,
+				Features/Option/Calibration/.gitkeep,
+				Features/Practice/List/.gitkeep,
+				Features/Practice/Listen/.gitkeep,
+				Features/Practice/Play/.gitkeep,
+				Features/Practice/Replay/.gitkeep,
+				Features/Practice/Summary/.gitkeep,
+			);
+			target = 000000000000000100000000 /* StrumMeng */;
+		};
+		000000000000000000000211 /* Exceptions for StrumMengTests */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Core/Data/.gitkeep,
+				Core/DesignSystem/.gitkeep,
+				Core/Models/.gitkeep,
+				Core/Services/.gitkeep,
+				Core/Services/Audio/.gitkeep,
+				Core/Services/Connectivity/.gitkeep,
+				Core/Services/Practice/.gitkeep,
+				Core/Services/Settings/.gitkeep,
+				Features/Controller/.gitkeep,
+				Features/Controller/Connection/.gitkeep,
+				Features/Controller/Touchpad/.gitkeep,
+				Features/Guidebook/.gitkeep,
+				Features/Home/.gitkeep,
+				Features/Option/.gitkeep,
+				Features/Option/Calibration/.gitkeep,
+				Features/Practice/List/.gitkeep,
+				Features/Practice/Listen/.gitkeep,
+				Features/Practice/Play/.gitkeep,
+				Features/Practice/Replay/.gitkeep,
+				Features/Practice/Summary/.gitkeep,
+				TestSupport/.gitkeep,
+			);
+			target = 000000000000000200000000 /* StrumMengTests */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		000000000000000000000010 /* StrumMeng */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				000000000000000000000011 /* Exceptions for StrumMeng */,
+			);
 			path = StrumMeng;
+			sourceTree = "<group>";
+		};
+		A5A3006F308B23E300F31946 /* StrumMengTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				000000000000000000000211 /* Exceptions for StrumMengTests */,
+			);
+			path = StrumMengTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -24,12 +102,24 @@
 			files = (
 			);
 		};
+		000000000000000230000000 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		000000000000000000000001 = {
 			isa = PBXGroup;
 			children = (
+				A5A3008B308B245700F31946 /* Docs */,
+				A5A3008D308B245700F31946 /* .gitignore */,
+				A5A30086308B244400F31946 /* CLAUDE.md */,
+				A5A30087308B244400F31946 /* README.md */,
+				A5A3006F308B23E300F31946 /* StrumMengTests */,
 				000000000000000000000010 /* StrumMeng */,
 				000000000000000000000020 /* Products */,
 			);
@@ -39,8 +129,17 @@
 			isa = PBXGroup;
 			children = (
 				000000000000000000000120 /* StrumMeng.app */,
+				000000000000000000000220 /* StrumMengTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		A5A3008B308B245700F31946 /* Docs */ = {
+			isa = PBXGroup;
+			children = (
+				A5A3008A308B245700F31946 /* ARCHITECTURE.md */,
+			);
+			path = Docs;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -64,6 +163,27 @@
 			productReference = 000000000000000000000120 /* StrumMeng.app */;
 			productType = "com.apple.product-type.application";
 		};
+		000000000000000200000000 /* StrumMengTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 000000000000000210000000 /* Build configuration list for PBXNativeTarget "StrumMengTests" */;
+			buildPhases = (
+				000000000000000220000000 /* Sources */,
+				000000000000000230000000 /* Frameworks */,
+				000000000000000240000000 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				000000000000000260000000 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A5A3006F308B23E300F31946 /* StrumMengTests */,
+			);
+			name = StrumMengTests;
+			productName = StrumMengTests;
+			productReference = 000000000000000000000220 /* StrumMengTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -76,6 +196,10 @@
 				TargetAttributes = {
 					000000000000000100000000 = {
 						CreatedOnToolsVersion = 26.3;
+					};
+					000000000000000200000000 = {
+						CreatedOnToolsVersion = 26.3;
+						TestTargetID = 000000000000000100000000;
 					};
 				};
 			};
@@ -94,6 +218,7 @@
 			projectRoot = "";
 			targets = (
 				000000000000000100000000 /* StrumMeng */,
+				000000000000000200000000 /* StrumMengTests */,
 			);
 		};
 /* End PBXProject section */
@@ -104,6 +229,13 @@
 			files = (
 			);
 		};
+		000000000000000240000000 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -112,7 +244,22 @@
 			files = (
 			);
 		};
+		000000000000000220000000 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		000000000000000260000000 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 000000000000000100000000 /* StrumMeng */;
+			targetProxy = 000000000000000250000000 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		000000000000000011000000 /* Debug configuration for PBXProject "StrumMeng" */ = {
@@ -323,6 +470,56 @@
 			};
 			name = Release;
 		};
+		000000000000000211000000 /* Debug configuration for PBXNativeTarget "StrumMengTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 75LP72YY5S;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "devplaceholder.$(PROJECT_UNIQUE_VALUE:identifier).StrumMengTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/StrumMeng.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/StrumMeng";
+			};
+			name = Debug;
+		};
+		000000000000000212000000 /* Release configuration for PBXNativeTarget "StrumMengTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 75LP72YY5S;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "devplaceholder.$(PROJECT_UNIQUE_VALUE:identifier).StrumMengTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/StrumMeng.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/StrumMeng";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -339,6 +536,14 @@
 			buildConfigurations = (
 				000000000000000111000000 /* Debug configuration for PBXNativeTarget "StrumMeng" */,
 				000000000000000112000000 /* Release configuration for PBXNativeTarget "StrumMeng" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		000000000000000210000000 /* Build configuration list for PBXNativeTarget "StrumMengTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				000000000000000211000000 /* Debug configuration for PBXNativeTarget "StrumMengTests" */,
+				000000000000000212000000 /* Release configuration for PBXNativeTarget "StrumMengTests" */,
 			);
 			defaultConfigurationName = Release;
 		};
