@@ -19,19 +19,17 @@
 /* Begin PBXFileReference section */
 		000000000000000000000120 /* StrumMeng.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StrumMeng.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		000000000000000000000220 /* StrumMengTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = StrumMengTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		A5A3008D308B245700F31946 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 		A5A30086308B244400F31946 /* CLAUDE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CLAUDE.md; sourceTree = "<group>"; };
 		A5A30087308B244400F31946 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		A5A3008A308B245700F31946 /* ARCHITECTURE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ARCHITECTURE.md; sourceTree = "<group>"; };
+		A5A3008D308B245700F31946 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		000000000000000000000011 /* Exceptions for StrumMeng */ = {
+		000000000000000000000011 /* Exceptions for "StrumMeng" folder in "StrumMeng" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Core/Data/.gitkeep,
 				Core/DesignSystem/.gitkeep,
-				Core/Models/.gitkeep,
 				Core/Services/Audio/.gitkeep,
 				Core/Services/Connectivity/.gitkeep,
 				Core/Services/Practice/.gitkeep,
@@ -48,10 +46,9 @@
 			);
 			target = 000000000000000100000000 /* StrumMeng */;
 		};
-		000000000000000000000211 /* Exceptions for StrumMengTests */ = {
+		000000000000000000000211 /* Exceptions for "StrumMengTests" folder in "StrumMengTests" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Core/Data/.gitkeep,
 				Core/DesignSystem/.gitkeep,
 				Core/Models/.gitkeep,
 				Core/Services/.gitkeep,
@@ -81,7 +78,7 @@
 		000000000000000000000010 /* StrumMeng */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				000000000000000000000011 /* Exceptions for StrumMeng */,
+				000000000000000000000011 /* Exceptions for "StrumMeng" folder in "StrumMeng" target */,
 			);
 			path = StrumMeng;
 			sourceTree = "<group>";
@@ -89,7 +86,7 @@
 		A5A3006F308B23E300F31946 /* StrumMengTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				000000000000000000000211 /* Exceptions for StrumMengTests */,
+				000000000000000000000211 /* Exceptions for "StrumMengTests" folder in "StrumMengTests" target */,
 			);
 			path = StrumMengTests;
 			sourceTree = "<group>";
@@ -104,10 +101,8 @@
 		};
 		000000000000000230000000 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
@@ -115,12 +110,12 @@
 		000000000000000000000001 = {
 			isa = PBXGroup;
 			children = (
+				000000000000000000000010 /* StrumMeng */,
 				A5A3008B308B245700F31946 /* Docs */,
 				A5A3008D308B245700F31946 /* .gitignore */,
 				A5A30086308B244400F31946 /* CLAUDE.md */,
 				A5A30087308B244400F31946 /* README.md */,
 				A5A3006F308B23E300F31946 /* StrumMengTests */,
-				000000000000000000000010 /* StrumMeng */,
 				000000000000000000000020 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -231,10 +226,8 @@
 		};
 		000000000000000240000000 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
@@ -246,10 +239,8 @@
 		};
 		000000000000000220000000 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
