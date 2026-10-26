@@ -29,9 +29,7 @@
 		000000000000000000000011 /* Exceptions for "StrumMeng" folder in "StrumMeng" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Core/Data/.gitkeep,
 				Core/DesignSystem/.gitkeep,
-				Core/Models/.gitkeep,
 				Core/Services/Audio/.gitkeep,
 				Core/Services/Connectivity/.gitkeep,
 				Core/Services/Practice/.gitkeep,
@@ -51,7 +49,6 @@
 		000000000000000000000211 /* Exceptions for "StrumMengTests" folder in "StrumMengTests" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Core/Data/.gitkeep,
 				Core/DesignSystem/.gitkeep,
 				Core/Models/.gitkeep,
 				Core/Services/.gitkeep,
@@ -113,12 +110,12 @@
 		000000000000000000000001 = {
 			isa = PBXGroup;
 			children = (
+				000000000000000000000010 /* StrumMeng */,
 				A5A3008B308B245700F31946 /* Docs */,
 				A5A3008D308B245700F31946 /* .gitignore */,
 				A5A30086308B244400F31946 /* CLAUDE.md */,
 				A5A30087308B244400F31946 /* README.md */,
 				A5A3006F308B23E300F31946 /* StrumMengTests */,
-				000000000000000000000010 /* StrumMeng */,
 				000000000000000000000020 /* Products */,
 			);
 			sourceTree = "<group>";
