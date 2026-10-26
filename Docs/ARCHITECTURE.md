@@ -40,7 +40,7 @@ The app runs on two devices from one universal target:
 - The app judges timing, not chords\. Practice does not require playing a chord\. Strum direction<br>\(down/up\) is known from the swipe, but it is not judged in the MVP \(see §4\.1\)\.
 - Input is a paired iPhone used as a strum controller \(companion\)\. The player swipes on the iPhone;<br>each strum is sent to the iPad over a local peer\-to\-peer link\. There is no microphone input \(see §4\.2\)\.
 - All patterns are open from the start\. There is a suggested order, but nothing is locked\. Order:<br>Foundation, Subdivision, Syncopation, The Upbeat, Dynamic\.
-- BPM is chosen by the user on the pattern list screen, range 40 to 120 \[Assumption\]\. A session lasts<br>about 1 minute \[Assumption\]\.
+- BPM is chosen by the user on the pattern list screen, range 60 to 120\. A session repeats the selected<br>pattern 10 times; its duration is derived from the pattern's beat count and selected BPM\.
 - Replay shows the previous session again, visually and audibly\. It does not start a new session and<br>does not re\-judge anything\.
 - Retry shows a BPM recommendation\. The user can accept it \(new BPM\) or reject it \(keep the old BPM\)\.<br>The popup appears for every accuracy tier, including "stay at the same BPM"\.
 - "History" means the records shown on each pattern card\. There is no separate history screen\. The<br>card shows the user's records for that pattern, sorted best to worst\. Three are visible, the rest scroll\.
@@ -52,7 +52,7 @@ The app runs on two devices from one universal target:
 
 ### 3\.1 Practice flow \(US 2, US 3\)
 
-Flow: pattern list \(choose pattern and BPM\) → Listen → Ready → count\-in 3\-2\-1 → Play \(about 1 minute\) → Summary\.
+Flow: pattern list \(choose pattern and BPM\) → Listen → Ready → count\-in 3\-2\-1 → Play \(10 pattern repetitions\) → Summary\.
 
 #### 3\.1\.1 Pattern list and BPM
 
@@ -66,15 +66,19 @@ struct StrumPattern: Identifiable, Codable, Sendable, Equatable {
     let name: String
     let strokes: [Stroke]
     let beatLabels: [String]    // "1", "&", "2", "&" ...
+    let beatsPerPattern: Int
     let suggestedOrder: Int
     let defaultBPM: Int
 }
 ```
 
-- PatternCatalog\.all holds the five patterns\. Stroke contents are confirmed with the Designer\.
+- PatternCatalog\.all holds the five confirmed patterns in suggested order: Foundation Strum,
+  Subdivision Strum, Syncopation Strum, The Upbeat Strum, and Dynamic Strum\.
 - Patterns are stored as stable ids in session records, never as copies, so renaming a pattern updates old records\.
-- PatternListViewModel state: \.loading, \.loaded\(\[PatternCardModel\]\), \.failed\. It owns selectedBPM<br>\(clamped to 40…120\)\.
+- PatternListViewModel owns the selected pattern and selectedBPM\. On this list, BPM changes in steps
+  of 5 and is clamped to 60…120\. Selecting another pattern resets BPM to that pattern's default\.
 - Each card shows name, arrow notation, and the record area \(§3\.3\)\.
+- Each card shows the calculated session duration next to BPM\. Duration is<br>`10 × beatsPerPattern × 60 / BPM` seconds\. Values below one minute are shown in seconds;<br>longer values use minutes and any remaining seconds\.
 - Selecting a pattern routes to Listen with only patternID and bpm, never a large object\.
 
 #### 3\.1\.2 Practice session state machine
@@ -413,7 +417,7 @@ Accepted risk: users with colour\-vision deficiency may find it hard to tell res
 | 4 | ToleranceConfig values | Perfect and early windows must be tuned on a real iPad with a real guitar\. |
 | 5 | Recommendation BPM deltas | Placeholders \(20 / 10 / 0 / \+10\)\. Tune after testing with users\. |
 | 6 | Latency calibration behaviour | Manual only or also on first launch; how many samples; what happens if it fails\. |
-| 7 | Session length and BPM range | 1 minute and 40…120 are assumptions\. |
+| 7 | Session length and BPM range | Resolved: 10 pattern repetitions per session and 60…120 BPM\. |
 | 8 | Connection indicator placement | On Ready, on Play, or both\. |
 | 9 | Xcode / Swift version and language mode | Needed to settle strict concurrency and testing framework\. |
 
@@ -439,6 +443,7 @@ Accepted risk: users with colour\-vision deficiency may find it hard to tell res
 | 14 | Do we detect strum direction? | No for the MVP\. Timing only\. |
 | 15 | Who reviews pull requests? | One reviewer\. UI PRs: Ce Gefo\. Code PRs: Axel\. |
 | 16 | Which test framework? | XCTest for now\. May move to Swift Testing if the whole team is on Xcode 16\+\. |
+| 17 | How long is a Practice session? | Repeat the selected pattern 10 times; calculate duration from its beat count and selected BPM\. |
 
 ## 11\. Suggested implementation order
 
