@@ -33,6 +33,29 @@ final class PracticeSessionConfigTests: XCTestCase {
         )
     }
 
+    func test_duration_usesDeclaredBeatsRatherThanNotationStepCount() {
+        let threeBeatPattern = StrumPattern(
+            id: "three-beats",
+            name: "Three Beat Pattern",
+            strokes: [.down, .rest, .down, .up, .rest, .up],
+            beatLabels: ["1", "&", "2", "&", "3", "&"],
+            beatsPerPattern: 3,
+            suggestedOrder: 1,
+            defaultBPM: 60
+        )
+
+        XCTAssertEqual(
+            PracticeSessionConfig.durationSeconds(for: threeBeatPattern, bpm: 60),
+            30,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            PracticeSessionConfig.durationSeconds(for: threeBeatPattern, bpm: 120),
+            15,
+            accuracy: 0.001
+        )
+    }
+
     func test_durationLabel_underOneMinute_usesSeconds() {
         XCTAssertEqual(
             PracticeSessionConfig.durationLabel(for: pattern, bpm: 80),
