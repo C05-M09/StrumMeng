@@ -16,6 +16,7 @@ final class StrumPatternTests: XCTestCase {
             name: "Test Pattern",
             strokes: [.down, .up, .rest],
             beatLabels: ["1", "&", "2"],
+            beatsPerPattern: 4,
             suggestedOrder: 1,
             defaultBPM: 75
         )
@@ -45,7 +46,7 @@ final class StrumPatternTests: XCTestCase {
         XCTAssertEqual(PatternCatalog.pattern(forID: "foundation"), PatternCatalog.foundation)
         XCTAssertEqual(PatternCatalog.pattern(forID: "subdivision"), PatternCatalog.subdivision)
         XCTAssertEqual(PatternCatalog.pattern(forID: "syncopation"), PatternCatalog.syncopation)
-        XCTAssertEqual(PatternCatalog.pattern(forID: "the-upbeat"), PatternCatalog.theUpbeat)
+        XCTAssertEqual(PatternCatalog.pattern(forID: "upbeat"), PatternCatalog.theUpbeat)
         XCTAssertEqual(PatternCatalog.pattern(forID: "dynamic"), PatternCatalog.dynamic)
         XCTAssertNil(PatternCatalog.pattern(forID: "non-existent"))
     }
