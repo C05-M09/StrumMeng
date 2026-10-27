@@ -29,10 +29,8 @@
 		000000000000000000000011 /* Exceptions for "StrumMeng" folder in "StrumMeng" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Core/DesignSystem/.gitkeep,
 				Core/Services/Audio/.gitkeep,
 				Core/Services/Connectivity/.gitkeep,
-				Core/Services/Practice/.gitkeep,
 				Core/Services/Settings/.gitkeep,
 				Features/Controller/Connection/.gitkeep,
 				Features/Controller/Touchpad/.gitkeep,
@@ -42,7 +40,6 @@
 				Features/Practice/Listen/.gitkeep,
 				Features/Practice/Play/.gitkeep,
 				Features/Practice/Replay/.gitkeep,
-				Features/Practice/Summary/.gitkeep,
 			);
 			target = 000000000000000100000000 /* StrumMeng */;
 		};
@@ -50,11 +47,9 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Core/DesignSystem/.gitkeep,
-				Core/Models/.gitkeep,
 				Core/Services/.gitkeep,
 				Core/Services/Audio/.gitkeep,
 				Core/Services/Connectivity/.gitkeep,
-				Core/Services/Practice/.gitkeep,
 				Core/Services/Settings/.gitkeep,
 				Features/Controller/.gitkeep,
 				Features/Controller/Connection/.gitkeep,
@@ -67,7 +62,6 @@
 				Features/Practice/Listen/.gitkeep,
 				Features/Practice/Play/.gitkeep,
 				Features/Practice/Replay/.gitkeep,
-				Features/Practice/Summary/.gitkeep,
 				TestSupport/.gitkeep,
 			);
 			target = 000000000000000200000000 /* StrumMengTests */;
