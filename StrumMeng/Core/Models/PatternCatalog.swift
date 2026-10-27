@@ -48,4 +48,15 @@ enum PatternCatalog {
             defaultBPM: 80
         ),
     ]
+
+    /// Lookup a pattern by its stable id slug.
+    static func pattern(forID id: String) -> StrumPattern? {
+        all.first { $0.id == id }
+    }
+
+    static var foundation: StrumPattern { all[0] }
+    static var subdivision: StrumPattern { all[1] }
+    static var syncopation: StrumPattern { all[2] }
+    static var theUpbeat: StrumPattern { all[3] }
+    static var dynamic: StrumPattern { all[4] }
 }
