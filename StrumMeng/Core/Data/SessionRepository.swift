@@ -16,4 +16,11 @@ nonisolated protocol SessionRepository: Sendable {
     /// The BPM of the newest Practice session for this pattern, or `nil` if the user
     /// has never played it. Used as the starting BPM on the pattern card.
     func lastPracticeBPM(forPattern patternID: String) async throws -> Int?
+
+    /// Records for one pattern, ordered by `sortedBy`. `limit == nil` returns all of them.
+    func topRecords(
+        patternID: String,
+        limit: Int?,
+        sortedBy: RecordSortCriterion
+    ) async throws -> [SessionResult]
 }
