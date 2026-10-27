@@ -11,5 +11,8 @@ struct AssetButtonStyle: ButtonStyle {
             .scaledToFit()
             .frame(width: size.width, height: size.height)
             .contentShape(Rectangle())
+            .transaction { transaction in
+                transaction.animation = nil
+            }
     }
 }
