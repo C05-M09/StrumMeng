@@ -4,19 +4,25 @@ import Observation
 /// The game loop of one practice session: Ready, 3-2-1 count-in, play, judge, finish.
 ///
 /// BeatClock ticks (one per pattern step, delivered on time) drive the session; strums come from
-/// StrumInputService. FeedbackEngine turns them into BeatEvents the moment each result is final,
+/// StrumInputService (on-screen swipes, or the iPhone controller link). FeedbackEngine turns them into BeatEvents the moment each result is final,
 /// and the screen shows them on the nodes. Every position on screen is derived from the clock's
 /// tick times, so the visuals cannot drift from the beat.
 @Observable
 final class PlayViewModel {
     /// 3-2-1 on quarter notes = 6 steps before the first step of the session.
     static let countInSteps = 6
+    /// How long to wait for an iPhone strum still on its way over Wi-Fi before closing a window.
+    /// Strums are judged by touch time, but a window closed before the strum arrives would
+    /// already be a Miss. Must stay well below one step (250 ms at 120 BPM).
+    static let controllerStrumArrivalGrace: TimeInterval = 0.15
 
     let pattern: StrumPattern
     let bpm: Int
 
     private(set) var state: PracticeState = .ready
     private(set) var beatEvents: [BeatEvent] = []
+    /// Always true without a controller. With one, a session only starts or resumes while it is true.
+    private(set) var isControllerConnected = false
 
     var isAnimating: Bool {
         switch state {
@@ -28,8 +34,10 @@ final class PlayViewModel {
     @ObservationIgnored private let clock: BeatClock
     @ObservationIgnored private let input: StrumInputService
     @ObservationIgnored private let touchInput: TouchStrumInput?
+    @ObservationIgnored private let controller: ControllerLink?
     @ObservationIgnored private let tolerance: ToleranceConfig
     @ObservationIgnored private let latencyOffset: TimeInterval
+    @ObservationIgnored private let strumArrivalGrace: TimeInterval
     @ObservationIgnored private let now: () -> TimeInterval
     @ObservationIgnored private let waitUntil: (TimeInterval) async -> Void
     @ObservationIgnored private let makeID: () -> UUID
@@ -62,8 +70,13 @@ final class PlayViewModel {
     @ObservationIgnored private var tickTask: Task<Void, Never>?
     @ObservationIgnored private var strumTask: Task<Void, Never>?
     @ObservationIgnored private var windowTask: Task<Void, Never>?
+    @ObservationIgnored private var controllerTask: Task<Void, Never>?
 
     /// - Parameters:
+    ///   - controller: the iPhone link when it is the strum source. The view model tells it when a
+    ///     session is running and pauses when it disconnects. Pass the same link as `input`.
+    ///   - strumArrivalGrace: extra time a window stays open for strums that arrive late (network
+    ///     delay); 0 for on-screen swipes, controllerStrumArrivalGrace for the iPhone.
     ///   - repetitions: how many times the pattern repeats (PracticeSessionConfig).
     ///   - latencyOffset: from calibration (SettingsStore, later); applied only inside TimingJudge.
     ///   - now: the host clock.
@@ -73,8 +86,10 @@ final class PlayViewModel {
          clock: BeatClock,
          input: StrumInputService,
          touchInput: TouchStrumInput?,
+         controller: ControllerLink? = nil,
          tolerance: ToleranceConfig = .standard,
          latencyOffset: TimeInterval = 0,
+         strumArrivalGrace: TimeInterval = 0,
          repetitions: Int = PracticeSessionConfig.patternRepetitions,
          now: @escaping () -> TimeInterval,
          waitUntil: @escaping (TimeInterval) async -> Void,
@@ -87,8 +102,11 @@ final class PlayViewModel {
         self.clock = clock
         self.input = input
         self.touchInput = touchInput
+        self.controller = controller
+        isControllerConnected = controller == nil
         self.tolerance = tolerance
         self.latencyOffset = latencyOffset
+        self.strumArrivalGrace = strumArrivalGrace
         self.now = now
         self.waitUntil = waitUntil
         self.makeID = makeID
@@ -117,29 +135,42 @@ final class PlayViewModel {
         strumTask = Task { [weak self] in
             for await strum in strums { self?.handle(strum) }
         }
+        controllerTask?.cancel()
+        if let states = controller?.connectionStates {
+            controllerTask = Task { [weak self] in
+                for await connection in states { await self?.handle(connection) }
+            }
+        }
     }
 
     /// Leaving the screen discards an unfinished session and stops every task.
     func onDisappear() async {
-        [tickTask, strumTask, windowTask].forEach { $0?.cancel() }
+        [tickTask, strumTask, windowTask, controllerTask].forEach { $0?.cancel() }
         await clock.stop()
+        await controller?.setSessionActive(false)
     }
 
     // MARK: Events from the View
 
     func send(_ event: PracticeEvent) async {
         let previous = state
-        state = reduce(previous, event)
-        guard state != previous else { return }
+        let next = reduce(previous, event)
+        guard next != previous else { return }
+        // Counting in without a connected controller would only collect Misses.
+        if case .countIn = next, !isControllerConnected { return }
+        state = next
 
         switch (event, state) {
         case (.tapReady, .countIn), (.tapRestart, .countIn):
             resetSession()
+            await controller?.setSessionActive(true)
             await clock.start(bpm: bpm)
         case (.tapResume, .countIn):
             countInFirstIndex = nil
+            await controller?.setSessionActive(true)
             await clock.resume()
         case (_, .paused):
+            await controller?.setSessionActive(false)
             await pause()
         case (.tapRestart, .ready):
             resetSession()
@@ -211,9 +242,22 @@ final class PlayViewModel {
         }
     }
 
-    /// Judges every beat whose window has ended by `time`.
+    /// A controller that stops being connected while counting in or playing pauses the session,
+    /// instead of judging the strums it can no longer send as Miss.
+    func handle(_ connection: ControllerConnectionState) async {
+        if case .connected = connection {
+            // Arrives with every ping; only a real change should notify observers.
+            if !isControllerConnected { isControllerConnected = true }
+            return
+        }
+        isControllerConnected = false
+        await send(.controllerDisconnected)
+    }
+
+    /// Judges every beat whose window ended before `time`, minus the arrival grace: a strum
+    /// touched inside a window may still be on its way.
     func closeWindows(upTo time: TimeInterval) {
-        apply(engine.close(upTo: time))
+        apply(engine.close(upTo: time - strumArrivalGrace))
         finishIfDone()
     }
 
@@ -256,7 +300,7 @@ final class PlayViewModel {
 
     private func playStep(_ tick: BeatTick) {
         let step = tick.index - stepOffset
-        apply(engine.close(upTo: tick.expectedTime))
+        apply(engine.close(upTo: tick.expectedTime - strumArrivalGrace))
         if step < totalSteps {
             nextStep = step + 1
             if let direction = Self.direction(for: pattern.strokes[step % pattern.strokes.count]) {
@@ -284,8 +328,8 @@ final class PlayViewModel {
     private func armWindowTimer() {
         windowTask?.cancel()
         guard let deadline = engine.nextDeadline else { return }
-        windowTask = Task { [weak self, waitUntil] in
-            await waitUntil(deadline)
+        windowTask = Task { [weak self, waitUntil, strumArrivalGrace] in
+            await waitUntil(deadline + strumArrivalGrace)
             guard !Task.isCancelled, let self else { return }
             self.closeWindows(upTo: self.now())
             self.armWindowTimer()
@@ -299,7 +343,10 @@ final class PlayViewModel {
         let result = SessionResultBuilder.build(id: makeID(), patternID: pattern.id, bpm: bpm,
                                                 beatEvents: beatEvents, createdAt: currentDate())
         state = reduce(state, .sessionEnded(result))
-        Task { [clock] in await clock.stop() }
+        Task { [clock, controller] in
+            await clock.stop()
+            await controller?.setSessionActive(false)
+        }
         onFinished(result)
     }
 
@@ -307,7 +354,7 @@ final class PlayViewModel {
         windowTask?.cancel()
         await clock.pause()
         frozenSongTime = currentSongTime()
-        apply(engine.close(upTo: now()))
+        apply(engine.close(upTo: now() - strumArrivalGrace))
         // Beats still open when the player paused are played again after the re-count.
         let dropped = engine.discardOpenBeats()
         resumeStep = dropped.first?.index ?? nextStep
