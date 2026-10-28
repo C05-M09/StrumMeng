@@ -18,6 +18,9 @@ struct ControllerLinkDebugView: View {
                 Section("Connection") {
                     LabeledContent("State", value: stateText)
                     LabeledContent("Session", value: model.sessionActive ? "Playing" : "Not playing")
+                    if model.role == .controller {
+                        LabeledContent("Strums sent", value: "\(model.sentCount)")
+                    }
                 }
                 switch model.role {
                 case .host:
@@ -55,7 +58,22 @@ struct ControllerLinkDebugView: View {
                 Button("Strum up") { model.strum(.up) }
                     .buttonStyle(.borderedProminent)
             }
+            swipePad
         }
+    }
+
+    /// Swipe up or down here to strum, like the real touch pad will.
+    private var swipePad: some View {
+        RoundedRectangle(cornerRadius: AppSpacing.radiusM)
+            .fill(.fill.tertiary)
+            .frame(height: 260)
+            .overlay { Text("Swipe up / down here to strum").foregroundStyle(.secondary) }
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { model.swipeChanged(translation: $0.translation.height, eventDate: $0.time) }
+                    .onEnded { _ in model.swipeEnded() }
+            )
     }
 
     private var stateText: String {

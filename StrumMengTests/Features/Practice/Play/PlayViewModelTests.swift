@@ -14,11 +14,13 @@ final class PlayViewModelTests: XCTestCase {
     private func makeViewModel(patternID: String = "syncopation",
                                repetitions: Int = 10,
                                latencyOffset: TimeInterval = 0,
-                               touchInput: TouchStrumInput? = nil) throws -> PlayViewModel {
+                               strumArrivalGrace: TimeInterval = 0,
+                               touchInput: TouchStrumInput? = nil,
+                               controller: ControllerLink? = nil) throws -> PlayViewModel {
         let pattern = try XCTUnwrap(PatternCatalog.all.first { $0.id == patternID })
         return PlayViewModel(
             pattern: pattern, bpm: 80, clock: clock, input: MockStrumInputService(), touchInput: touchInput,
-            latencyOffset: latencyOffset, repetitions: repetitions,
+            controller: controller, latencyOffset: latencyOffset, strumArrivalGrace: strumArrivalGrace, repetitions: repetitions,
             now: { [unowned self] in self.currentTime },
             waitUntil: { _ in try? await Task.sleep(for: .seconds(3600)) },
             makeID: { UUID(uuidString: "00000000-0000-0000-0000-000000000001") ?? UUID() },
@@ -286,5 +288,158 @@ final class PlayViewModelTests: XCTestCase {
             XCTAssertEqual(result.perfectCount, pattern.strokes.filter { $0 != .rest }.count, pattern.id)
             XCTAssertEqual(result.accuracy, 1, accuracy: 1e-9, pattern.id)
         }
+    }
+
+    // MARK: iPhone controller
+
+    private func makeConnectedViewModel(_ controller: MockControllerLink) async throws -> PlayViewModel {
+        let viewModel = try makeViewModel(controller: controller)
+        await viewModel.handle(.connected(latencyMs: 5))
+        return viewModel
+    }
+
+    func test_withoutAController_sessionsStartAsBefore() async throws {
+        let viewModel = try makeViewModel()
+        XCTAssertTrue(viewModel.isControllerConnected)
+        await viewModel.send(.tapReady)
+        XCTAssertEqual(viewModel.state, .countIn(3))
+    }
+
+    func test_tapReady_whileTheControllerIsNotConnected_isIgnored() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try makeViewModel(controller: controller)
+        await viewModel.handle(.searching)
+        await viewModel.send(.tapReady)
+        XCTAssertEqual(viewModel.state, .ready)
+        XCTAssertTrue(clock.startedBPMs.isEmpty)
+        XCTAssertTrue(controller.sessionActiveCalls.isEmpty)
+    }
+
+    func test_tapReady_withAConnectedController_tellsTheIPhoneTheSessionStarted() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try await makeConnectedViewModel(controller)
+        await viewModel.send(.tapReady)
+        XCTAssertEqual(viewModel.state, .countIn(3))
+        XCTAssertEqual(controller.sessionActiveCalls, [true])
+    }
+
+    func test_controllerDisconnectingWhilePlaying_pausesTheSession() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try await makeConnectedViewModel(controller)
+        await startPlaying(viewModel)
+        await viewModel.handle(.reconnecting)
+        XCTAssertEqual(viewModel.state, .paused)
+        XCTAssertEqual(clock.pauseCount, 1)
+        XCTAssertEqual(controller.sessionActiveCalls, [true, false])
+    }
+
+    func test_controllerDisconnectingDuringTheCountIn_pausesTheSession() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try await makeConnectedViewModel(controller)
+        await viewModel.send(.tapReady)
+        await viewModel.handle(.reconnecting)
+        XCTAssertEqual(viewModel.state, .paused)
+    }
+
+    func test_controllerDisconnectingWhilePlaying_doesNotJudgeMisses() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try await makeConnectedViewModel(controller)
+        await startPlaying(viewModel)
+        await viewModel.handle(.reconnecting)
+        currentTime = time(ofTick: 20)
+        viewModel.closeWindows(upTo: currentTime)
+        XCTAssertFalse(viewModel.beatEvents.contains { $0.result == .miss })
+    }
+
+    func test_controllerDisconnectingOutsideASession_changesNothing() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try await makeConnectedViewModel(controller)
+        await viewModel.handle(.reconnecting)
+        XCTAssertEqual(viewModel.state, .ready)
+        XCTAssertFalse(viewModel.isControllerConnected)
+        XCTAssertTrue(controller.sessionActiveCalls.isEmpty)
+    }
+
+    func test_resume_waitsForTheControllerToReconnect() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try await makeConnectedViewModel(controller)
+        await startPlaying(viewModel)
+        await viewModel.handle(.reconnecting)
+        await viewModel.send(.tapResume)
+        XCTAssertEqual(viewModel.state, .paused)
+        await viewModel.handle(.connected(latencyMs: 8))
+        await viewModel.send(.tapResume)
+        XCTAssertEqual(viewModel.state, .countIn(3))
+        XCTAssertEqual(controller.sessionActiveCalls, [true, false, true])
+    }
+
+    func test_tapPause_tellsTheIPhoneTheSessionStopped() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try await makeConnectedViewModel(controller)
+        await startPlaying(viewModel)
+        await viewModel.send(.tapPause)
+        XCTAssertEqual(controller.sessionActiveCalls, [true, false])
+    }
+
+    func test_leavingTheScreen_tellsTheIPhoneTheSessionStopped() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try await makeConnectedViewModel(controller)
+        await startPlaying(viewModel)
+        await viewModel.onDisappear()
+        XCTAssertEqual(controller.sessionActiveCalls.last, false)
+    }
+
+    func test_finishing_tellsTheIPhoneTheSessionStopped() async throws {
+        let controller = MockControllerLink()
+        // Syncopation × 1 repetition = 8 steps; tick 6 is step 0, tick 14 is past the last step.
+        let viewModel = try makeViewModel(repetitions: 1, controller: controller)
+        await viewModel.handle(.connected(latencyMs: 5))
+        await viewModel.send(.tapReady)
+        for n in 0...14 { tick(viewModel, n) }
+        currentTime = time(ofTick: 14) + 1
+        viewModel.closeWindows(upTo: currentTime)
+        guard case .finished = viewModel.state else { return XCTFail("Expected finished") }
+        for _ in 0..<20 where controller.sessionActiveCalls.last != false { await Task.yield() }
+        XCTAssertEqual(controller.sessionActiveCalls.last, false)
+    }
+
+    // MARK: Strums arriving late over the network
+
+    func test_strumTouchedInTime_butArrivingAfterTheWindow_isPerfectWithAGrace() async throws {
+        let viewModel = try makeViewModel(strumArrivalGrace: 0.15)
+        await startPlaying(viewModel)
+        // The window has ended (beat + 50 ms) but the iPhone strum is still on its way.
+        currentTime = time(ofTick: 6) + 0.07
+        viewModel.closeWindows(upTo: currentTime)
+        XCTAssertNil(nodeResult(viewModel, step: 0))
+        // It arrives, carrying the touch time inside the Perfect window.
+        viewModel.handle(PracticeFixtures.strum(at: time(ofTick: 6) + 0.02, .down))
+        XCTAssertEqual(nodeResult(viewModel, step: 0), .perfect)
+    }
+
+    func test_withoutAGrace_aStrumArrivingAfterTheWindowIsTooLate() async throws {
+        let viewModel = try makeViewModel()
+        await startPlaying(viewModel)
+        currentTime = time(ofTick: 6) + 0.07
+        viewModel.closeWindows(upTo: currentTime)
+        viewModel.handle(PracticeFixtures.strum(at: time(ofTick: 6) + 0.02, .down))
+        XCTAssertEqual(nodeResult(viewModel, step: 0), .miss)
+    }
+
+    func test_withAGrace_noStrumIsStillAMissOnceTheGraceHasPassed() async throws {
+        let viewModel = try makeViewModel(strumArrivalGrace: 0.15)
+        await startPlaying(viewModel)
+        currentTime = time(ofTick: 6) + 0.05 + 0.15
+        viewModel.closeWindows(upTo: currentTime)
+        XCTAssertEqual(nodeResult(viewModel, step: 0), .miss)
+    }
+
+    func test_withAGrace_aLateTouchIsStillAMiss() async throws {
+        let viewModel = try makeViewModel(strumArrivalGrace: 0.15)
+        await startPlaying(viewModel)
+        viewModel.handle(PracticeFixtures.strum(at: time(ofTick: 6) + 0.08, .down))
+        currentTime = time(ofTick: 6) + 0.25
+        viewModel.closeWindows(upTo: currentTime)
+        XCTAssertEqual(nodeResult(viewModel, step: 0), .miss)
     }
 }
