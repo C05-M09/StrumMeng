@@ -40,8 +40,16 @@ struct SummaryView: View {
 
                 // 3. Pop-up Rekomendasi (Muncul saat tombol Retry ditekan)
                 if case .showingRecommendation(let recommendation) = viewModel.state {
-                    recommendationDialog(recommendation: recommendation)
-                        .scaleEffect(scale)
+                    BPMRecommendationOverlay(
+                        recommendation: recommendation,
+                        offTempoCount: viewModel.result.tooEarlyCount + viewModel.result.missCount,
+                        onKeepPrevious: {
+                            viewModel.send(.rejectRecommendation)
+                        },
+                        onStartRecommended: { _ in
+                            viewModel.send(.acceptRecommendation)
+                        }
+                    )
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -257,108 +265,6 @@ struct SummaryView: View {
         }
         .frame(maxWidth: .infinity)
     }
-
-    // MARK: - Recommendation Modal Pop-up
-    private func recommendationDialog(recommendation: RecommendedBPM) -> some View {
-        ZStack {
-            Color.black.opacity(0.55).ignoresSafeArea()
-
-            VStack(spacing: 24) {
-                Text("RETRY RECOMMENDATION")
-                    .font(AppTypography.bungee(size: 32))
-                    .foregroundStyle(AppColors.white)
-                    .padding(.top, 28)
-
-                VStack(spacing: 12) {
-                    if recommendation.delta > 0 {
-                        Text("Great job! Let's increase the tempo.")
-                            .font(AppTypography.dmMono(size: 20))
-                            .foregroundStyle(AppColors.cream)
-                    } else if recommendation.delta < 0 {
-                        Text("Let's slow down the tempo to master timing.")
-                            .font(AppTypography.dmMono(size: 20))
-                            .foregroundStyle(AppColors.cream)
-                    } else {
-                        Text("Nice consistency! Let's practice at the same tempo.")
-                            .font(AppTypography.dmMono(size: 20))
-                            .foregroundStyle(AppColors.cream)
-                    }
-
-                    HStack(spacing: 24) {
-                        VStack(spacing: 4) {
-                            Text("CURRENT")
-                                .font(AppTypography.dmMono(size: 16))
-                                .foregroundStyle(AppColors.tan)
-                            Text("\(recommendation.currentBPM) BPM")
-                                .font(AppTypography.bungee(size: 28))
-                                .foregroundStyle(AppColors.white)
-                        }
-
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 28, weight: .bold))
-                            .foregroundStyle(AppColors.orange)
-
-                        VStack(spacing: 4) {
-                            Text("TARGET")
-                                .font(AppTypography.dmMono(size: 16))
-                                .foregroundStyle(AppColors.yellowAccent)
-                            Text("\(recommendation.targetBPM) BPM")
-                                .font(AppTypography.bungee(size: 32))
-                                .foregroundStyle(AppColors.yellowAccent)
-                        }
-                    }
-                    .padding(.vertical, 16)
-                    .padding(.horizontal, 32)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(AppColors.brownInk.opacity(0.6))
-                    )
-                }
-                .padding(.horizontal, 32)
-
-                HStack(spacing: 20) {
-                    Button {
-                        viewModel.send(.rejectRecommendation)
-                    } label: {
-                        Text("KEEP \(recommendation.currentBPM) BPM")
-                            .font(AppTypography.bungee(size: 18))
-                            .foregroundStyle(AppColors.brownInk)
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 16)
-                            .background(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(AppColors.tan)
-                            )
-                    }
-
-                    Button {
-                        viewModel.send(.acceptRecommendation)
-                    } label: {
-                        Text("USE \(recommendation.targetBPM) BPM")
-                            .font(AppTypography.bungee(size: 18))
-                            .foregroundStyle(AppColors.white)
-                            .padding(.horizontal, 28)
-                            .padding(.vertical, 16)
-                            .background(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(AppColors.orange)
-                            )
-                    }
-                }
-                .padding(.bottom, 28)
-            }
-            .frame(width: 620)
-            .background(
-                RoundedRectangle(cornerRadius: 28)
-                    .fill(AppColors.brownPrimary)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 28)
-                    .stroke(AppColors.brownInk, lineWidth: 5)
-            )
-            .shadow(color: .black.opacity(0.4), radius: 24, x: 0, y: 12)
-        }
-    }
 }
 
 // MARK: - Scale-Only Button Style (No Opacity Fade)
@@ -399,3 +305,23 @@ private struct PreviewSessionRepository: SessionRepository {
     let vm = SummaryViewModel(result: sampleResult, repository: repo)
     SummaryView(viewModel: vm)
 }
+
+#Preview("Summary with Recommendation", traits: .landscapeLeft) {
+    let repo = PreviewSessionRepository()
+    let sampleResult = SessionResult(
+        id: UUID(),
+        patternID: "syncopation",
+        songID: nil,
+        bpm: 70,
+        accuracy: 0.45,
+        perfectCount: 10,
+        tooEarlyCount: 4,
+        missCount: 3,
+        createdAt: Date(),
+        beatEvents: []
+    )
+    let vm = SummaryViewModel(result: sampleResult, repository: repo)
+    let _ = vm.send(.tapRetry)
+    SummaryView(viewModel: vm)
+}
+

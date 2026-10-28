@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="896px" height="362px" viewBox="0 0 896 362" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>Text_Box</title>
+    <defs>
+        <polygon id="path-1" points="486.076981 541.531936 521.232111 599.081305 519.355977 634.880093 1286.11917 711.350443 1316.96261 454.833495 554.428578 440.942979 529.713677 553.318542"></polygon>
+        <filter x="-4.7%" y="-8.2%" width="107.6%" height="122.0%" filterUnits="objectBoundingBox" id="filter-2">
+            <feMorphology radius="15" operator="dilate" in="SourceAlpha" result="shadowSpreadOuter1"></feMorphology>
+            <feOffset dx="0" dy="14" in="shadowSpreadOuter1" result="shadowOffsetOuter1"></feOffset>
+            <feComposite in="shadowOffsetOuter1" in2="SourceAlpha" operator="out" result="shadowOffsetOuter1"></feComposite>
+            <feColorMatrix values="0 0 0 0 0.180392157   0 0 0 0 0.0901960784   0 0 0 0 0.0549019608  0 0 0 1 0" type="matrix" in="shadowOffsetOuter1"></feColorMatrix>
+        </filter>
+    </defs>
+    <g id="Semi-HiFI" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Practice-Retry" transform="translate(-446, -403)">
+            <g id="Text_Box" transform="translate(901.5198, 576.1467) rotate(-3) translate(-901.5198, -576.1467)">
+                <use fill="black" fill-opacity="1" filter="url(#filter-2)" xlink:href="#path-1"></use>
+                <path stroke="#2E170E" stroke-width="15" d="M554.565178,433.444223 L1317.09921,447.334739 L1325.4001,447.48595 L1324.40898,455.728841 L1293.56553,712.24579 L1292.68815,719.542783 L1285.37488,718.81342 L518.611684,642.34307 L511.491779,641.632992 L511.866255,634.487573 L513.620812,601.008635 L479.676678,545.441683 L469.868168,529.385035 L488.032701,534.291414 L524.077829,544.02748 L547.103639,439.331995 L548.423152,433.332338 Z" fill="#FFFFFF" fill-rule="evenodd"></path>
+            </g>
+        </g>
+    </g>
+</svg>
