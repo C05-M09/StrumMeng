@@ -27,4 +27,15 @@ actor MockSessionRepository: SessionRepository {
     func lastPracticeBPM(forPattern patternID: String) async throws -> Int? {
         stubbedLastBPM
     }
+
+    func topRecords(
+        patternID: String,
+        limit: Int?,
+        sortedBy: RecordSortCriterion
+    ) async throws -> [SessionResult] {
+        if let limit {
+            return Array(stubbedRecords.prefix(limit))
+        }
+        return stubbedRecords
+    }
 }

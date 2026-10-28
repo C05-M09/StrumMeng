@@ -37,7 +37,7 @@ The app runs on two devices from one universal target:
 
 - MVP covers Practice, Guidebook, records and Option only\. Showtime is deferred\. Its button appears on<br>Home but does nothing \(no navigation, no "Coming Soon" message\)\.
 - Feedback is by colour only, in real time\. Three results: Perfect, Too Early, Miss\. A strum that is<br>too late counts as Miss\. There is no "Too Late" state and no shape or icon difference between results\.
-- The app judges timing, not chords\. Practice does not require playing a chord\. Strum direction<br>\(down/up\) is known from the swipe, but it is not judged in the MVP \(see §4\.1\)\.
+- The app judges timing and strum direction, not chords\. Practice does not require playing a chord\.<br>Each step must be strummed in its direction \(down/up\); a strum in the wrong direction inside a<br>step's window makes that step a Miss \(see §3\.2\.2 and decision 18\)\.
 - Input is a paired iPhone used as a strum controller \(companion\)\. The player swipes on the iPhone;<br>each strum is sent to the iPad over a local peer\-to\-peer link\. There is no microphone input \(see §4\.2\)\.
 - All patterns are open from the start\. There is a suggested order, but nothing is locked\. Order:<br>Foundation, Subdivision, Syncopation, The Upbeat, Dynamic\.
 - BPM is chosen by the user on the pattern list screen, range 60 to 120\. A session repeats the selected<br>pattern 10 times; its duration is derived from the pattern's beat count and selected BPM\.
@@ -156,7 +156,7 @@ struct BeatEvent: Codable, Sendable, Equatable {
     let index: Int
     let expectedTime: TimeInterval
     let strumTime: TimeInterval?          // nil when no strum matched the beat
-    let direction: StrumDirection?        // retained for Replay; not judged in MVP
+    let direction: StrumDirection?        // judged: must match the step's stroke (decision 18)
     let result: BeatResult
 }
 
@@ -205,6 +205,8 @@ Every type above has a mock \(MockControllerLink emits scripted strums: on\-time
 - Within the Perfect window of the \(latency\-corrected\) beat time: Perfect\.
 - Before the Perfect window but inside the early window: Too Early\.
 - No strum inside the window, including a strum that arrives too late: Miss\.
+- Direction \(decision 18\): each judged step expects its stroke's direction\. Strums inside the window<br>are read in time order\. A strum in the wrong direction makes the step a Miss at once, even if a<br>right one follows\. A right\-direction strum in the Perfect window makes it Perfect at once\. Rest<br>steps are never judged\.
+- The clock's BeatTick carries no direction, so the view model pairs each tick with the pattern's<br>Stroke as a BeatTarget \(index, expectedTime, direction\) before handing it to the judge\.
 - ToleranceConfig \(perfectWindowMs, earlyWindowMs\) lives in one place so it is easy to tune\. Windows<br>are capped to a fraction of the beat interval so they never overlap at high BPM\. Actual values come<br>from on\-device testing \(§9\)\.
 - FeedbackEngine consumes beatStream and strums and emits each BeatEvent as soon as that beat's window<br>closes, not at the end of the session\. This is what makes colours appear in real time\.
 - SessionResultBuilder collects events and produces a SessionResult on finish\(\)\. A session ended by<br>Restart or Back to Menu produces nothing\.
@@ -315,7 +317,7 @@ Three read\-only pages: Counting Beats, Practice Tempo, How to Strum\. Content i
 
 ### 4\.1 Judging up vs down strokes
 
-Not required\. The feedback is about timing only\. With the companion controller the direction is known<br>exactly from the swipe, so it is cheap to add later as an optional rule in TimingJudge if the team<br>wants it\. It stays out of the MVP\.
+Adopted \(decision 18, replacing decision 14\)\. With the companion controller \(and the on\-iPad swipe<br>input used before it\) the direction is known exactly from the swipe, so TimingJudge checks it: a<br>wrong\-direction strum in a step's window is a Miss\. There is still no "wrong direction" result;<br>the three results stay Perfect, Too Early and Miss\.
 
 ### 4\.2 Microphone input instead of a companion controller
 
@@ -440,10 +442,11 @@ Accepted risk: users with colour\-vision deficiency may find it hard to tell res
 | 11 | Where do settings live? | UserDefaults behind SettingsStore\. |
 | 12 | Is latency calibration in the MVP? | Yes, inside Option\. |
 | 13 | Is the Guidebook in the MVP? | Yes, three pages\. |
-| 14 | Do we detect strum direction? | No for the MVP\. Timing only\. |
+| 14 | Do we detect strum direction? | Superseded by 18\. \(Was: no for the MVP, timing only\.\) |
 | 15 | Who reviews pull requests? | One reviewer\. UI PRs: Ce Gefo\. Code PRs: Axel\. |
 | 16 | Which test framework? | XCTest for now\. May move to Swift Testing if the whole team is on Xcode 16\+\. |
 | 17 | How long is a Practice session? | Repeat the selected pattern 10 times; calculate duration from its beat count and selected BPM\. |
+| 18 | Is strum direction judged? | Yes\. Each step must be strummed in its direction; a wrong\-direction strum inside the step's window makes it a Miss immediately, even if a right one follows\. Results stay Perfect, Too Early, Miss\. |
 
 ## 11\. Suggested implementation order
 

@@ -18,21 +18,23 @@ struct PatternWheelView: View {
     private let lineWidth: CGFloat = 3
 
     var body: some View {
-        rotatingWheel
-            .rotationEffect(
-                .degrees(wheelRotation),
-                anchor: UnitPoint(
-                    x: pivot.x / AppLayout.referenceSize.width,
-                    y: pivot.y / AppLayout.referenceSize.height
+        ZStack {
+            rotatingWheel
+                .rotationEffect(
+                    .degrees(wheelRotation),
+                    anchor: UnitPoint(
+                        x: pivot.x / AppLayout.referenceSize.width,
+                        y: pivot.y / AppLayout.referenceSize.height
+                    )
                 )
-            )
-            .contentShape(Rectangle())
-            .simultaneousGesture(dragGesture)
-            .frame(
-                width: AppLayout.referenceSize.width,
-                height: AppLayout.referenceSize.height
-            )
-            .clipped()
+        }
+        .frame(
+            width: AppLayout.referenceSize.width,
+            height: AppLayout.referenceSize.height
+        )
+        .contentShape(Rectangle())
+        .gesture(dragGesture.exclusively(before: sectorTapGesture))
+        .clipped()
     }
 
     private var rotatingWheel: some View {
@@ -80,26 +82,26 @@ struct PatternWheelView: View {
                 }
 
                 let proposedAngle = Double(value.translation.height / 5)
+                let minimumAngle = -Double(max(patterns.count - 1 - selectedIndex, 0))
+                    * angleBetweenPatterns
+                let maximumAngle = Double(selectedIndex) * angleBetweenPatterns
                 dragAngle = min(
-                    max(proposedAngle, -angleBetweenPatterns),
-                    angleBetweenPatterns
+                    max(proposedAngle, minimumAngle),
+                    maximumAngle
                 )
             }
             .onEnded { value in
                 isDragging = false
 
-                let threshold: CGFloat = 45
-                let targetIndex: Int
+                guard !patterns.isEmpty else { return }
 
-                if value.predictedEndTranslation.height <= -threshold {
-                    targetIndex = min(selectedIndex + 1, patterns.count - 1)
-                } else if value.predictedEndTranslation.height >= threshold {
-                    targetIndex = max(selectedIndex - 1, 0)
-                } else {
-                    targetIndex = selectedIndex
-                }
+                let projectedAngle = Double(value.predictedEndTranslation.height / 5)
+                let projectedIndex = Double(selectedIndex) - projectedAngle / angleBetweenPatterns
+                let targetIndex = Int(
+                    min(max(projectedIndex, 0), Double(patterns.count - 1)).rounded()
+                )
 
-                selectPattern(at: targetIndex)
+                selectPattern(at: targetIndex, duration: 0.28)
             }
     }
 
@@ -128,34 +130,58 @@ struct PatternWheelView: View {
         let position = point(radius: labelCenterRadius, angle: angle)
         let isSelected = pattern.id == selectedPatternID
 
-        return Button {
-            selectPattern(at: index)
-        } label: {
-            VStack(alignment: .leading, spacing: AppLayout.patternOrderSpacing) {
-                Text(String(format: "%02d", pattern.suggestedOrder))
-                    .font(AppTypography.bungee(size: 30))
-                    .foregroundStyle(isSelected ? AppColors.yellowAccent : AppColors.tan)
+        return VStack(alignment: .leading, spacing: AppLayout.patternOrderSpacing) {
+            Text(String(format: "%02d", pattern.suggestedOrder))
+                .font(AppTypography.bungee(size: 30))
+                .foregroundStyle(isSelected ? AppColors.yellowAccent : AppColors.tan)
 
-                VStack(alignment: .leading, spacing: AppLayout.patternNameLineSpacing) {
-                    ForEach(patternNameLines(for: pattern), id: \.self) { line in
-                        OutlinedText(
-                            text: line,
-                            font: AppTypography.bungee(size: 40),
-                            foregroundColor: isSelected ? AppColors.white : AppColors.tan,
-                            outlineColor: AppColors.brownInk,
-                            outlineWidth: 3,
-                            shadowColor: AppColors.brownInk,
-                            shadowOffset: CGSize(width: 0, height: 7)
-                        )
-                    }
+            VStack(alignment: .leading, spacing: AppLayout.patternNameLineSpacing) {
+                ForEach(patternNameLines(for: pattern), id: \.self) { line in
+                    OutlinedText(
+                        text: line,
+                        font: AppTypography.bungee(size: 40),
+                        foregroundColor: isSelected ? AppColors.white : AppColors.tan,
+                        outlineColor: AppColors.brownInk,
+                        outlineWidth: 3,
+                        shadowColor: AppColors.brownInk,
+                        shadowOffset: CGSize(width: 0, height: 7)
+                    )
                 }
             }
-            .frame(width: AppLayout.patternLabelWidth, alignment: .leading)
-            .rotationEffect(.degrees(angle))
         }
-        .buttonStyle(.plain)
+        .frame(width: AppLayout.patternLabelWidth, alignment: .leading)
+        .rotationEffect(.degrees(angle))
         .position(position)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(pattern.name)
         .accessibilityValue(isSelected ? "Selected" : "")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { selectPattern(at: index) }
+    }
+
+    private var sectorTapGesture: some Gesture {
+        SpatialTapGesture()
+            .onEnded { value in
+                guard !isDragging, !isRotating else { return }
+
+                let dx = value.location.x - pivot.x
+                let dy = value.location.y - pivot.y
+                let radius = hypot(dx, dy)
+                let outerRadius = max(
+                    lineOuterRadius,
+                    AppLayout.patternLabelInnerRadius + AppLayout.patternLabelWidth
+                )
+                guard radius >= lineInnerRadius + 25, radius <= outerRadius else { return }
+
+                let screenAngle = atan2(dy, dx) * 180 / .pi
+                let relativeAngle = screenAngle - wheelRotation
+                let normalizedAngle = (relativeAngle + 360)
+                    .truncatingRemainder(dividingBy: 360)
+                let signedAngle = normalizedAngle > 360 - angleBetweenPatterns / 2
+                    ? normalizedAngle - 360 : normalizedAngle
+                let index = Int((signedAngle / angleBetweenPatterns).rounded())
+                selectPattern(at: index)
+            }
     }
 
     private var generatedPatternLines: some View {
@@ -189,7 +215,7 @@ struct PatternWheelView: View {
             .allowsHitTesting(false)
     }
 
-    private func selectPattern(at index: Int) {
+    private func selectPattern(at index: Int, duration: Double = 0.14) {
         guard patterns.indices.contains(index) else { return }
         interactionGeneration += 1
         let generation = interactionGeneration
@@ -199,7 +225,7 @@ struct PatternWheelView: View {
         }
 
         withAnimation(
-            .easeOut(duration: 0.14),
+            .easeOut(duration: duration),
             completionCriteria: .logicallyComplete
         ) {
             dragAngle = 0
