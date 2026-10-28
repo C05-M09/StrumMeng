@@ -13,8 +13,9 @@ final class ControllerMessageTests: XCTestCase {
             .stopSession,
             .strum(id: UUID(), direction: .down, hostTime: 1234.5678),
             .strum(id: UUID(), direction: .up, hostTime: nil),
-            .ping(sentAt: 10.25),
-            .pong(sentAt: 10.25, receivedAt: 99.75),
+            .ping(sentAt: 10.25, latencyMs: 12.5),
+            .ping(sentAt: 10.25, latencyMs: nil),
+            .pong(sentAt: 10.25, receivedAt: 99.75, sessionActive: true),
         ]
         for message in messages {
             XCTAssertEqual(try roundTrip(message), message)
