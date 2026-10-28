@@ -17,6 +17,12 @@ struct BPMRecommendationOverlay: View {
     var onKeepPrevious: () -> Void
     var onStartRecommended: (Int) -> Void
 
+    // MARK: - Animation States
+    @State private var bannersEntered: Bool = false
+    @State private var mascotEntered: Bool = false
+    @State private var bubbleEntered: Bool = false
+    @State private var buttonsEntered: Bool = false
+
     init(
         recommendation: RecommendedBPM,
         offTempoCount: Int,
@@ -58,29 +64,61 @@ struct BPMRecommendationOverlay: View {
         .ignoresSafeArea()
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
+        .onAppear {
+            triggerEntranceAnimation()
+        }
+    }
+
+    // MARK: - Arcade Entrance Choreography
+    private func triggerEntranceAnimation() {
+        // Step 1: Banners smash in simultaneously (Top from right-to-left, Bottom from left-to-right)
+        withAnimation(.spring(response: 0.42, dampingFraction: 0.72)) {
+            bannersEntered = true
+        }
+
+        // Step 2: Capybara dashes in from the left
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.75).delay(0.12)) {
+            mascotEntered = true
+        }
+
+        // Step 3: Comic speech bubble pops in with comic bounce
+        withAnimation(.spring(response: 0.38, dampingFraction: 0.65).delay(0.24)) {
+            bubbleEntered = true
+        }
+
+        // Step 4: Action buttons appear and lock into place
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.75).delay(0.36)) {
+            buttonsEntered = true
+        }
     }
 
     // MARK: - Overlay Canvas (1376 x 1032)
     @ViewBuilder
     private var overlayCanvas: some View {
         ZStack {
-            
+            // Capybara mascot with exam paper on the left
             capybaraMascot
-            
-            // Angled top & bottom comic banners
+                .offset(x: mascotEntered ? 0 : -140)
+                .opacity(mascotEntered ? 1.0 : 0.0)
+
+            // Angled top & bottom comic banners (Sliding in like a game intro)
             topBanner
             bottomBanner
 
             // Speech bubble with dynamic text
             speechBubble
+                .scaleEffect(bubbleEntered ? 1.0 : 0.1)
+                .opacity(bubbleEntered ? 1.0 : 0.0)
 
             // Action buttons below the speech bubble
             actionButtons
+                .offset(y: buttonsEntered ? 0 : 25)
+                .opacity(buttonsEntered ? 1.0 : 0.0)
         }
         .frame(width: AppLayout.referenceSize.width, height: AppLayout.referenceSize.height)
     }
 
-    // MARK: - Top Angled Banner
+    // MARK: - Top Angled Banner (Masuk dari KANAN ke KIRI seperti intro game)
     private var topBanner: some View {
         ZStack {
             TopAngledBannerShape()
@@ -89,9 +127,10 @@ struct BPMRecommendationOverlay: View {
             TopAngledBannerLine()
                 .stroke(AppColors.white, lineWidth: 8)
         }
+        .offset(x: bannersEntered ? 0 : AppLayout.referenceSize.width + 400)
     }
 
-    // MARK: - Bottom Angled Banner
+    // MARK: - Bottom Angled Banner (Masuk dari KIRI ke KANAN seperti intro game)
     private var bottomBanner: some View {
         ZStack {
             BottomAngledBannerShape()
@@ -100,6 +139,7 @@ struct BPMRecommendationOverlay: View {
             BottomAngledBannerLine()
                 .stroke(AppColors.white, lineWidth: 8)
         }
+        .offset(x: bannersEntered ? 0 : -(AppLayout.referenceSize.width + 400))
     }
 
     // MARK: - Capybara Mascot
@@ -180,14 +220,17 @@ struct BPMRecommendationOverlay: View {
 private struct TopAngledBannerShape: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
-        // Bleed beyond edges so no gap appears on non-standard aspect ratios
+        // Generous trailing bleed on the right so no gap appears during spring overshoot
         let leftY: CGFloat = 68
         let rightY: CGFloat = 164
+        let slope = (rightY - leftY) / rect.width
+        let minX: CGFloat = -200
+        let maxX: CGFloat = rect.width + 1200
 
-        path.move(to: CGPoint(x: -100, y: -200))
-        path.addLine(to: CGPoint(x: rect.width + 100, y: -200))
-        path.addLine(to: CGPoint(x: rect.width + 100, y: rightY + (100 * (164 - 68) / 1376)))
-        path.addLine(to: CGPoint(x: -100, y: leftY - (100 * (164 - 68) / 1376)))
+        path.move(to: CGPoint(x: minX, y: -200))
+        path.addLine(to: CGPoint(x: maxX, y: -200))
+        path.addLine(to: CGPoint(x: maxX, y: leftY + slope * maxX))
+        path.addLine(to: CGPoint(x: minX, y: leftY + slope * minX))
         path.closeSubpath()
         return path
     }
@@ -199,8 +242,10 @@ private struct TopAngledBannerLine: Shape {
         let leftY: CGFloat = 68
         let rightY: CGFloat = 164
         let slope = (rightY - leftY) / rect.width
-        path.move(to: CGPoint(x: -100, y: leftY - 100 * slope))
-        path.addLine(to: CGPoint(x: rect.width + 100, y: rightY + 100 * slope))
+        let minX: CGFloat = -200
+        let maxX: CGFloat = rect.width + 1200
+        path.move(to: CGPoint(x: minX, y: leftY + slope * minX))
+        path.addLine(to: CGPoint(x: maxX, y: leftY + slope * maxX))
         return path
     }
 }
@@ -208,14 +253,17 @@ private struct TopAngledBannerLine: Shape {
 private struct BottomAngledBannerShape: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
+        // Generous trailing bleed on the left so no gap appears during spring overshoot
         let leftY: CGFloat = 848
         let rightY: CGFloat = 944
         let slope = (rightY - leftY) / rect.width
+        let minX: CGFloat = -1200
+        let maxX: CGFloat = rect.width + 200
 
-        path.move(to: CGPoint(x: -100, y: leftY - 100 * slope))
-        path.addLine(to: CGPoint(x: rect.width + 100, y: rightY + 100 * slope))
-        path.addLine(to: CGPoint(x: rect.width + 100, y: rect.height + 200))
-        path.addLine(to: CGPoint(x: -100, y: rect.height + 200))
+        path.move(to: CGPoint(x: minX, y: leftY + slope * minX))
+        path.addLine(to: CGPoint(x: maxX, y: leftY + slope * maxX))
+        path.addLine(to: CGPoint(x: maxX, y: rect.height + 200))
+        path.addLine(to: CGPoint(x: minX, y: rect.height + 200))
         path.closeSubpath()
         return path
     }
@@ -227,8 +275,10 @@ private struct BottomAngledBannerLine: Shape {
         let leftY: CGFloat = 848
         let rightY: CGFloat = 944
         let slope = (rightY - leftY) / rect.width
-        path.move(to: CGPoint(x: -100, y: leftY - 100 * slope))
-        path.addLine(to: CGPoint(x: rect.width + 100, y: rightY + 100 * slope))
+        let minX: CGFloat = -1200
+        let maxX: CGFloat = rect.width + 200
+        path.move(to: CGPoint(x: minX, y: leftY + slope * minX))
+        path.addLine(to: CGPoint(x: maxX, y: leftY + slope * maxX))
         return path
     }
 }
