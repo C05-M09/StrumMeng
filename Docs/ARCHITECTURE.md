@@ -179,12 +179,24 @@ enum ControllerConnectionState: Sendable, Equatable {
     case connected(latencyMs: Double)
 }
 
-protocol ControllerLink: Sendable {
+// iPad side. Refines StrumInputService so the game loop can take it in place of on-screen swipes.
+protocol ControllerLink: StrumInputService {
     var connectionStates: AsyncStream<ControllerConnectionState> { get }
     var strums: AsyncStream<StrumEvent> { get }
+    var pairCode: PairCode { get }                 // shown on the iPad, entered once on the iPhone
     func start() async throws
     func refreshIfNeeded() async throws
+    func setSessionActive(_ active: Bool) async    // iPhone sends strums only while true
     func stop() async
+}
+
+// iPhone side.
+protocol ControllerClient: Sendable {
+    var connectionStates: AsyncStream<ControllerConnectionState> { get }
+    var sessionActive: AsyncStream<Bool> { get }
+    func connect(pairCode: PairCode) async
+    func send(_ direction: StrumDirection, touchTime: TimeInterval) async
+    func disconnect() async
 }
 
 protocol BeatClock: Sendable {
@@ -216,6 +228,10 @@ Every type above has a mock \(MockControllerLink emits scripted strums: on\-time
 - Gesture \(iPhone\): a swipe with N fingers \(default 2\) past a distance threshold is one strum; the<br>direction comes from the swipe\. Single\-finger touches are ignored so the palm can rest on the screen\.<br>Sensitivity, finger count and invert are controller settings stored on the iPhone\.
 - Transport: Wi\-Fi Aware \(iOS 26\) is the primary path: the devices are paired once with the system<br>pairing UI \(DeviceDiscoveryUI\), then connect directly without a router\. Regular Wi\-Fi via Bonjour<br>with a 6\-digit pair code is the fallback\. Both use the same message format\.
 - Messages: UDP\. Each strum is sent several times \(3 copies\) so one lost packet does not lose the<br>strum; the iPad de\-duplicates them inside the link before they become a StrumEvent\.
+- Message format: ControllerMessage \(hello, startSession, stopSession, strum, ping, pong\), JSON over<br>one datagram each\. ping carries the latency the iPhone measured so the iPad can show it; pong<br>repeats whether a session is playing, so a lost startSession/stopSession corrects itself within a<br>second\. Start/stop are also sent as 3 copies\.
+- Session gating: the iPad calls setSessionActive when a session starts or ends\. The iPhone sends<br>strums only while a session is playing, and the iPad also drops any strum outside one\.
+- Structure: what each message means lives in pure, unit\-tested HostMessageHandler \(iPad\) and<br>ClientMessageHandler \(iPhone\)\. Each transport is a thin actor whose executor is its Network<br>callback queue \(BonjourControllerLink, BonjourControllerClient\), verified on real devices\.
+- Bonjour security: UDP with DTLS using a pre\-shared key derived from the 6\-digit PairCode, so only an<br>iPhone that knows the code can connect\. A device that fails the handshake never replaces the<br>connected controller\.
 - Timing: the strum time is when the finger moved on the iPhone, not when the message arrived\. The<br>link measures a clock offset between the two devices with ping/pong \(lowest round trip of recent<br>samples\) and converts the iPhone touch time into iPad host time\. Network delay therefore does not<br>count against the player\.
 - Liveness: the iPhone pings every second\. No message for about 4–5 seconds means disconnected; the<br>link reconnects automatically\.
 - Wi\-Fi Aware publishing has a system time limit; when it expires the connection drops\. The link<br>requests a long publish duration, restarts publishing when it expires, and is refreshed before a<br>session starts if it is old \(§3\.1\.4\), never during playing\.

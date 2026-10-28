@@ -13,10 +13,13 @@ nonisolated enum ControllerMessage: Codable, Sendable, Equatable {
     /// `hostTime` is when the finger moved, already on the iPad host clock, or nil while the
     /// clocks are not synced yet (the iPad then falls back to the arrival time).
     case strum(id: UUID, direction: StrumDirection, hostTime: TimeInterval?)
-    /// iPhone → iPad, carrying the iPhone clock when it was sent.
-    case ping(sentAt: TimeInterval)
+    /// iPhone → iPad, carrying the iPhone clock when it was sent and the latency the iPhone
+    /// measured so far, so the iPad can show it too.
+    case ping(sentAt: TimeInterval, latencyMs: Double?)
     /// iPad → iPhone: echoes the ping time and adds when the ping arrived, on the iPad host clock.
-    case pong(sentAt: TimeInterval, receivedAt: TimeInterval)
+    /// Also repeats whether a session is playing, so a lost startSession or stopSession packet
+    /// corrects itself within one ping.
+    case pong(sentAt: TimeInterval, receivedAt: TimeInterval, sessionActive: Bool)
 
     init(data: Data) throws {
         self = try JSONDecoder().decode(Self.self, from: data)

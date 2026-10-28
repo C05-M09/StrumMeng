@@ -1,7 +1,7 @@
 import Foundation
 
 /// One strum from the player, already on the iPad host clock.
-struct StrumEvent: Identifiable, Codable, Sendable, Equatable {
+nonisolated struct StrumEvent: Identifiable, Codable, Sendable, Equatable {
     /// Used to de-duplicate redundant copies from the iPhone link.
     let id: UUID
     let direction: StrumDirection
