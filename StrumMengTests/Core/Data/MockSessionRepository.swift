@@ -8,13 +8,14 @@ actor MockSessionRepository: SessionRepository {
     private var stubbedRecords: [SessionResult] = []
     private var stubbedLastBPM: Int?
 
+    /// Every call to `topRecords`, so a test can check what the view model asked for.
+    private(set) var topRecordsCalls: [(patternID: String, limit: Int?, sortedBy: RecordSortCriterion)] = []
+
     func stub(records: [SessionResult], lastBPM: Int?) {
         stubbedRecords = records
         stubbedLastBPM = lastBPM
     }
-    
-    
-    
+
     func save(_ result: SessionResult) async throws {
         guard !savedResults.contains(where: { $0.id == result.id }) else { return }
         savedResults.append(result)
@@ -28,14 +29,15 @@ actor MockSessionRepository: SessionRepository {
         stubbedLastBPM
     }
 
+    /// Returns the stubbed records in the order the test gave them, cut to `limit` when there is one.
+    /// It does not sort: stub the records already in the order you expect.
     func topRecords(
         patternID: String,
         limit: Int?,
         sortedBy: RecordSortCriterion
     ) async throws -> [SessionResult] {
-        if let limit {
-            return Array(stubbedRecords.prefix(limit))
-        }
-        return stubbedRecords
+        topRecordsCalls.append((patternID: patternID, limit: limit, sortedBy: sortedBy))
+        guard let limit else { return stubbedRecords }
+        return Array(stubbedRecords.prefix(limit))
     }
 }
