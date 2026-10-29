@@ -4,9 +4,9 @@ struct ContentView: View {
     @State private var router: AppRouter
     @State private var patternListViewModel: PatternListViewModel
 
-    init() {
+    init(inMemory: Bool = false) {
         let router = AppRouter()
-        let container = AppContainer(router: router)
+        let container = AppContainer(router: router, inMemory: inMemory)
         _router = State(initialValue: router)
         _patternListViewModel = State(initialValue: container.makePatternListViewModel())
     }
@@ -34,5 +34,5 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView()
+    ContentView(inMemory: true)
 }
