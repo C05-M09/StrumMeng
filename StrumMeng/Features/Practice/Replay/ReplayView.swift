@@ -64,18 +64,15 @@ struct ReplayView: View {
     private func header(_ layout: PlayScreenLayout, _ model: PlayScreenModel) -> some View {
         let u = layout.unit
         return ZStack(alignment: .topLeading) {
-            // Tombol Pause di pojok kiri atas (sesuai posisi Play screen)
+            // Tombol Pause di pojok kiri atas (sesuai posisi Play & Listen)
             PauseButton(
                 size: layout.pauseSize,
-                isPaused: false,
+                isPaused: viewModel.state == .paused,
                 action: {
-                    switch viewModel.state {
-                    case .playing:
+                    if viewModel.state == .playing {
                         viewModel.send(.pause)
-                    case .paused:
+                    } else if viewModel.state == .paused {
                         viewModel.send(.play)
-                    case .ready, .finished, .dismissed:
-                        viewModel.send(.backToSummary)
                     }
                 }
             )
@@ -136,94 +133,27 @@ struct ReplayView: View {
         switch viewModel.state {
         case .ready:
             ReplayReadyOverlay {
-                viewModel.send(.play)
+                withAnimation(.easeOut(duration: 0.25)) {
+                    viewModel.send(.play)
+                }
             }
             .transition(.opacity)
 
         case .paused:
-            pausedOverlay(layout)
+            ZStack {
+                AppColor.dim.opacity(0.6)
+                PauseMenuOverlay(
+                    unit: layout.unit,
+                    onResume: { viewModel.send(.play) },
+                    onRestart: { viewModel.send(.restart) },
+                    onBackToMenu: { viewModel.send(.backToSummary) }
+                )
+                .transition(.scale(scale: 0.9).combined(with: .opacity))
+            }
+            .transition(.opacity)
 
         case .finished, .playing, .dismissed:
             EmptyView()
-        }
-    }
-
-    // MARK: 2. Paused Overlay
-    private func pausedOverlay(_ layout: PlayScreenLayout) -> some View {
-        ZStack {
-            AppColor.dim.opacity(0.6)
-
-            replayCard(
-                unit: layout.unit,
-                title: "REPLAY PAUSED",
-                content: {
-                    VStack(spacing: 12 * layout.unit) {
-                        ChunkyButton(
-                            title: "RESUME",
-                            style: .primary,
-                            fontSize: 22 * layout.unit,
-                            width: 280 * layout.unit,
-                            height: 48 * layout.unit,
-                            action: { viewModel.send(.play) }
-                        )
-
-                        ChunkyButton(
-                            title: "RESTART",
-                            style: .primary,
-                            fontSize: 22 * layout.unit,
-                            width: 280 * layout.unit,
-                            height: 48 * layout.unit,
-                            action: { viewModel.send(.restart) }
-                        )
-
-                        ChunkyButton(
-                            title: "BACK TO SUMMARY",
-                            style: .secondary,
-                            fontSize: 20 * layout.unit,
-                            width: 280 * layout.unit,
-                            height: 48 * layout.unit,
-                            action: { viewModel.send(.backToSummary) }
-                        )
-                    }
-                }
-            )
-        }
-        .transition(.opacity)
-    }
-
-
-    // MARK: - Helper UI Components
-
-    private func replayCard<Content: View>(
-        unit: CGFloat,
-        title: String,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        let radius = 22 * unit
-        let outline = 4 * unit
-        let card = RoundedRectangle(cornerRadius: radius)
-
-        return VStack(spacing: 16 * unit) {
-            Text(title)
-                .font(AppFont.display(32 * unit))
-                .multilineTextAlignment(.center)
-                .foregroundStyle(AppColor.ink)
-                .padding(.bottom, 4 * unit)
-
-            content()
-        }
-        .padding(.horizontal, 54 * unit)
-        .padding(.top, 40 * unit)
-        .padding(.bottom, 44 * unit)
-        .background {
-            ZStack {
-                // Bayangan tepi bawah card
-                card.fill(AppColor.boardRed).offset(y: 10 * unit)
-                card.strokeBorder(AppColor.ink, lineWidth: outline).offset(y: 10 * unit)
-                // Warna kertas card
-                card.fill(AppColor.paper)
-                card.strokeBorder(AppColor.ink, lineWidth: outline)
-            }
         }
     }
 
