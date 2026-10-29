@@ -14,4 +14,5 @@ enum SummaryEvent: Equatable, Sendable {
     case tapBackToMain
     case acceptRecommendation
     case rejectRecommendation
+    case returnFromReplay
 }

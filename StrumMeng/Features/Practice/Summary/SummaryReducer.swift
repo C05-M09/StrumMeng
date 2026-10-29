@@ -36,6 +36,9 @@ func reduce(_ state: SummaryState, _ event: SummaryEvent) -> SummaryState {
     case (.showingRecommendation, .tapBackToMain):
         return .navigating(.backToMain)
 
+    case (.navigating(.replay(let result)), .returnFromReplay):
+        return .showing(result)
+
     default:
         return state
     }

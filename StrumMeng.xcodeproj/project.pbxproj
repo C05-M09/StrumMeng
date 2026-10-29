@@ -39,7 +39,6 @@
 				Features/Practice/List/.gitkeep,
 				Features/Practice/Listen/.gitkeep,
 				Features/Practice/Play/.gitkeep,
-				Features/Practice/Replay/.gitkeep,
 				Info.plist,
 			);
 			target = 000000000000000100000000 /* StrumMeng */;

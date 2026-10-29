@@ -34,6 +34,15 @@ final class SummaryReducerTests: XCTestCase {
         XCTAssertEqual(next, .navigating(.replay(result)))
     }
 
+    func test_returnFromReplay_fromNavigatingReplay_transitionsBackToShowing() {
+        let result = makeSampleResult()
+        let initial = SummaryState.navigating(.replay(result))
+
+        let next = reduce(initial, .returnFromReplay)
+
+        XCTAssertEqual(next, .showing(result))
+    }
+
     func test_tapRetry_fromShowing_transitionsToShowingRecommendation() {
         let result = makeSampleResult(accuracy: 0.90, bpm: 80)
         let initial = SummaryState.showing(result)
