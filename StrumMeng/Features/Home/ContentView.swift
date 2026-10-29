@@ -33,6 +33,14 @@ struct ContentView: View {
                     case let .listen(patternID, bpm):
                         if let pattern = PatternCatalog.all.first(where: { $0.id == patternID }) {
                             ListenPlaceholderView(pattern: pattern, bpm: bpm, onBack: { router.pop() })
+                            ListenView(viewModel: AppContainer(router: router)
+                                .makeListenViewModel(pattern: pattern, bpm: bpm))
+                        }
+                    case let .play(patternID, bpm):
+                        if let pattern = PatternCatalog.all.first(where: { $0.id == patternID }) {
+                            PracticePlaySessionView(viewModel: AppContainer(router: router)
+                                .makePlayViewModel(pattern: pattern, bpm: bpm), startImmediately: true)
+                                .navigationBarBackButtonHidden()
                         }
                     }
                     
