@@ -14,9 +14,6 @@ enum ListenLayout {
     static let trackWidth: CGFloat = 1140
     static let trackHeight: CGFloat = 30
     static let trackCenterX: CGFloat = 690
-    static let informationTravel: CGFloat = 90
-    static let informationDuration: Double = 0.42
-    static let informationStagger: Double = 0.08
     static let titleLineSpacing: CGFloat = -20
     static let informationBannerSize = CGSize(width: 1500, height: 616)
     static let informationBannerCenter = CGPoint(x: 688, y: 516)
@@ -146,18 +143,17 @@ struct ListenView: View {
                 .frame(width: ListenLayout.informationBannerSize.width,
                        height: ListenLayout.informationBannerSize.height)
                 .position(ListenLayout.informationBannerCenter)
-                .modifier(informationEntrance(y: ListenLayout.informationTravel / 3))
+                .modifier(informationEntrance(.banner))
                 .allowsHitTesting(false)
             Image("Retry_Character").resizable().scaledToFit()
                 .frame(width: ListenLayout.informationCharacterSize.width,
                        height: ListenLayout.informationCharacterSize.height)
                 .position(ListenLayout.informationCharacterCenter)
-                .modifier(informationEntrance(delay: 0.08, x: -ListenLayout.informationTravel))
-            Group {
+                .modifier(informationEntrance(.mascot))
+            ZStack {
                 Image("Listen_Bubble").resizable().scaledToFit()
                     .frame(width: ListenLayout.informationBubbleSize.width,
                            height: ListenLayout.informationBubbleSize.height)
-                    .position(ListenLayout.informationBubbleCenter)
                 VStack(spacing: 2) {
                     Text("Read and listen to the pattern,")
                     Text("then strum along when you’re ready.")
@@ -165,22 +161,24 @@ struct ListenView: View {
                 }
                     .font(AppTypography.dmMono(size: 28)).multilineTextAlignment(.center)
                     .foregroundStyle(AppColors.brownInk)
-                    .frame(width: 720).position(ListenLayout.informationTextCenter)
+                    .frame(width: 720)
+                    .offset(x: ListenLayout.informationTextCenter.x - ListenLayout.informationBubbleCenter.x,
+                            y: ListenLayout.informationTextCenter.y - ListenLayout.informationBubbleCenter.y)
             }
-            .modifier(informationEntrance(delay: ListenLayout.informationStagger * 2,
-                                          y: ListenLayout.informationTravel / 3))
+            .frame(width: ListenLayout.informationBubbleSize.width,
+                   height: ListenLayout.informationBubbleSize.height)
+            .modifier(informationEntrance(.bubble))
+            .position(ListenLayout.informationBubbleCenter)
             assetButton("Next", normal: "Button_Next_Normal", pressed: "Button_Next_Pressed",
                         size: CGSize(width: 252, height: 112)) { viewModel.send(.next) }
                 .position(ListenLayout.informationNextCenter)
-                .modifier(informationEntrance(delay: ListenLayout.informationStagger * 3,
-                                              y: ListenLayout.informationTravel / 4))
+                .modifier(informationEntrance(.buttons))
         }
     }
     
-    private func informationEntrance(delay: Double = 0, x: CGFloat = 0,
-                                     y: CGFloat = 0) -> ListenInformationEntrance {
+    private func informationEntrance(_ stage: ListenInformationEntrance.Stage) -> ListenInformationEntrance {
         ListenInformationEntrance(visible: informationVisible, reduceMotion: reduceMotion,
-                                  duration: ListenLayout.informationDuration, delay: delay, x: x, y: y)
+                                  stage: stage, canvasWidth: ListenLayout.size.width)
     }
     
     private var pauseMenu: some View {
