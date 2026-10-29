@@ -25,6 +25,10 @@ struct ReplayView: View {
 
     var body: some View {
         GeometryReader { geo in
+            let scale = max(
+                geo.size.width / AppLayout.referenceSize.width,
+                geo.size.height / AppLayout.referenceSize.height
+            )
             let layout = PlayScreenLayout(size: geo.size)
             let model = viewModel.screenModel()
 
@@ -43,7 +47,7 @@ struct ReplayView: View {
                 header(layout, model)
 
                 // 4. Lapisan Overlay (Ready, Paused, Finished)
-                overlays(layout)
+                overlays(layout, scale: scale)
             }
             .frame(width: geo.size.width, height: geo.size.height)
             .animation(.easeOut(duration: 0.2), value: viewModel.state)
@@ -64,17 +68,22 @@ struct ReplayView: View {
     private func header(_ layout: PlayScreenLayout, _ model: PlayScreenModel) -> some View {
         let u = layout.unit
         return ZStack(alignment: .topLeading) {
-            // Tombol Pause di pojok kiri atas (sesuai posisi Play & Listen)
-            PauseButton(
-                size: layout.pauseSize,
-                isPaused: viewModel.state == .paused,
-                action: {
+            // Tombol Pause di pojok kiri atas (sesuai ListenView & Play)
+            Button("Pause") {
+                withAnimation(.easeOut(duration: 0.2)) {
                     if viewModel.state == .playing {
                         viewModel.send(.pause)
                     } else if viewModel.state == .paused {
                         viewModel.send(.play)
                     }
                 }
+            }
+            .buttonStyle(
+                AssetButtonStyle(
+                    normalAssetName: "Button_Pause_Normal",
+                    pressedAssetName: "Button_Pause_Pressed",
+                    size: CGSize(width: 90 * (layout.pauseSize / 86), height: 98 * (layout.pauseSize / 86))
+                )
             )
             .position(layout.pauseCenter)
 
@@ -129,7 +138,7 @@ struct ReplayView: View {
     // MARK: - Lapisan Overlay (Ready, Paused, Finished)
 
     @ViewBuilder
-    private func overlays(_ layout: PlayScreenLayout) -> some View {
+    private func overlays(_ layout: PlayScreenLayout, scale: CGFloat) -> some View {
         switch viewModel.state {
         case .ready:
             ReplayReadyOverlay {
@@ -140,21 +149,74 @@ struct ReplayView: View {
             .transition(.opacity)
 
         case .paused:
-            ZStack {
-                AppColor.dim.opacity(0.6)
-                PauseMenuOverlay(
-                    unit: layout.unit,
-                    onResume: { viewModel.send(.play) },
-                    onRestart: { viewModel.send(.restart) },
-                    onBackToMenu: { viewModel.send(.backToSummary) }
-                )
-                .transition(.scale(scale: 0.9).combined(with: .opacity))
-            }
-            .transition(.opacity)
+            pauseMenu(scale: scale)
 
         case .finished, .playing, .dismissed:
             EmptyView()
         }
+    }
+
+    // MARK: - Pause Menu (Sama persis seperti ListenView.pauseMenu)
+    private func pauseMenu(scale: CGFloat) -> some View {
+        ZStack {
+            AppColors.brownInk.opacity(0.65)
+                .ignoresSafeArea()
+
+            ZStack {
+                Image("Option_Card")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 800, height: 720)
+
+                VStack(spacing: 20) {
+                    Text("ARE YOU SURE YOU WANT\nTO END THE SESSION?")
+                        .font(AppTypography.bungee(size: 45))
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(AppColors.brownInk)
+                        .padding(.bottom, 12)
+
+                    Button("Resume") {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            viewModel.send(.play)
+                        }
+                    }
+                    .buttonStyle(
+                        AssetButtonStyle(
+                            normalAssetName: "Button_Resume_Normal",
+                            pressedAssetName: "Button_Resume_Pressed",
+                            size: CGSize(width: 510, height: 88)
+                        )
+                    )
+
+                    Button("Restart") {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            viewModel.send(.restart)
+                        }
+                    }
+                    .buttonStyle(
+                        AssetButtonStyle(
+                            normalAssetName: "Button_Restart_Normal",
+                            pressedAssetName: "Button_Restart_Pressed",
+                            size: CGSize(width: 510, height: 88)
+                        )
+                    )
+
+                    Button("Back to Menu") {
+                        viewModel.send(.backToSummary)
+                    }
+                    .buttonStyle(
+                        AssetButtonStyle(
+                            normalAssetName: "Button_Back to Menu_Normal",
+                            pressedAssetName: "Button_Back to Menu_Pressed",
+                            size: CGSize(width: 510, height: 88)
+                        )
+                    )
+                }
+            }
+            .scaleEffect(scale)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .transition(.opacity)
     }
 
 }

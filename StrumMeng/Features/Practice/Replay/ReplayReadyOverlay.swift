@@ -122,8 +122,8 @@ struct ReplayReadyOverlay: View {
         Image("Retry_Character")
             .resizable()
             .scaledToFit()
-            .frame(width: 960, height: 1020)
-            .position(x: 450, y: 620)
+            .frame(width: 920)
+            .position(x: 450, y: 567)
     }
 
     // MARK: - Speech Bubble (Listen_Bubble)
