@@ -115,6 +115,17 @@ func reduce(_ state: PracticeState, _ event: PracticeEvent) -> PracticeState {
 
 #### 3\.1\.3 Listen screen
 
+US3 implementation: the list routes to Listen's information state, followed by the looping audio
+example. `ListenViewModel` owns `ListenState` and a pure reducer; `ListenPatternPlayer` isolates
+audio output. `GuitarListenPlayer` composes a loop from the supplied mono Down/Up WAV files,
+overlaps their decays, preserves silent rest slots, and exposes AVAudioPlayerNode sample time to
+drive the marker. Ready unlocks after one full loop, and routes through AppRouter into the existing
+Play session/count-in. Pause preserves playback position; Restart resets the first-loop requirement;
+Back returns to the pattern list. Leaving the screen, backgrounding, or an audio interruption stops
+or pauses playback. Audio files are bundled under Resources/Audio; direction labels follow the
+user-provided mapping, not automatic classification. The current Play route uses the existing
+on-iPad swipe input; controller pairing and finished-session navigation remain separate work.
+
 The user hears the correct pattern before playing\. It can be replayed any number of times, then Next<br>leads to Ready\. PatternPlayer plays the pattern at the chosen BPM \(a guitar sample or click\-accent<br>sound \[Assumption\]; the prototype synthesises the guitar sound on device\) and stops when the user<br>leaves the screen\.
 
 #### 3\.1\.4 Ready, count\-in and Play
