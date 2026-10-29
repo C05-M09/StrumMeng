@@ -6,7 +6,5 @@
 	<array>
 		<string>_strummeng._udp</string>
 	</array>
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>StrumMeng connects your iPhone and iPad on the local network so your iPhone can be your strumming controller.</string>
 </dict>
 </plist>
