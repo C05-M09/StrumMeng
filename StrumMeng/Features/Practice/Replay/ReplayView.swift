@@ -135,7 +135,10 @@ struct ReplayView: View {
     private func overlays(_ layout: PlayScreenLayout) -> some View {
         switch viewModel.state {
         case .ready:
-            readyOverlay(layout)
+            ReplayReadyOverlay {
+                viewModel.send(.play)
+            }
+            .transition(.opacity)
 
         case .paused:
             pausedOverlay(layout)
@@ -143,33 +146,6 @@ struct ReplayView: View {
         case .finished, .playing, .dismissed:
             EmptyView()
         }
-    }
-
-    // MARK: 1. Ready Overlay (Tunggu klik untuk mulai)
-    private func readyOverlay(_ layout: PlayScreenLayout) -> some View {
-        ZStack {
-            AppColor.dim.opacity(0.55)
-
-            VStack(spacing: 18 * layout.unit) {
-                PlayCalloutView(text: "READY TO REPLAY", fontSize: 50 * layout.unit)
-
-                ChunkyButton(
-                    title: "START PLAY",
-                    style: .primary,
-                    fontSize: 24 * layout.unit,
-                    width: 260 * layout.unit,
-                    height: 52 * layout.unit,
-                    hasDropShadow: true,
-                    action: { viewModel.send(.play) }
-                )
-            }
-            .position(layout.calloutCenter)
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            viewModel.send(.play)
-        }
-        .transition(.opacity)
     }
 
     // MARK: 2. Paused Overlay
@@ -259,10 +235,10 @@ struct ReplayView: View {
     let result = SessionResultBuilder.build(
         id: UUID(),
         patternID: "foundation",
-        bpm: 120,
+        bpm: 80,
         beatEvents: [
             BeatEvent(stepIndex: 0, result: .perfect, offsetMs: 0),
-            BeatEvent(stepIndex: 2, result: .tooEarly, offsetMs: -50)
+            BeatEvent(stepIndex: 2, result: .tooEarly, offsetMs: -10),
         ],
         createdAt: Date()
     )
@@ -273,7 +249,7 @@ struct ReplayView: View {
     let result = SessionResultBuilder.build(
         id: UUID(),
         patternID: "foundation",
-        bpm: 120,
+        bpm: 80,
         beatEvents: [
             BeatEvent(stepIndex: 0, result: .perfect, offsetMs: 0),
             BeatEvent(stepIndex: 2, result: .tooEarly, offsetMs: -40),
