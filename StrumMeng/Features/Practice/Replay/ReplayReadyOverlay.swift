@@ -113,8 +113,8 @@ struct ReplayReadyOverlay: View {
         Image("Replay_Box")
             .resizable()
             .scaledToFit()
-            .frame(width: 1572)
-            .position(x: AppLayout.referenceSize.width / 2, y: AppLayout.referenceSize.height / 2)
+            .frame(width: 1500, height: 616)
+            .position(x: 688, y: 516)
     }
 
     // MARK: - Character Mascot (Retry_Character)
@@ -122,53 +122,44 @@ struct ReplayReadyOverlay: View {
         Image("Retry_Character")
             .resizable()
             .scaledToFit()
-            .frame(width: 920)
-            .position(x: 450, y: 567)
+            .frame(width: 960, height: 1020)
+            .position(x: 450, y: 620)
     }
 
-    // MARK: - Speech Bubble (Retry_Bubble)
+    // MARK: - Speech Bubble (Listen_Bubble)
     private var speechBubble: some View {
         ZStack {
             Image("Listen_Bubble")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 740)
+                .frame(width: 850, height: 320)
 
-            Text("Time for a replay. Let’s see\nhow you played!")
-                .font(AppFont.mono(30))
-                .fontWeight(.medium)
-                .foregroundStyle(AppColor.ink)
-                .multilineTextAlignment(.center)
-                .lineSpacing(8)
-                .frame(width: 580)
-                .offset(x: 35, y: -10)
+            VStack(spacing: 4) {
+                Text("Time for a replay.")
+                Text("Let’s see how you played!")
+            }
+            .font(AppTypography.dmMono(size: 28))
+            .fontWeight(.medium)
+            .multilineTextAlignment(.center)
+            .foregroundStyle(AppColors.brownInk)
+            .frame(width: 680)
+            .offset(x: 30, y: -5)
         }
-        .position(x: 850, y: 650)
+        .frame(width: 850, height: 320)
+        .position(x: 895, y: 680)
     }
 
-    // MARK: - NEXT Button
+    // MARK: - NEXT Button (Button_Next_Normal / Button_Next_Pressed)
     private var nextButton: some View {
-        Button(action: onStart) {
-            let shape = RoundedRectangle(cornerRadius: 14)
-            HStack(spacing: 8) {
-                Text("NEXT")
-                    .font(AppFont.display(24))
-                    .foregroundStyle(AppColor.ink)
-                Image(systemName: "play.fill")
-                    .font(.system(size: 18, weight: .black))
-                    .foregroundStyle(AppColor.ink)
-            }
-            .frame(width: 180, height: 54)
-            .background {
-                ZStack {
-                    shape.fill(AppColor.ink).offset(y: 5)
-                    shape.fill(AppColor.buttonPrimary)
-                    shape.strokeBorder(AppColor.ink, lineWidth: 3.5)
-                }
-            }
-        }
-        .buttonStyle(PressableButtonStyle())
-        .position(x: 1140, y: 580)
+        Button("Next", action: onStart)
+            .buttonStyle(
+                AssetButtonStyle(
+                    normalAssetName: "Button_Next_Normal",
+                    pressedAssetName: "Button_Next_Pressed",
+                    size: CGSize(width: 252, height: 112)
+                )
+            )
+            .position(x: 1190, y: 825)
     }
 }
 
