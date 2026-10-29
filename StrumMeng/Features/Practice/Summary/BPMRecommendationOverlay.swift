@@ -10,7 +10,7 @@ import SwiftUI
 /// An overlay presenting tempo recommendations following a practice session.
 ///
 /// Designed to be overlaid cleanly on top of `PracticePlayView` (or presented from `SummaryView`),
-/// without baking in any static game board or strum backgrounds.
+/// using the official Retry assets (`Retry_Box`, `Retry_Character`, `Retry_Bubble`).
 struct BPMRecommendationOverlay: View {
     let recommendation: RecommendedBPM
     let offTempoCount: Int
@@ -18,7 +18,7 @@ struct BPMRecommendationOverlay: View {
     var onStartRecommended: (Int) -> Void
 
     // MARK: - Animation States
-    @State private var bannersEntered: Bool = false
+    @State private var bannerEntered: Bool = false
     @State private var mascotEntered: Bool = false
     @State private var bubbleEntered: Bool = false
     @State private var buttonsEntered: Bool = false
@@ -44,7 +44,7 @@ struct BPMRecommendationOverlay: View {
 
             ZStack {
                 // 1. Semi-transparent dark comic dim layer
-                AppColor.dim.opacity(0.8)
+                AppColor.dim.opacity(0.82)
                     .ignoresSafeArea()
 
                 // 2. Main overlay content scaled to reference canvas (1376 x 1032)
@@ -71,12 +71,12 @@ struct BPMRecommendationOverlay: View {
 
     // MARK: - Arcade Entrance Choreography
     private func triggerEntranceAnimation() {
-        // Step 1: Banners smash in simultaneously (Top from right-to-left, Bottom from left-to-right)
+        // Step 1: Retry_Box (Red comic slash banner) slashes in from right to left
         withAnimation(.spring(response: 0.42, dampingFraction: 0.72)) {
-            bannersEntered = true
+            bannerEntered = true
         }
 
-        // Step 2: Capybara dashes in from the left
+        // Step 2: Retry_Character dashes in from the left
         withAnimation(.spring(response: 0.45, dampingFraction: 0.75).delay(0.12)) {
             mascotEntered = true
         }
@@ -96,21 +96,21 @@ struct BPMRecommendationOverlay: View {
     @ViewBuilder
     private var overlayCanvas: some View {
         ZStack {
-            // Capybara mascot with exam paper on the left
-            capybaraMascot
-                .offset(x: mascotEntered ? 0 : -140)
+            // 1. Red angled comic banner in the background (Retry_Box)
+            retryBanner
+                .offset(x: bannerEntered ? 0 : AppLayout.referenceSize.width + 400)
+
+            // 2. Character on the bottom left (Retry_Character)
+            retryCharacter
+                .offset(x: mascotEntered ? 0 : -AppLayout.referenceSize.width / 2)
                 .opacity(mascotEntered ? 1.0 : 0.0)
 
-            // Angled top & bottom comic banners (Sliding in like a game intro)
-            topBanner
-            bottomBanner
-
-            // Speech bubble with dynamic text
+            // 3. Speech bubble with dynamic text (Retry_Bubble)
             speechBubble
                 .scaleEffect(bubbleEntered ? 1.0 : 0.1)
                 .opacity(bubbleEntered ? 1.0 : 0.0)
 
-            // Action buttons below the speech bubble
+            // 4. Action buttons below the speech bubble
             actionButtons
                 .offset(y: buttonsEntered ? 0 : 25)
                 .opacity(buttonsEntered ? 1.0 : 0.0)
@@ -118,76 +118,67 @@ struct BPMRecommendationOverlay: View {
         .frame(width: AppLayout.referenceSize.width, height: AppLayout.referenceSize.height)
     }
 
-    // MARK: - Top Angled Banner (Masuk dari KANAN ke KIRI seperti intro game)
-    private var topBanner: some View {
-        ZStack {
-            TopAngledBannerShape()
-                .fill(AppColors.redAccent)
-
-            TopAngledBannerLine()
-                .stroke(AppColors.white, lineWidth: 8)
-        }
-        .offset(x: bannersEntered ? 0 : AppLayout.referenceSize.width + 400)
-    }
-
-    // MARK: - Bottom Angled Banner (Masuk dari KIRI ke KANAN seperti intro game)
-    private var bottomBanner: some View {
-        ZStack {
-            BottomAngledBannerShape()
-                .fill(AppColors.redAccent)
-
-            BottomAngledBannerLine()
-                .stroke(AppColors.white, lineWidth: 8)
-        }
-        .offset(x: bannersEntered ? 0 : -(AppLayout.referenceSize.width + 400))
-    }
-
-    // MARK: - Capybara Mascot
-    private var capybaraMascot: some View {
-        Image("Capybara")
+    // MARK: - Retry Banner (Retry_Box)
+    private var retryBanner: some View {
+        Image("Retry_Box")
             .resizable()
             .scaledToFit()
-            .frame(width: 580)
-            .position(x: 270, y: 545)
+            .frame(width: 1572)
+            .position(x: AppLayout.referenceSize.width / 2, y: AppLayout.referenceSize.height / 2)
     }
 
-    // MARK: - Speech Bubble
+    // MARK: - Character Mascot (Retry_Character)
+    private var retryCharacter: some View {
+        Image("Retry_Character")
+            .resizable()
+            .scaledToFit()
+            .frame(width: 920)
+            .position(x: 450, y: 567)
+    }
+
+    // MARK: - Speech Bubble (Retry_Bubble)
     private var speechBubble: some View {
         ZStack {
-            Image("Text_Box")
+            Image("Retry_Bubble")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 780)
+                .frame(width: 740)
 
             Text(speechText)
-                .font(AppTypography.dmMono(size: 24))
+                .font(AppTypography.dmMono(size: 23))
                 .fontWeight(.medium)
                 .foregroundStyle(AppColor.ink)
                 .multilineTextAlignment(.center)
                 .lineSpacing(4)
-                .frame(width: 560)
-                .offset(x: 24, y: -20)
+                .frame(width: 580)
+                .offset(x: 35, y: -5)
         }
-        .position(x: 885, y: 535)
+        .position(x: 880, y: 460)
     }
 
     // MARK: - Action Buttons
     private var actionButtons: some View {
         VStack(alignment: .leading, spacing: 16) {
-
             Button {
                 onStartRecommended(recommendation.targetBPM)
             } label: {
                 HStack(spacing: 12) {
                     Image(systemName: "play.fill")
                         .font(.system(size: 22, weight: .bold))
-                    Text("START WITH \(recommendation.targetBPM) BPM")
-                        .font(AppTypography.bungee(size: 40))
+                    OutlinedText(
+                        text: "Start With \(recommendation.targetBPM) BPM",
+                        font: AppTypography.bungee(size: 38),
+                        foregroundColor: AppColors.yellowAccent,
+                        outlineColor: AppColors.brownInk,
+                        outlineWidth: 5,
+                        shadowColor: AppColors.brownPrimary,
+                        shadowOffset: CGSize(width: 0, height: 0)
+                    )
                 }
-                .foregroundStyle(AppColors.yellowAccent)
+                .foregroundStyle(AppColors.brownInk)
             }
             .buttonStyle(OverlayScaleButtonStyle())
-            
+
             Button {
                 onKeepPrevious()
             } label: {
@@ -195,14 +186,14 @@ struct BPMRecommendationOverlay: View {
                     Image(systemName: "play.fill")
                         .font(.system(size: 22, weight: .bold))
                     Text("KEEP PREVIOUS BPM")
-                        .font(AppTypography.bungee(size: 40))
+                        .font(AppTypography.bungee(size: 38))
                 }
                 .foregroundStyle(Color.white)
             }
             .buttonStyle(OverlayScaleButtonStyle())
         }
-        .frame(width: 560, alignment: .leading)
-        .position(x: 870, y: 740)
+        .frame(width: 580, alignment: .leading)
+        .position(x: 960, y: 670)
     }
 
     // MARK: - Helpers
@@ -213,73 +204,6 @@ struct BPMRecommendationOverlay: View {
         } else {
             return "All on tempo! Ready to level up to \(recommendation.targetBPM) BPM, or keep practicing at your previous BPM?"
         }
-    }
-}
-
-// MARK: - Banner Shapes (Angles match reference canvas)
-private struct TopAngledBannerShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        // Generous trailing bleed on the right so no gap appears during spring overshoot
-        let leftY: CGFloat = 68
-        let rightY: CGFloat = 164
-        let slope = (rightY - leftY) / rect.width
-        let minX: CGFloat = -200
-        let maxX: CGFloat = rect.width + 1200
-
-        path.move(to: CGPoint(x: minX, y: -200))
-        path.addLine(to: CGPoint(x: maxX, y: -200))
-        path.addLine(to: CGPoint(x: maxX, y: leftY + slope * maxX))
-        path.addLine(to: CGPoint(x: minX, y: leftY + slope * minX))
-        path.closeSubpath()
-        return path
-    }
-}
-
-private struct TopAngledBannerLine: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let leftY: CGFloat = 68
-        let rightY: CGFloat = 164
-        let slope = (rightY - leftY) / rect.width
-        let minX: CGFloat = -200
-        let maxX: CGFloat = rect.width + 1200
-        path.move(to: CGPoint(x: minX, y: leftY + slope * minX))
-        path.addLine(to: CGPoint(x: maxX, y: leftY + slope * maxX))
-        return path
-    }
-}
-
-private struct BottomAngledBannerShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        // Generous trailing bleed on the left so no gap appears during spring overshoot
-        let leftY: CGFloat = 848
-        let rightY: CGFloat = 944
-        let slope = (rightY - leftY) / rect.width
-        let minX: CGFloat = -1200
-        let maxX: CGFloat = rect.width + 200
-
-        path.move(to: CGPoint(x: minX, y: leftY + slope * minX))
-        path.addLine(to: CGPoint(x: maxX, y: leftY + slope * maxX))
-        path.addLine(to: CGPoint(x: maxX, y: rect.height + 200))
-        path.addLine(to: CGPoint(x: minX, y: rect.height + 200))
-        path.closeSubpath()
-        return path
-    }
-}
-
-private struct BottomAngledBannerLine: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let leftY: CGFloat = 848
-        let rightY: CGFloat = 944
-        let slope = (rightY - leftY) / rect.width
-        let minX: CGFloat = -1200
-        let maxX: CGFloat = rect.width + 200
-        path.move(to: CGPoint(x: minX, y: leftY + slope * minX))
-        path.addLine(to: CGPoint(x: maxX, y: leftY + slope * maxX))
-        return path
     }
 }
 
