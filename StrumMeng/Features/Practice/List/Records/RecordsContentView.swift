@@ -13,17 +13,17 @@ struct RecordsContentView: View {
     let state: RecordsViewState
 
     private enum Layout {
-        static let rowHeight: CGFloat = 68
+        static let rowHeight: CGFloat = 95
         static let visibleRows: CGFloat = 3
         /// The design lets a piece of the 4th row peek out to hint that the list scrolls.
         /// Set to 0 for exactly 3 rows.
-        static let peek: CGFloat = 24
+        static let peek: CGFloat = 48
         /// Soft fade at the inner top and bottom edges so rows do not get cut off sharply.
         static let fadeTop: CGFloat = 16
         static let fadeBottom: CGFloat = Layout.peek
         /// Space between the row content and the scroll indicator.
         static let scrollTrailingInset: CGFloat = 28
-        static let headerSpacing: CGFloat = 8
+        static let headerSpacing: CGFloat = 4
         static let dividerHeight: CGFloat = 1
         static let sectionTitleSize: CGFloat = 30
         static let bodySize: CGFloat = 17
@@ -34,9 +34,9 @@ struct RecordsContentView: View {
         /// Tune it to the corner radius plus line width of the asset.
         static let frameCapInset: CGFloat = 40
         static let frameHorizontalPadding: CGFloat = 20
-        static let frameVerticalPadding: CGFloat = 16
+        static let frameVerticalPadding: CGFloat = 24
         /// The frame never grows wider than this, even if the card slot is wider.
-        static let frameMaxWidth: CGFloat = 520
+        static let frameMaxWidth: CGFloat = 555
     }
 
     private var listHeight: CGFloat { Layout.rowHeight * Layout.visibleRows }
