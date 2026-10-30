@@ -5,9 +5,11 @@ import SwiftUI
 struct PracticePlaySessionView: View {
     @State private var viewModel: PlayViewModel
     @Environment(\.scenePhase) private var scenePhase
+    private let startImmediately: Bool
 
-    init(viewModel: PlayViewModel) {
+    init(viewModel: PlayViewModel, startImmediately: Bool = false) {
         _viewModel = State(initialValue: viewModel)
+        self.startImmediately = startImmediately
     }
 
     var body: some View {
@@ -35,7 +37,10 @@ struct PracticePlaySessionView: View {
             )
         }
         .ignoresSafeArea()
-        .onAppear { viewModel.onAppear() }
+        .onAppear {
+            viewModel.onAppear()
+            if startImmediately { send(.tapReady) }
+        }
         .onDisappear { Task { await viewModel.onDisappear() } }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { send(.appMovedToBackground) }

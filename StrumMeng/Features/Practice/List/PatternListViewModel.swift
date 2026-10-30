@@ -5,12 +5,16 @@ import Observation
 @Observable
 final class PatternListViewModel {
     private(set) var state: PatternListState
+    let recordsViewModels: [String: RecordsViewModel]
+    let recordsFallbackState: RecordsViewState
 
     private let onListenRequested: (String, Int) -> Void
     private let onBackRequested: () -> Void
 
     init(
         patterns: [StrumPattern]? = nil,
+        recordsViewModels: [String: RecordsViewModel] = [:],
+        recordsFallbackState: RecordsViewState = .empty,
         onListenRequested: @escaping (String, Int) -> Void,
         onBackRequested: @escaping () -> Void
     ) {
@@ -29,6 +33,8 @@ final class PatternListViewModel {
 
         self.onListenRequested = onListenRequested
         self.onBackRequested = onBackRequested
+        self.recordsViewModels = recordsViewModels
+        self.recordsFallbackState = recordsFallbackState
     }
 
     func send(_ event: PatternListEvent) {
