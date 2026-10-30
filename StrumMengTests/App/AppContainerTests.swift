@@ -96,4 +96,92 @@ final class AppContainerTests: XCTestCase {
 
         XCTAssertNil(home.presentedOverlay)
     }
+    // MARK: - Practice session flow
+
+    private func finishedSession(bpm: Int = 80) -> SessionResult {
+        SessionResultBuilder.build(id: UUID(), patternID: "foundation", bpm: bpm,
+                                   beatEvents: PracticeFixtures.events([.perfect, .miss, .tooEarly, .miss]),
+                                   createdAt: Date())
+    }
+
+    /// Summary navigates once the session is saved, which takes a moment on the in-memory store.
+    private func waitForPath(_ expected: [AppRoute], on router: AppRouter) async throws {
+        for _ in 0..<200 where router.path != expected {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        XCTAssertEqual(router.path, expected)
+    }
+
+    func test_finishedSession_replacesPlayWithSummary() {
+        let container = AppContainer(router: router, inMemory: true)
+        router.path = [.practiceList, .listen(patternID: "foundation", bpm: 80), .play(patternID: "foundation", bpm: 80)]
+        let session = finishedSession()
+
+        container.sessionFinished(session)
+
+        XCTAssertEqual(router.path, [.practiceList, .listen(patternID: "foundation", bpm: 80),
+                                     .summary(sessionID: session.id)])
+        XCTAssertEqual(container.makeSummaryViewModel(sessionID: session.id)?.result, session)
+    }
+
+    func test_summaryForAnUnknownSession_isNil() {
+        let container = AppContainer(router: router, inMemory: true)
+
+        XCTAssertNil(container.makeSummaryViewModel(sessionID: UUID()))
+    }
+
+    func test_retry_listensAgainAtTheChosenTempo_andTheListKeepsIt() async throws {
+        let container = AppContainer(router: router, inMemory: true)
+        let list = container.makePatternListViewModel()
+        let session = finishedSession(bpm: 80)
+        router.path = [.practiceList, .listen(patternID: "foundation", bpm: 80), .play(patternID: "foundation", bpm: 80)]
+        container.sessionFinished(session)
+        let summary = try XCTUnwrap(container.makeSummaryViewModel(sessionID: session.id))
+
+        summary.send(.tapRetry)
+        guard case let .showingRecommendation(recommendation) = summary.state else {
+            return XCTFail("Retry should show the BPM recommendation first")
+        }
+        summary.send(.acceptRecommendation)
+
+        let bpm = recommendation.targetBPM
+        try await waitForPath([.practiceList, .listen(patternID: "foundation", bpm: bpm)], on: router)
+        XCTAssertEqual(list.state.selectedBPM, bpm)
+    }
+
+    func test_retryAtTheSameTempo_listensAgainAtThatTempo() async throws {
+        let container = AppContainer(router: router, inMemory: true)
+        let session = finishedSession(bpm: 75)
+        router.path = [.practiceList, .listen(patternID: "foundation", bpm: 75), .play(patternID: "foundation", bpm: 75)]
+        container.sessionFinished(session)
+        let summary = try XCTUnwrap(container.makeSummaryViewModel(sessionID: session.id))
+
+        summary.send(.tapRetry)
+        summary.send(.rejectRecommendation)
+
+        try await waitForPath([.practiceList, .listen(patternID: "foundation", bpm: 75)], on: router)
+    }
+
+    func test_backToMain_returnsToThePracticeList() async throws {
+        let container = AppContainer(router: router, inMemory: true)
+        let session = finishedSession()
+        router.path = [.practiceList, .listen(patternID: "foundation", bpm: 80), .play(patternID: "foundation", bpm: 80)]
+        container.sessionFinished(session)
+        let summary = try XCTUnwrap(container.makeSummaryViewModel(sessionID: session.id))
+
+        summary.send(.tapBackToMain)
+
+        try await waitForPath([.practiceList], on: router)
+    }
+
+    func test_backOnListen_returnsToThePracticeList() {
+        let container = AppContainer(router: router, inMemory: true)
+        let pattern = PatternCatalog.foundation
+        router.path = [.practiceList, .listen(patternID: pattern.id, bpm: 80)]
+        let listen = container.makeListenViewModel(pattern: pattern, bpm: 80)
+
+        listen.send(.back)
+
+        XCTAssertEqual(router.path, [.practiceList])
+    }
 }

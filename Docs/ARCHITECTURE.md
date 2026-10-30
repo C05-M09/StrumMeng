@@ -264,6 +264,8 @@ Shows pattern, BPM, duration, accuracy \(%\), counts of Perfect, Too Early and M
 
 SummaryState: \.showing\(SessionResult\), \.showingRecommendation\(RecommendedBPM\), \.navigating\(destination\)\.<br>The session is saved exactly once, when the summary first appears, so re\-appearing never creates a duplicate\.
 
+Flow: when the session ends, Play is replaced by Summary \(Back never returns to a finished session\)\.<br>The summary route carries only the session id; the result waits in SessionResultStore \(App\)\. Retry<br>shows the recommendation, then opens Listen at the chosen BPM, which also becomes the practice list's<br>BPM\. Back to Main, and Back on Listen or Play, return to the practice list\. Replay opens inside Summary<br>and returns to it\. Leaving Summary waits for the save, so the practice list's records include the session\.
+
 #### 3\.3\.2 Replay
 
 Replay plays the previous session again, visually and audibly, from the stored \[BeatEvent\]\. It takes<br>no controller input and does no new judging\. The colour sequence must match the original session exactly\.
@@ -332,7 +334,7 @@ Three read\-only pages: Counting Beats, Practice Tempo, How to Strum\. Content i
 ### 3\.6 Home, navigation and Option \(US 7, US 9\)
 
 - Home: Practice, Option, Guidebook icon, and a Showtime button that is visible but has no action\.
-- AppRouter: one @Observable object owning a NavigationPath and a single enum Route \(home,<br>practiceList, listen, ready, play, summary, replay, guidebook, option\)\. Methods: push, pop,<br>popToRoot\. Routes carry ids and primitive values only\. No scattered NavigationLinks\.
+- AppRouter: one @Observable object owning a NavigationPath and a single enum Route \(home,<br>practiceList, listen, ready, play, summary, replay, guidebook, option\)\. Methods: push, pop,<br>popToRoot, replaceLast \(Play → Summary\) and popTo \(back to the practice list\)\. Routes carry ids and primitive values only\. No scattered NavigationLinks\.
 - Back button: one shared BackButton component used on every screen\. No screen is a dead end\.
 - Option: two sliders \(Sound, Sound Effects\), latency calibration, and the controller connection\.
     - Sound: metronome and pattern example volume\.

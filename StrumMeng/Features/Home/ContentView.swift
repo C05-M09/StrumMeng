@@ -42,6 +42,10 @@ struct ContentView: View {
                             PlayRoute(pattern: pattern, bpm: bpm, container: container)
                                 .navigationBarBackButtonHidden()
                         }
+
+                    case let .summary(sessionID):
+                        SummaryRoute(sessionID: sessionID, container: container)
+                            .navigationBarBackButtonHidden()
                     }
                 }
         }
@@ -73,6 +77,21 @@ private struct PlayRoute: View {
 
     var body: some View {
         PracticePlaySessionView(viewModel: viewModel, startImmediately: true)
+    }
+}
+
+/// Same idea for Summary, so a redraw cannot save the session twice or reset the overlays.
+private struct SummaryRoute: View {
+    @State private var viewModel: SummaryViewModel?
+
+    init(sessionID: UUID, container: AppContainer) {
+        _viewModel = State(initialValue: container.makeSummaryViewModel(sessionID: sessionID))
+    }
+
+    var body: some View {
+        if let viewModel {
+            SummaryView(viewModel: viewModel)
+        }
     }
 }
 
