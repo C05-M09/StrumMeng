@@ -4,14 +4,27 @@ import Foundation
 final class AppContainer {
 
     private let router: AppRouter
-    private let settings: any SettingsStore
+   private let repository: SessionRepository?
+  private let settings: any SettingsStore
 
-    init(
-        router: AppRouter,
-        settings: (any SettingsStore)? = nil
-    ) {
-        self.router = router
-        self.settings = settings ?? UserDefaultsSettingsStore()
+init(
+    router: AppRouter,
+    inMemory: Bool = false,
+    settings: (any SettingsStore)? = nil
+) {
+    self.router = router
+    self.settings = settings ?? UserDefaultsSettingsStore()
+
+    do {
+        let modelContainer = try ModelContainerFactory.make(
+            inMemory: inMemory
+        )
+        repository = SwiftDataSessionRepository(
+            modelContainer: modelContainer
+        )
+    } catch {
+        // Show a records error when storage cannot be initialized.
+        repository = nil
     }
 
     func makeHomeViewModel() -> HomeViewModel {
@@ -39,7 +52,14 @@ final class AppContainer {
     }
 
     func makePatternListViewModel() -> PatternListViewModel {
-        PatternListViewModel(
+        let records = repository.map { repository in
+            Dictionary(uniqueKeysWithValues: PatternCatalog.all.map { pattern in
+                (pattern.id, RecordsViewModel(patternID: pattern.id, repository: repository))
+            })
+        } ?? [:]
+        return PatternListViewModel(
+            recordsViewModels: records,
+            recordsFallbackState: repository == nil ? .failed : .empty,
             onListenRequested: { [weak router] patternID, bpm in
                 router?.push(.listen(patternID: patternID, bpm: bpm))
             },
