@@ -92,6 +92,9 @@ final class AppContainer {
             repository: repository ?? UnavailableSessionRepository(),
             onNavigate: { [weak self] destination in
                 self?.navigate(from: result, to: destination)
+            },
+            makeReplayViewModel: { [guitar = guitarSound, metronome = metronomeSound] result in
+                ReplayViewModel(result: result, guitar: guitar, metronome: metronome)
             }
         )
     }

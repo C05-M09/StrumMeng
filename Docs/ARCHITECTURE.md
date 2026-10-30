@@ -270,7 +270,7 @@ Flow: when the session ends, Play is replaced by Summary \(Back never returns to
 
 Replay plays the previous session again, visually and audibly, from the stored \[BeatEvent\]\. It takes<br>no controller input and does no new judging\. The colour sequence must match the original session exactly\.
 
-Audio is reconstructed, not recorded: the metronome and pattern are re\-scheduled from the stored beat<br>times, and the player's own strums are re\-played as guitar strums at their stored times and<br>directions\. There is no microphone recording to play back\.
+Audio is reconstructed, not recorded: the metronome is re\-scheduled on every quarter note, and the<br>player's own strums are re\-played as guitar strums at their stored times \(ReplayCue, scheduled on the<br>host clock through GuitarSound and MetronomeSound\)\. BeatEvent does not store a strum's direction, so a<br>strum takes the direction of the note it was judged against; a Miss with no strum makes no sound\.<br>There is no microphone recording to play back\.
 
 #### 3\.3\.3 Retry and BPM recommendation
 
