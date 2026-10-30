@@ -35,6 +35,10 @@ final class PlayViewModel {
     @ObservationIgnored private let input: StrumInputService
     @ObservationIgnored private let touchInput: TouchStrumInput?
     @ObservationIgnored private let controller: ControllerLink?
+    @ObservationIgnored private let requiresController: Bool
+    /// Whether the current session started with the controller connected; only such a session
+    /// pauses when the controller drops.
+    @ObservationIgnored private var sessionUsesController = false
     @ObservationIgnored private let tolerance: ToleranceConfig
     @ObservationIgnored private let latencyOffset: TimeInterval
     @ObservationIgnored private let strumArrivalGrace: TimeInterval
@@ -74,7 +78,11 @@ final class PlayViewModel {
 
     /// - Parameters:
     ///   - controller: the iPhone link when it is the strum source. The view model tells it when a
-    ///     session is running and pauses when it disconnects. Pass the same link as `input`.
+    ///     session is running and pauses when it disconnects. Pass the same link as `input` (or
+    ///     merged into it).
+    ///   - requiresController: true when the controller is the only input, so Ready and Resume
+    ///     wait for it. False when on-screen swipes work too: the player may start without the
+    ///     iPhone, and only a session started with it pauses when it drops.
     ///   - strumArrivalGrace: extra time a window stays open for strums that arrive late (network
     ///     delay); 0 for on-screen swipes, controllerStrumArrivalGrace for the iPhone.
     ///   - repetitions: how many times the pattern repeats (PracticeSessionConfig).
@@ -87,6 +95,7 @@ final class PlayViewModel {
          input: StrumInputService,
          touchInput: TouchStrumInput?,
          controller: ControllerLink? = nil,
+         requiresController: Bool = true,
          tolerance: ToleranceConfig = .standard,
          latencyOffset: TimeInterval = 0,
          strumArrivalGrace: TimeInterval = 0,
@@ -103,6 +112,7 @@ final class PlayViewModel {
         self.input = input
         self.touchInput = touchInput
         self.controller = controller
+        self.requiresController = requiresController
         isControllerConnected = controller == nil
         self.tolerance = tolerance
         self.latencyOffset = latencyOffset
@@ -156,9 +166,12 @@ final class PlayViewModel {
         let previous = state
         let next = reduce(previous, event)
         guard next != previous else { return }
-        // Counting in without a connected controller would only collect Misses.
-        if case .countIn = next, !isControllerConnected { return }
+        // Counting in without the only input connected would only collect Misses.
+        if case .countIn = next, requiresController, !isControllerConnected { return }
         state = next
+        if case .countIn = state {
+            sessionUsesController = controller != nil && isControllerConnected
+        }
 
         switch (event, state) {
         case (.tapReady, .countIn), (.tapRestart, .countIn):
@@ -234,7 +247,10 @@ final class PlayViewModel {
     func handle(_ strum: StrumEvent) {
         switch state {
         case .countIn, .playing:
-            if let anchorTime { lastStrumSongTime = strum.time - anchorTime }
+            // The ring reacts when the strum arrives, not at its touch time: an iPhone strum can
+            // arrive after the short pulse would already be over, so it would look undetected.
+            // Judging still uses the touch time.
+            if anchorTime != nil { lastStrumSongTime = currentSongTime() }
             apply(engine.addStrum(strum))
             finishIfDone()
         default:
@@ -251,6 +267,8 @@ final class PlayViewModel {
             return
         }
         isControllerConnected = false
+        // A session played on the iPad screen alone carries on without the iPhone.
+        guard requiresController || sessionUsesController else { return }
         await send(.controllerDisconnected)
     }
 

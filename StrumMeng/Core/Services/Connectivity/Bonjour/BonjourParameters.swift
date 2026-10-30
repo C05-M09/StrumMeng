@@ -24,8 +24,10 @@ nonisolated enum BonjourParameters {
             sec_protocol_options_append_tls_ciphersuite(tls.securityProtocolOptions, suite)
         }
         let parameters = NWParameters(dtls: tls, udp: NWProtocolUDP.Options())
-        // AWDL: iPhone and iPad can talk directly even without a shared router.
-        parameters.includePeerToPeer = true
+        // No AWDL (peer-to-peer Wi-Fi): it makes the radio hop between the router's channel and its
+        // own every second or two, which showed up as 30–100 ms latency spikes. Both devices must
+        // therefore be on the same Wi-Fi network (Apple DTS advice for low latency).
+        parameters.includePeerToPeer = false
         parameters.serviceClass = .interactiveVoice
         return parameters
     }
@@ -33,7 +35,7 @@ nonisolated enum BonjourParameters {
     /// Browsing needs no encryption; only the connection itself is secured.
     static func browsing() -> NWParameters {
         let parameters = NWParameters()
-        parameters.includePeerToPeer = true
+        parameters.includePeerToPeer = false
         return parameters
     }
 

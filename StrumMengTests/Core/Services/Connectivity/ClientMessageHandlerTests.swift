@@ -62,9 +62,17 @@ final class ClientMessageHandlerTests: XCTestCase {
     }
 
     func test_pings_areQuickAtFirstThenEverySecond() {
-        XCTAssertEqual(ClientMessageHandler.pingDelay(afterPing: 1), .milliseconds(150))
-        XCTAssertEqual(ClientMessageHandler.pingDelay(afterPing: ClientMessageHandler.quickPingCount - 1), .milliseconds(150))
-        XCTAssertEqual(ClientMessageHandler.pingDelay(afterPing: ClientMessageHandler.quickPingCount), .seconds(1))
+        let quick = ClientMessageHandler.quickPingCount
+        XCTAssertEqual(ClientMessageHandler.pingDelay(afterPing: 1, sessionActive: false), .milliseconds(150))
+        XCTAssertEqual(ClientMessageHandler.pingDelay(afterPing: quick - 1, sessionActive: false), .milliseconds(150))
+        XCTAssertEqual(ClientMessageHandler.pingDelay(afterPing: quick, sessionActive: false), .seconds(1))
+    }
+
+    func test_pings_stayFastWhileASessionIsPlaying() {
+        let fast = ClientMessageHandler.playingPingInterval
+        XCTAssertEqual(ClientMessageHandler.pingDelay(afterPing: 1, sessionActive: true), fast)
+        XCTAssertEqual(ClientMessageHandler.pingDelay(afterPing: 500, sessionActive: true), fast)
+        XCTAssertLessThanOrEqual(fast, .milliseconds(100), "Must beat Wi-Fi power save's ~100 ms doze")
     }
 
     func test_newConnection_forgetsTheOldClockAndSession() {

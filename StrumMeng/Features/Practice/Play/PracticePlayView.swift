@@ -8,6 +8,10 @@ import SwiftUI
 /// artwork, title, BPM and buttons are drawn once and only change with the phase. That keeps each
 /// frame cheap and the buttons' touch handling stable while the lane scrolls.
 struct PracticePlayView: View {
+    /// 60 fps is smooth enough. On a 120 Hz iPad an uncapped timeline draws twice as often, and the
+    /// main thread then handles strums (especially from the iPhone) later. Same cap as the prototype.
+    private static let frameInterval: TimeInterval = 1.0 / 60
+
     private let liveModel: () -> PlayScreenModel
     private let isAnimating: Bool
     private let onReady: () -> Void
@@ -53,7 +57,7 @@ struct PracticePlayView: View {
                 Image("Play_BG")
                     .resizable()
                     .frame(width: geo.size.width, height: geo.size.height)
-                TimelineView(.animation(minimumInterval: nil, paused: !isAnimating)) { _ in
+                TimelineView(.animation(minimumInterval: Self.frameInterval, paused: !isAnimating)) { _ in
                     board(layout, liveModel())
                 }
                 header(layout, model)
@@ -130,7 +134,7 @@ struct PracticePlayView: View {
             ZStack(alignment: .topLeading) {
                 AppColor.dim.opacity(0.55)
                 // Only the number's pop animation needs the per-frame time.
-                TimelineView(.animation(minimumInterval: nil, paused: !isAnimating)) { _ in
+                TimelineView(.animation(minimumInterval: Self.frameInterval, paused: !isAnimating)) { _ in
                     let frame = liveModel()
                     PlayCalloutView(
                         text: "\(number)",

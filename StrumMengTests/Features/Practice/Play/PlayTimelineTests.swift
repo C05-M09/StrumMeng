@@ -25,10 +25,10 @@ final class PlayTimelineTests: XCTestCase {
     }
 
     func test_laneTime_holdsOnTheReadyLeadInThenFollowsSessionTime() {
-        let lead = -PlayTimeline.readyLeadSlots * slot
-        XCTAssertEqual(PlayTimeline.laneTime(songTime: -10, slotInterval: slot), lead, accuracy: 1e-9)
-        XCTAssertEqual(PlayTimeline.laneTime(songTime: lead / 2, slotInterval: slot), lead / 2, accuracy: 1e-9)
-        XCTAssertEqual(PlayTimeline.laneTime(songTime: 4, slotInterval: slot), 4, accuracy: 1e-9)
+        let lead = 1.5
+        XCTAssertEqual(PlayTimeline.laneTime(songTime: -10, readyLead: lead), -lead, accuracy: 1e-9)
+        XCTAssertEqual(PlayTimeline.laneTime(songTime: -lead / 2, readyLead: lead), -lead / 2, accuracy: 1e-9)
+        XCTAssertEqual(PlayTimeline.laneTime(songTime: 4, readyLead: lead), 4, accuracy: 1e-9)
     }
 
     func test_makeNodes_repeatsThePatternWithCountLabels() {

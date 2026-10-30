@@ -44,13 +44,7 @@ actor BonjourControllerClient: ControllerClient {
     func connect(pairCode: PairCode) async {
         await disconnect()
         self.pairCode = pairCode
-        let browser = NWBrowser(for: .bonjour(type: BonjourParameters.serviceType, domain: nil),
-                                using: BonjourParameters.browsing())
-        browser.browseResultsChangedHandler = { [weak self] _, _ in
-            self?.assumeIsolated { $0.connectIfNeeded() }
-        }
-        browser.start(queue: queue)
-        self.browser = browser
+        startBrowsing()
         stateBroadcast.yield(.searching)
     }
 
@@ -69,8 +63,7 @@ actor BonjourControllerClient: ControllerClient {
     }
 
     func disconnect() async {
-        browser?.cancel()
-        browser = nil
+        stopBrowsing()
         dropConnection()
         retryTask?.cancel()
         retryTask = nil
@@ -81,6 +74,24 @@ actor BonjourControllerClient: ControllerClient {
     }
 
     // MARK: - Finding and connecting
+
+    /// Browsing runs only while there is no connection: an active browser keeps scanning the
+    /// network, which costs radio time the strums need.
+    private func startBrowsing() {
+        guard browser == nil else { return }
+        let browser = NWBrowser(for: .bonjour(type: BonjourParameters.serviceType, domain: nil),
+                                using: BonjourParameters.browsing())
+        browser.browseResultsChangedHandler = { [weak self] _, _ in
+            self?.assumeIsolated { $0.connectIfNeeded() }
+        }
+        browser.start(queue: queue)
+        self.browser = browser
+    }
+
+    private func stopBrowsing() {
+        browser?.cancel()
+        browser = nil
+    }
 
     private func connectIfNeeded() {
         guard connection == nil, let pairCode, let results = browser?.browseResults, !results.isEmpty else { return }
@@ -110,6 +121,7 @@ actor BonjourControllerClient: ControllerClient {
         switch state {
         case .ready:
             handshakeTask?.cancel()
+            stopBrowsing()
             isReady = true
             hasEverConnected = true
             handler.connectionOpened(at: HostClock.now())
@@ -136,6 +148,8 @@ actor BonjourControllerClient: ControllerClient {
     private func connectionLost() {
         dropConnection()
         stateBroadcast.yield(hasEverConnected ? .reconnecting : .searching)
+        // Browsing stopped once connected; the iPad may also have a new address now.
+        startBrowsing()
         scheduleRetry()
     }
 
@@ -168,21 +182,22 @@ actor BonjourControllerClient: ControllerClient {
             var count = 0
             while !Task.isCancelled {
                 count += 1
-                guard let self, await self.pingAndCheckLiveness() else { return }
-                try? await Task.sleep(for: ClientMessageHandler.pingDelay(afterPing: count))
+                guard let self, let delay = await self.pingAndCheckLiveness(count: count) else { return }
+                try? await Task.sleep(for: delay)
             }
         }
     }
 
-    /// Returns false once the iPad has gone quiet and the connection was dropped.
-    private func pingAndCheckLiveness() -> Bool {
+    /// Returns how long to wait before the next ping, or nil once the iPad has gone quiet and the
+    /// connection was dropped.
+    private func pingAndCheckLiveness(count: Int) -> Duration? {
         let now = HostClock.now()
         guard handler.isAlive(now: now) else {
             connectionLost()
-            return false
+            return nil
         }
         send(handler.pingMessage(sentAt: now))
-        return true
+        return ClientMessageHandler.pingDelay(afterPing: count, sessionActive: handler.sessionActive)
     }
 
     private func receiveNext(on connection: NWConnection) {
@@ -200,7 +215,11 @@ actor BonjourControllerClient: ControllerClient {
         guard let message = try? ControllerMessage(data: data) else { return }
         let wasActive = handler.sessionActive
         handler.receive(message, arrivedAt: arrival)
-        if handler.sessionActive != wasActive { sessionBroadcast.yield(handler.sessionActive) }
+        if handler.sessionActive != wasActive {
+            sessionBroadcast.yield(handler.sessionActive)
+            // Switch to the fast play rate now rather than after the current (up to 1 s) wait.
+            if handler.sessionActive { startPinging() }
+        }
         if case .pong = message, let latencyMs = handler.clock.latencyMs {
             stateBroadcast.yield(.connected(latencyMs: latencyMs))
         }

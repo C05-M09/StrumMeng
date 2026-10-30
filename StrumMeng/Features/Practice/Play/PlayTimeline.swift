@@ -7,9 +7,6 @@ enum PlayTimeline {
     static let countLabels = ["1", "&", "2", "&", "3", "&", "4", "&"]
     /// 3-2-1 on quarter notes = 6 eighth-note slots before the first slot.
     static let countInSlots = 6
-    /// On READY? the first node waits this many slots before the ring, at the right edge of the lane
-    /// (hi-fi "Practice-Play Copy 5"). It starts moving during the count-in and reaches the ring on beat 1.
-    static let readyLeadSlots = 3.1
 
     static func slotInterval(bpm: Int) -> TimeInterval {
         60.0 / Double(max(1, bpm)) / 2
@@ -17,8 +14,10 @@ enum PlayTimeline {
 
     /// The time the lane is drawn at: session time, but never earlier than the READY? lead-in, so the
     /// nodes hold still while waiting and glide in without a jump once the count-in reaches them.
-    static func laneTime(songTime: TimeInterval, slotInterval: TimeInterval) -> TimeInterval {
-        max(songTime, -readyLeadSlots * slotInterval)
+    /// - Parameter readyLead: how long before the ring the first node waits on READY? (hi-fi
+    ///   "Practice-Play Copy 5"); PlayScreenLayout.readyLeadTime puts it near the lane's right edge.
+    static func laneTime(songTime: TimeInterval, readyLead: TimeInterval) -> TimeInterval {
+        max(songTime, -readyLead)
     }
 
     /// Repeats one bar of slots (nil = rest) to fill the session.
