@@ -26,27 +26,6 @@ final class AppContainer {
             // Show a records error when storage cannot be initialized.
             repository = nil
         }
-   private let repository: SessionRepository?
-  private let settings: any SettingsStore
-
-init(
-    router: AppRouter,
-    inMemory: Bool = false,
-    settings: (any SettingsStore)? = nil
-) {
-    self.router = router
-    self.settings = settings ?? UserDefaultsSettingsStore()
-
-    do {
-        let modelContainer = try ModelContainerFactory.make(
-            inMemory: inMemory
-        )
-        repository = SwiftDataSessionRepository(
-            modelContainer: modelContainer
-        )
-    } catch {
-        // Show a records error when storage cannot be initialized.
-        repository = nil
     }
 
     func makeHomeViewModel() -> HomeViewModel {
@@ -101,8 +80,6 @@ init(
             }
         )
     }
-    
-    
 
     /// Option is an overlay on Home, so whoever shows it decides what "back" means
     /// (close the overlay), instead of popping the router.
