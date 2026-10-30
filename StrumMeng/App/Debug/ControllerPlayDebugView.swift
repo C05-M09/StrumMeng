@@ -21,6 +21,9 @@ struct ControllerPlayDebugView: View {
     let onLeave: () -> Void
 
     /// One link for the whole launch, as in the real app: sessions come and go, the link stays.
+    /// The synthesised guitar and metronome, one for the whole launch. Made on appear, not as the
+    /// initial value: that would start a new audio engine every time this view is re-created.
+    @State private var guitar: GuitarEngine?
     @State private var link: any ControllerLink = BonjourControllerLink(
         pairCode: ControllerLinkDebugModel.savedHostPairCode())
     /// Built once, and again after Back to Menu; never on a redraw.
@@ -55,10 +58,14 @@ struct ControllerPlayDebugView: View {
             }
         }
         .onAppear {
+            if guitar == nil { guitar = GuitarEngine() }
             if viewModel == nil { startNewSession() }
         }
         .task {
             try? await link.start()
+        }
+        .task {
+            await guitar?.prepare()
         }
         .task {
             for await strum in link.strums { collectCalibration(strum) }
@@ -156,6 +163,7 @@ struct ControllerPlayDebugView: View {
             pattern: pattern, bpm: bpm, clock: AudioBeatClock(),
             input: MergedStrumInputService(sources: [link, touch]), touchInput: touch,
             controller: link, requiresController: false,
+            guitar: guitar, metronome: guitar,
             latencyOffset: Double(latencyMs) / 1000,
             strumArrivalGrace: PlayViewModel.controllerStrumArrivalGrace,
             repetitions: repetitions,

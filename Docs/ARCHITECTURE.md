@@ -134,7 +134,7 @@ The user hears the correct pattern before playing\. It can be replayed any numbe
 - If the Wi\-Fi Aware session is close to its time limit, it is refreshed after Ready and before the<br>count\-in, and the count\-in waits until the controller is back \(§3\.2\.3\)\.
 - After it, a 3\-2\-1 count\-in aligned to the beat interval at the chosen BPM\. After "1", the session<br>enters playing exactly on the first beat\.
 - Play renders the pattern as a row of beat nodes with a moving beat marker\. The marker is driven by<br>BeatClock ticks, never by its own timer\.
-- The metronome is scheduled by the same BeatClock\. Volume follows SettingsStore\.soundVolume\.
+- The metronome is scheduled by the same BeatClock: on each tick, the next quarter note's click is<br>scheduled on the host clock \(GuitarEngine, MetronomeSound\), and the first beat of a bar is<br>accented\. Every swipe also sounds the synthesised guitar \(a C chord in the swipe's direction,<br>GuitarSound\), in or out of a session\. Volume follows SettingsStore\.soundVolume \[not wired yet\]\.
 - Beat node colours come from design tokens, not hard\-coded values\.
 
 ### 3\.2 Real\-time feedback engine \(US 1, US 6\)

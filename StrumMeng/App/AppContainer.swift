@@ -17,6 +17,7 @@ final class AppContainer {
         return engine
     }()
     private var guitarSound: any GuitarSound { guitar ?? SilentGuitarSound() }
+    private var metronomeSound: any MetronomeSound { guitar ?? SilentGuitarSound() }
 
     init(
         router: AppRouter,
@@ -65,6 +66,8 @@ final class AppContainer {
             clock: AudioBeatClock(),
             input: input,
             touchInput: input,
+            guitar: guitarSound,
+            metronome: metronomeSound,
             now: HostClock.now,
             waitUntil: { time in
                 let delay = time - HostClock.now()
