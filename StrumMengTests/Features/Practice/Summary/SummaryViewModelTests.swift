@@ -102,6 +102,24 @@ final class SummaryViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.state, .navigating(.replay(result)))
     }
 
+    func test_returnFromReplay_allowsReplayToBeEnteredAgain() {
+        let repository = MockSessionRepository()
+        let result = makeSampleResult()
+        let viewModel = SummaryViewModel(result: result, repository: repository)
+
+        // 1. Enter Replay
+        viewModel.send(.tapReplay)
+        XCTAssertEqual(viewModel.state, .navigating(.replay(result)))
+
+        // 2. Return from Replay
+        viewModel.send(.returnFromReplay)
+        XCTAssertEqual(viewModel.state, .showing(result))
+
+        // 3. Can enter Replay again
+        viewModel.send(.tapReplay)
+        XCTAssertEqual(viewModel.state, .navigating(.replay(result)))
+    }
+
     func test_send_tapBackToMain_navigatesToBackToMain() {
         let repository = MockSessionRepository()
         let result = makeSampleResult()
