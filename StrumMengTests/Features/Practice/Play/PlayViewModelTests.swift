@@ -17,11 +17,13 @@ final class PlayViewModelTests: XCTestCase {
                                strumArrivalGrace: TimeInterval = 0,
                                touchInput: TouchStrumInput? = nil,
                                controller: ControllerLink? = nil,
-                               requiresController: Bool = true) throws -> PlayViewModel {
+                               requiresController: Bool = true,
+                               sound: MockGuitarSound? = nil) throws -> PlayViewModel {
         let pattern = try XCTUnwrap(PatternCatalog.all.first { $0.id == patternID })
         return PlayViewModel(
             pattern: pattern, bpm: 80, clock: clock, input: MockStrumInputService(), touchInput: touchInput,
-            controller: controller, requiresController: requiresController, latencyOffset: latencyOffset, strumArrivalGrace: strumArrivalGrace, repetitions: repetitions,
+            controller: controller, requiresController: requiresController,
+            guitar: sound, metronome: sound, latencyOffset: latencyOffset, strumArrivalGrace: strumArrivalGrace, repetitions: repetitions,
             now: { [unowned self] in self.currentTime },
             waitUntil: { _ in try? await Task.sleep(for: .seconds(3600)) },
             makeID: { UUID(uuidString: "00000000-0000-0000-0000-000000000001") ?? UUID() },
@@ -480,5 +482,64 @@ final class PlayViewModelTests: XCTestCase {
         await startPlaying(viewModel)
         await viewModel.handle(.reconnecting)
         XCTAssertEqual(viewModel.state, .paused)
+    }
+    // MARK: Sound
+
+    func test_everySwipe_soundsTheGuitar_evenBeforeTheSession() async throws {
+        let sound = MockGuitarSound()
+        let viewModel = try makeViewModel(sound: sound)
+
+        strum(viewModel, at: 50, .up)
+        await startPlaying(viewModel)
+        strum(viewModel, at: time(ofTick: 6), .down)
+
+        XCTAssertEqual(sound.strums, [.init(direction: .up, time: nil, accent: 1),
+                                      .init(direction: .down, time: nil, accent: 1)])
+    }
+
+    func test_metronome_clicksTheCountInAndTheFirstBeat_onTime() async throws {
+        let sound = MockGuitarSound()
+        let viewModel = try makeViewModel(sound: sound)
+
+        await startPlaying(viewModel)                     // ticks 0…6
+
+        // Quarter notes: ticks 0, 2, 4 (3-2-1) and 6 (step 0, the bar's first beat, accented).
+        XCTAssertEqual(sound.clicks.map(\.accent), [false, false, false, true])
+        for (click, tick) in zip(sound.clicks, [0, 2, 4, 6]) {
+            XCTAssertEqual(click.time, time(ofTick: tick), accuracy: 1e-9)
+        }
+    }
+
+    func test_metronome_accentsTheFirstBeatOfEveryBar() async throws {
+        let sound = MockGuitarSound()
+        let viewModel = try makeViewModel(sound: sound)
+        await startPlaying(viewModel)
+
+        for n in 7...13 { tick(viewModel, n) }            // up to step 7; step 8 is scheduled ahead
+
+        XCTAssertEqual(sound.clicks.last?.time ?? 0, time(ofTick: 14), accuracy: 1e-9)
+        XCTAssertEqual(sound.clicks.last?.accent, true)
+        XCTAssertEqual(sound.clicks.filter(\.accent).count, 2)
+    }
+
+    func test_metronome_stopsAtTheEndOfTheSession() async throws {
+        let sound = MockGuitarSound()
+        let viewModel = try makeViewModel(repetitions: 1, sound: sound)    // steps 0…7
+        await startPlaying(viewModel)
+
+        for n in 7...14 { tick(viewModel, n) }
+
+        let lastClick = try XCTUnwrap(sound.clicks.last)
+        XCTAssertEqual(lastClick.time, time(ofTick: 12), accuracy: 1e-9, "Step 6 is the last quarter note")
+    }
+
+    func test_pause_cancelsScheduledClicks() async throws {
+        let sound = MockGuitarSound()
+        let viewModel = try makeViewModel(sound: sound)
+        await startPlaying(viewModel)
+
+        await viewModel.send(.tapPause)
+
+        XCTAssertGreaterThan(sound.cancelClicksCount, 0)
     }
 }

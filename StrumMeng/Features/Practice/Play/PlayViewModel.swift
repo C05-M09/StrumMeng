@@ -35,6 +35,8 @@ final class PlayViewModel {
     @ObservationIgnored private let input: StrumInputService
     @ObservationIgnored private let touchInput: TouchStrumInput?
     @ObservationIgnored private let controller: ControllerLink?
+    @ObservationIgnored private let guitar: (any GuitarSound)?
+    @ObservationIgnored private let metronome: (any MetronomeSound)?
     @ObservationIgnored private let requiresController: Bool
     /// Whether the current session started with the controller connected; only such a session
     /// pauses when the controller drops.
@@ -83,6 +85,8 @@ final class PlayViewModel {
     ///   - requiresController: true when the controller is the only input, so Ready and Resume
     ///     wait for it. False when on-screen swipes work too: the player may start without the
     ///     iPhone, and only a session started with it pauses when it drops.
+    ///   - guitar: sounds every swipe, in or out of a session, like a real guitar.
+    ///   - metronome: clicks on every quarter note while counting in and playing.
     ///   - strumArrivalGrace: extra time a window stays open for strums that arrive late (network
     ///     delay); 0 for on-screen swipes, controllerStrumArrivalGrace for the iPhone.
     ///   - repetitions: how many times the pattern repeats (PracticeSessionConfig).
@@ -96,6 +100,8 @@ final class PlayViewModel {
          touchInput: TouchStrumInput?,
          controller: ControllerLink? = nil,
          requiresController: Bool = true,
+         guitar: (any GuitarSound)? = nil,
+         metronome: (any MetronomeSound)? = nil,
          tolerance: ToleranceConfig = .standard,
          latencyOffset: TimeInterval = 0,
          strumArrivalGrace: TimeInterval = 0,
@@ -113,6 +119,8 @@ final class PlayViewModel {
         self.touchInput = touchInput
         self.controller = controller
         self.requiresController = requiresController
+        self.guitar = guitar
+        self.metronome = metronome
         isControllerConnected = controller == nil
         self.tolerance = tolerance
         self.latencyOffset = latencyOffset
@@ -156,6 +164,7 @@ final class PlayViewModel {
     /// Leaving the screen discards an unfinished session and stops every task.
     func onDisappear() async {
         [tickTask, strumTask, windowTask, controllerTask].forEach { $0?.cancel() }
+        metronome?.cancelClicks()
         await clock.stop()
         await controller?.setSessionActive(false)
     }
@@ -188,6 +197,7 @@ final class PlayViewModel {
         case (.tapRestart, .ready):
             resetSession()
         case (.tapBackToMenu, .idle):
+            metronome?.cancelClicks()
             resetSession()
             await clock.stop()
             onExit()
@@ -223,7 +233,10 @@ final class PlayViewModel {
                 countInFirstIndex = first
                 stepOffset = first + Self.countInSteps - resumeStep
                 frozenSongTime = nil
+                // Nothing scheduled the first count-in click ahead of time.
+                scheduleClick(forStep: tick.index - stepOffset, at: tick.expectedTime)
             }
+            scheduleClick(forStep: tick.index + 1 - stepOffset, at: tick.expectedTime + stepInterval)
             anchorTime = tick.expectedTime - Double(tick.index - stepOffset) * stepInterval
             let position = tick.index - first
             if position < Self.countInSteps {
@@ -235,6 +248,7 @@ final class PlayViewModel {
             state = reduce(state, .countInDone)
             playStep(tick)
         case .playing:
+            scheduleClick(forStep: tick.index + 1 - stepOffset, at: tick.expectedTime + stepInterval)
             anchorTime = tick.expectedTime - Double(tick.index - stepOffset) * stepInterval
             playStep(tick)
         default:
@@ -245,6 +259,8 @@ final class PlayViewModel {
     /// Strums count during the count-in too, because the first beat's early window starts before
     /// step 0. Outside a running session they are ignored, not judged.
     func handle(_ strum: StrumEvent) {
+        // Heard straight away, whether or not it is judged.
+        guitar?.strum(strum.direction, at: nil, accent: 1)
         switch state {
         case .countIn, .playing:
             // The ring reacts when the strum arrives, not at its touch time: an iPhone strum can
@@ -332,6 +348,14 @@ final class PlayViewModel {
         finishIfDone()
     }
 
+    /// Clicks are scheduled one step ahead (the tick before), so they sound exactly on time. They
+    /// fall on quarter notes (even steps; the count-in's are negative) up to the end of the session,
+    /// and the first beat of each bar is accented.
+    private func scheduleClick(forStep step: Int, at time: TimeInterval) {
+        guard let metronome, step < totalSteps, step.isMultiple(of: 2) else { return }
+        metronome.click(at: time, accent: step >= 0 && step.isMultiple(of: pattern.strokes.count))
+    }
+
     private func apply(_ events: [BeatEvent]) {
         guard !events.isEmpty else { return }
         let songTime = currentSongTime()
@@ -357,6 +381,7 @@ final class PlayViewModel {
     private func finishIfDone() {
         guard state == .playing, nextStep >= totalSteps, engine.openBeats.isEmpty else { return }
         windowTask?.cancel()
+        metronome?.cancelClicks()
         frozenSongTime = currentSongTime()
         let result = SessionResultBuilder.build(id: makeID(), patternID: pattern.id, bpm: bpm,
                                                 beatEvents: beatEvents, createdAt: currentDate())
@@ -370,6 +395,7 @@ final class PlayViewModel {
 
     private func pause() async {
         windowTask?.cancel()
+        metronome?.cancelClicks()
         await clock.pause()
         frozenSongTime = currentSongTime()
         apply(engine.close(upTo: now() - strumArrivalGrace))
