@@ -102,7 +102,7 @@ final class ReplayViewModel {
         self.duration = Double(steps) * interval
 
         // 3. Pasang lead-in waktu awal di minus beberapa beat agar panah terlihat meluncur dari kanan
-        self.initialSongTime = -PlayTimeline.readyLeadSlots * interval
+        self.initialSongTime = -PlayScreenLayout.designReadyLeadTime
         self.currentSongTime = self.initialSongTime
 
         // 4. Generate daftar visual panah (BeatNodeView) sepanjang rel trek

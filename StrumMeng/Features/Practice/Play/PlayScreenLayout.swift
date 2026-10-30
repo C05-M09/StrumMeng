@@ -103,6 +103,10 @@ struct PlayScreenLayout: Equatable {
         return TimeInterval((readyX - hitX) / scrollSpeed)
     }
 
+    /// readyLeadTime at the hi-fi size, for code that has no screen size (Replay's start time).
+    /// PlayLaneView clamps to the real screen's value, so a small difference only shifts the start.
+    static let designReadyLeadTime = PlayScreenLayout(size: designSize).readyLeadTime
+
     /// Where the READY? text and the count-in numbers sit: centre of the lane, on the rail.
     var calloutCenter: CGPoint { CGPoint(x: laneRect.midX, y: railY) }
 }
