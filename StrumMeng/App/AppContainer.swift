@@ -6,6 +6,9 @@ final class AppContainer {
     private let router: AppRouter
     private let repository: SessionRepository?
     private let settings: any SettingsStore
+    private let results = SessionResultStore()
+    /// The one pattern list of the app, so Retry can hand it the chosen tempo.
+    private weak var patternListViewModel: PatternListViewModel?
 
     init(
         router: AppRouter,
@@ -42,7 +45,7 @@ final class AppContainer {
             bpm: bpm,
             player: GuitarListenPlayer(),
             onReady: { [weak router] in router?.push(.play(patternID: pattern.id, bpm: bpm)) },
-            onBack: { [weak router] in router?.popToRoot() }
+            onBack: { [weak router] in router?.popTo(.practiceList) }
         )
     }
 
@@ -59,8 +62,42 @@ final class AppContainer {
                 let delay = time - HostClock.now()
                 if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
             },
-            onExit: { [weak router] in router?.popToRoot() }
+            onFinished: { [weak self] result in self?.sessionFinished(result) },
+            onExit: { [weak router] in router?.popTo(.practiceList) }
         )
+    }
+
+    /// Play becomes Summary, so Back from Summary never returns to the finished session.
+    func sessionFinished(_ result: SessionResult) {
+        results.add(result)
+        router.replaceLast(with: .summary(sessionID: result.id))
+    }
+
+    /// nil if the session is unknown (it never finished in this app session).
+    func makeSummaryViewModel(sessionID: UUID) -> SummaryViewModel? {
+        guard let result = results.result(for: sessionID) else { return nil }
+        return SummaryViewModel(
+            result: result,
+            repository: repository ?? UnavailableSessionRepository(),
+            onNavigate: { [weak self] destination in
+                self?.navigate(from: result, to: destination)
+            }
+        )
+    }
+
+    private func navigate(from result: SessionResult, to destination: SummaryDestination) {
+        switch destination {
+        case let .retry(bpm):
+            // The chosen tempo becomes the list's tempo too, then the pattern is listened to again.
+            patternListViewModel?.send(.setBPM(bpm))
+            router.popTo(.practiceList)
+            router.push(.listen(patternID: result.patternID, bpm: bpm))
+        case .backToMain:
+            router.popTo(.practiceList)
+        case .replay:
+            // Shown inside SummaryView.
+            break
+        }
     }
 
     func makePatternListViewModel() -> PatternListViewModel {
@@ -69,7 +106,7 @@ final class AppContainer {
                 (pattern.id, RecordsViewModel(patternID: pattern.id, repository: repository))
             })
         } ?? [:]
-        return PatternListViewModel(
+        let viewModel = PatternListViewModel(
             recordsViewModels: records,
             recordsFallbackState: repository == nil ? .failed : .empty,
             onListenRequested: { [weak router] patternID, bpm in
@@ -79,6 +116,8 @@ final class AppContainer {
                 router?.pop()
             }
         )
+        patternListViewModel = viewModel
+        return viewModel
     }
 
     /// Option is an overlay on Home, so whoever shows it decides what "back" means

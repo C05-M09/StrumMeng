@@ -30,6 +30,13 @@ func reduce(_ state: PatternListState, _ event: PatternListEvent) -> PatternList
             selectedBPM: PracticeTempoConfig.clamped(selectedBPM + PracticeTempoConfig.step)
         )
 
+    case let .setBPM(bpm):
+        return .loaded(
+            patterns: patterns,
+            selectedPatternID: selectedPatternID,
+            selectedBPM: PracticeTempoConfig.clamped(bpm)
+        )
+
     case .tapPlay, .tapBack:
         return state
     }

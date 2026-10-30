@@ -51,7 +51,7 @@ final class PatternListViewModel {
         case .tapBack:
             onBackRequested()
 
-        case .selectPattern, .decreaseBPM, .increaseBPM:
+        case .selectPattern, .decreaseBPM, .increaseBPM, .setBPM:
             break
         }
     }

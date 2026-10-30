@@ -129,4 +129,74 @@ final class SummaryViewModelTests: XCTestCase {
 
         XCTAssertEqual(viewModel.state, .navigating(.backToMain))
     }
+    // MARK: - Navigation
+
+    /// Lets queued tasks (the save, then the navigation) run.
+    private func settle() async {
+        for _ in 0..<50 { await Task.yield() }
+    }
+
+    func test_retry_navigatesWithTheChosenBPM() async {
+        var destinations: [SummaryDestination] = []
+        let viewModel = SummaryViewModel(result: makeSampleResult(accuracy: 0.90, bpm: 80),
+                                         repository: MockSessionRepository()) { destinations.append($0) }
+
+        viewModel.send(.tapRetry)
+        viewModel.send(.acceptRecommendation)
+        await settle()
+
+        XCTAssertEqual(destinations, [.retry(bpm: 90)])
+    }
+
+    func test_backToMain_waitsForTheSaveBeforeNavigating() async {
+        let repository = GatedSessionRepository()
+        let result = makeSampleResult()
+        var destinations: [SummaryDestination] = []
+        let viewModel = SummaryViewModel(result: result, repository: repository) { destinations.append($0) }
+
+        viewModel.send(.tapBackToMain)
+        await settle()
+        XCTAssertTrue(destinations.isEmpty, "Must not leave while the session is still being saved")
+
+        await repository.open()
+        await settle()
+        XCTAssertEqual(destinations, [.backToMain])
+        let saved = await repository.savedResults
+        XCTAssertEqual(saved.map(\.id), [result.id])
+    }
+
+    func test_leavingAfterOnAppear_doesNotSaveAgain() async {
+        let repository = MockSessionRepository()
+        let viewModel = SummaryViewModel(result: makeSampleResult(), repository: repository)
+
+        await viewModel.onAppear()
+        viewModel.send(.tapBackToMain)
+        await settle()
+
+        let saved = await repository.savedResults
+        XCTAssertEqual(saved.count, 1)
+    }
+
+    func test_tappingBackToMainTwice_navigatesOnce() async {
+        var destinations: [SummaryDestination] = []
+        let viewModel = SummaryViewModel(result: makeSampleResult(),
+                                         repository: MockSessionRepository()) { destinations.append($0) }
+
+        viewModel.send(.tapBackToMain)
+        viewModel.send(.tapBackToMain)
+        await settle()
+
+        XCTAssertEqual(destinations, [.backToMain])
+    }
+
+    func test_replay_isShownBySummaryItself_soNothingIsNavigated() async {
+        var destinations: [SummaryDestination] = []
+        let viewModel = SummaryViewModel(result: makeSampleResult(),
+                                         repository: MockSessionRepository()) { destinations.append($0) }
+
+        viewModel.send(.tapReplay)
+        await settle()
+
+        XCTAssertTrue(destinations.isEmpty)
+    }
 }

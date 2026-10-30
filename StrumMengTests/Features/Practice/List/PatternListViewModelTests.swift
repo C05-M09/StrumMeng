@@ -30,6 +30,20 @@ final class PatternListViewModelTests: XCTestCase {
         XCTAssertEqual(routedBPM, 85)
     }
 
+    func test_setBPM_doesNotNavigate_andTheNextPlayUsesIt() {
+        var routedBPMs: [Int] = []
+        let viewModel = PatternListViewModel(
+            onListenRequested: { _, bpm in routedBPMs.append(bpm) },
+            onBackRequested: {}
+        )
+
+        viewModel.send(.setBPM(70))
+        XCTAssertEqual(routedBPMs, [], "Setting the tempo must not open Listen by itself")
+
+        viewModel.send(.tapPlay)
+        XCTAssertEqual(routedBPMs, [70])
+    }
+
     func test_tapBack_requestsRouterPop() {
         var didRequestBack = false
         let viewModel = PatternListViewModel(

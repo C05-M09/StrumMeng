@@ -31,6 +31,29 @@ final class PatternListReducerTests: XCTestCase {
         XCTAssertEqual(state.selectedBPM, 60)
     }
 
+    func test_setBPM_replacesTheTempoAndKeepsThePattern() {
+        var state = makeLoadedState(selectedPatternID: "subdivision", selectedBPM: 80)
+
+        state = reduce(state, .setBPM(70))
+
+        XCTAssertEqual(state.selectedPatternID, "subdivision")
+        XCTAssertEqual(state.selectedBPM, 70)
+    }
+
+    func test_setBPM_isClampedToThePracticeRange() {
+        var state = makeLoadedState(selectedPatternID: "foundation", selectedBPM: 80)
+
+        state = reduce(state, .setBPM(30))
+        XCTAssertEqual(state.selectedBPM, PracticeTempoConfig.minimumBPM)
+
+        state = reduce(state, .setBPM(200))
+        XCTAssertEqual(state.selectedBPM, PracticeTempoConfig.maximumBPM)
+    }
+
+    func test_setBPM_onAnEmptyList_isIgnored() {
+        XCTAssertEqual(reduce(.empty, .setBPM(70)), .empty)
+    }
+
     func test_selectEveryPattern_isAllowed() {
         var state = makeLoadedState(selectedPatternID: "foundation", selectedBPM: 80)
 
