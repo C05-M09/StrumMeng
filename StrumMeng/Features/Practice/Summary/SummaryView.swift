@@ -55,7 +55,7 @@ struct SummaryView: View {
 
                 // 4. Layar Replay (Slide)
                 if let replayResult = activeReplayResult {
-                    ReplayView(viewModel: ReplayViewModel(result: replayResult)) {
+                    ReplayView(viewModel: viewModel.makeReplayViewModel(replayResult)) {
                         withAnimation(.easeInOut(duration: 0.35)) {
                             activeReplayResult = nil
                         }

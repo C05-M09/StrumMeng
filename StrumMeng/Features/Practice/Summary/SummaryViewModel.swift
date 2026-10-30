@@ -24,15 +24,20 @@ final class SummaryViewModel {
     /// Where to go after Retry or Back to Main. Replay is shown inside SummaryView, so it is not sent.
     @ObservationIgnored private let onNavigate: (SummaryDestination) -> Void
     @ObservationIgnored private var saveTask: Task<Void, Never>?
+    /// Builds the Replay screen's view model, so the composition layer can give it sound.
+    @ObservationIgnored let makeReplayViewModel: (SessionResult) -> ReplayViewModel
 
     init(
         result: SessionResult,
         repository: SessionRepository,
-        onNavigate: @escaping (SummaryDestination) -> Void = { _ in }
+        onNavigate: @escaping (SummaryDestination) -> Void = { _ in },
+        makeReplayViewModel: ((SessionResult) -> ReplayViewModel)? = nil
     ) {
         self.result = result
         self.repository = repository
         self.onNavigate = onNavigate
+        // A silent Replay unless the composition layer supplies one with sound.
+        self.makeReplayViewModel = makeReplayViewModel ?? { ReplayViewModel(result: $0) }
         self.state = .showing(result)
     }
 

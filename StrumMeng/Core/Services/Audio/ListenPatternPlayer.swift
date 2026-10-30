@@ -1,4 +1,9 @@
-import Foundation
+import AVFoundation
+
+extension Notification.Name {
+    /// A phone call or Siri took the audio; Listen pauses.
+    static let listenAudioInterrupted = AVAudioSession.interruptionNotification
+}
 
 @MainActor
 protocol ListenPatternPlayer: AnyObject {

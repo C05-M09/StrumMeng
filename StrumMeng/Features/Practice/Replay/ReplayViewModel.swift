@@ -66,6 +66,20 @@ final class ReplayViewModel {
     /// Callback yang dipanggil saat user keluar dari layar Replay untuk kembali ke Summary.
     private let onDismiss: () -> Void
 
+    // MARK: - Sound
+
+    /// How far ahead sounds are handed to the audio engine.
+    static let soundLookahead: TimeInterval = 0.12
+    private static let soundPollInterval: Duration = .milliseconds(25)
+
+    private let guitar: (any GuitarSound)?
+    private let metronome: (any MetronomeSound)?
+    /// The host clock the audio engine schedules on (separate from `now`, which drives song time).
+    private let soundClock: () -> TimeInterval
+    private let cues: [ReplayCue]
+    private var nextCue = 0
+    private var soundTask: Task<Void, Never>?
+
     // MARK: - Inisialisasi
 
     /// Membuat instance ReplayViewModel baru.
@@ -79,7 +93,10 @@ final class ReplayViewModel {
         result: SessionResult,
         pattern: StrumPattern? = nil,
         repetitions: Int? = nil,
+        guitar: (any GuitarSound)? = nil,
+        metronome: (any MetronomeSound)? = nil,
         now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
+        soundClock: @escaping () -> TimeInterval = HostClock.now,
         onDismiss: @escaping () -> Void = {}
     ) {
         self.result = result
@@ -88,6 +105,9 @@ final class ReplayViewModel {
         self.bpm = result.bpm
         self.now = now
         self.onDismiss = onDismiss
+        self.guitar = guitar
+        self.metronome = metronome
+        self.soundClock = soundClock
 
         // 1. Hitung interval waktu per slot ketukan berdasarkan BPM
         let reps = repetitions ?? PracticeSessionConfig.patternRepetitions
@@ -111,6 +131,8 @@ final class ReplayViewModel {
             slotInterval: interval,
             duration: self.duration
         )
+        self.cues = ReplayCue.cues(for: result, pattern: resolvedPattern,
+                                   stepInterval: interval, totalSteps: steps)
     }
 
     // MARK: - Properti Komputasi untuk UI
@@ -149,21 +171,26 @@ final class ReplayViewModel {
                 songTimeAtAnchor = currentSongTime
             }
             hostTimeAnchor = now()
+            startSound()
 
         case (_, .paused):
             // Menghentikan pemutaran sementara: bekukan waktu lagu
             currentSongTime = songTime()
             hostTimeAnchor = nil
+            stopSound(silence: true)
 
         case (_, .finished):
             // Pemutaran selesai: kunci waktu lagu di durasi maksimal dan otomatis kembali ke summary
             currentSongTime = duration
             hostTimeAnchor = nil
+            // The last strums ring out.
+            stopSound(silence: false)
             onDismiss()
 
         case (_, .dismissed):
             // Keluar dari replay: hentikan timer dan panggil aksi dismiss
             hostTimeAnchor = nil
+            stopSound(silence: true)
             onDismiss()
 
         default:
@@ -199,6 +226,7 @@ final class ReplayViewModel {
             songTimeAtAnchor = target
             if hostTimeAnchor != nil {
                 hostTimeAnchor = now()
+                startSound()
             }
         }
     }
@@ -267,6 +295,49 @@ final class ReplayViewModel {
             lastJudgement: lastJudgement,
             lastStrumTime: lastStrumTime
         )
+    }
+
+    // MARK: - Sound scheduling
+
+    /// Hands every cue due within the lookahead to the audio engine, timed on the host clock from
+    /// the current song time. Internal so tests can drive it with fake clocks.
+    func scheduleDueSounds() {
+        guard hostTimeAnchor != nil else { return }
+        let songNow = songTime()
+        let hostNow = soundClock()
+        while nextCue < cues.count, cues[nextCue].time < songNow + Self.soundLookahead {
+            let cue = cues[nextCue]
+            let at = hostNow + (cue.time - songNow)
+            switch cue.sound {
+            case let .strum(direction): guitar?.strum(direction, at: at, accent: 1)
+            case let .click(accent): metronome?.click(at: at, accent: accent)
+            }
+            nextCue += 1
+        }
+    }
+
+    /// Starts (or restarts) the sound from the current song time.
+    private func startSound() {
+        stopSound(silence: true)
+        guard guitar != nil || metronome != nil else { return }
+        let songNow = songTime()
+        nextCue = cues.firstIndex { $0.time >= songNow } ?? cues.count
+        scheduleDueSounds()
+        soundTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: Self.soundPollInterval)
+                self?.scheduleDueSounds()
+            }
+        }
+    }
+
+    /// - Parameter silence: also cut the strings (pause, restart, leaving), instead of letting the
+    ///   last strums ring out (the end of the replay).
+    private func stopSound(silence: Bool) {
+        soundTask?.cancel()
+        soundTask = nil
+        metronome?.cancelClicks()
+        if silence { guitar?.stopStrums() }
     }
 
     // MARK: - Helper

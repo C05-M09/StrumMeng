@@ -117,9 +117,9 @@ func reduce(_ state: PracticeState, _ event: PracticeEvent) -> PracticeState {
 
 US3 implementation: the list routes to Listen's information state, followed by the looping audio
 example. `ListenViewModel` owns `ListenState` and a pure reducer; `ListenPatternPlayer` isolates
-audio output. `GuitarListenPlayer` composes a loop from the supplied mono Down/Up WAV files,
-overlaps their decays, preserves silent rest slots, and exposes AVAudioPlayerNode sample time to
-drive the marker. Ready unlocks after one full loop, and routes through AppRouter into the existing
+audio output. `SynthListenPlayer` plays the pattern on the synthesised guitar (`GuitarEngine`, a
+C chord for every strum), scheduling each strum a little ahead on the host clock; rest slots stay
+silent, and the time since the first strum drives the marker. Ready unlocks after one full loop, and routes through AppRouter into the existing
 Play session/count-in. Pause preserves playback position; Restart resets the first-loop requirement;
 Back returns to the pattern list. Leaving the screen, backgrounding, or an audio interruption stops
 or pauses playback. Audio files are bundled under Resources/Audio; direction labels follow the
@@ -134,7 +134,7 @@ The user hears the correct pattern before playing\. It can be replayed any numbe
 - If the Wi\-Fi Aware session is close to its time limit, it is refreshed after Ready and before the<br>count\-in, and the count\-in waits until the controller is back \(§3\.2\.3\)\.
 - After it, a 3\-2\-1 count\-in aligned to the beat interval at the chosen BPM\. After "1", the session<br>enters playing exactly on the first beat\.
 - Play renders the pattern as a row of beat nodes with a moving beat marker\. The marker is driven by<br>BeatClock ticks, never by its own timer\.
-- The metronome is scheduled by the same BeatClock\. Volume follows SettingsStore\.soundVolume\.
+- The metronome is scheduled by the same BeatClock: on each tick, the next quarter note's click is<br>scheduled on the host clock \(GuitarEngine, MetronomeSound\), and the first beat of a bar is<br>accented\. Every swipe also sounds the synthesised guitar \(a C chord in the swipe's direction,<br>GuitarSound\), in or out of a session\. Volume follows SettingsStore\.soundVolume \[not wired yet\]\.
 - Beat node colours come from design tokens, not hard\-coded values\.
 
 ### 3\.2 Real\-time feedback engine \(US 1, US 6\)
@@ -270,7 +270,7 @@ Flow: when the session ends, Play is replaced by Summary \(Back never returns to
 
 Replay plays the previous session again, visually and audibly, from the stored \[BeatEvent\]\. It takes<br>no controller input and does no new judging\. The colour sequence must match the original session exactly\.
 
-Audio is reconstructed, not recorded: the metronome and pattern are re\-scheduled from the stored beat<br>times, and the player's own strums are re\-played as guitar strums at their stored times and<br>directions\. There is no microphone recording to play back\.
+Audio is reconstructed, not recorded: the metronome is re\-scheduled on every quarter note, and the<br>player's own strums are re\-played as guitar strums at their stored times \(ReplayCue, scheduled on the<br>host clock through GuitarSound and MetronomeSound\)\. BeatEvent does not store a strum's direction, so a<br>strum takes the direction of the note it was judged against; a Miss with no strum makes no sound\.<br>There is no microphone recording to play back\.
 
 #### 3\.3\.3 Retry and BPM recommendation
 

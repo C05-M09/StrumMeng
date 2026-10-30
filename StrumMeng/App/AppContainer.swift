@@ -9,6 +9,15 @@ final class AppContainer {
     private let results = SessionResultStore()
     /// The one pattern list of the app, so Retry can hand it the chosen tempo.
     private weak var patternListViewModel: PatternListViewModel?
+    /// One synthesised guitar for the whole app, made when a screen first needs it. Notes are
+    /// synthesised right away, so they are ready before the first strum.
+    private lazy var guitar: GuitarEngine? = {
+        let engine = GuitarEngine()
+        if let engine { Task { await engine.prepare() } }
+        return engine
+    }()
+    private var guitarSound: any GuitarSound { guitar ?? SilentGuitarSound() }
+    private var metronomeSound: any MetronomeSound { guitar ?? SilentGuitarSound() }
 
     init(
         router: AppRouter,
@@ -43,7 +52,7 @@ final class AppContainer {
         ListenViewModel(
             pattern: pattern,
             bpm: bpm,
-            player: GuitarListenPlayer(),
+            player: SynthListenPlayer(sound: guitarSound),
             onReady: { [weak router] in router?.push(.play(patternID: pattern.id, bpm: bpm)) },
             onBack: { [weak router] in router?.popTo(.practiceList) }
         )
@@ -57,6 +66,8 @@ final class AppContainer {
             clock: AudioBeatClock(),
             input: input,
             touchInput: input,
+            guitar: guitarSound,
+            metronome: metronomeSound,
             now: HostClock.now,
             waitUntil: { time in
                 let delay = time - HostClock.now()
@@ -81,6 +92,9 @@ final class AppContainer {
             repository: repository ?? UnavailableSessionRepository(),
             onNavigate: { [weak self] destination in
                 self?.navigate(from: result, to: destination)
+            },
+            makeReplayViewModel: { [guitar = guitarSound, metronome = metronomeSound] result in
+                ReplayViewModel(result: result, guitar: guitar, metronome: metronome)
             }
         )
     }
