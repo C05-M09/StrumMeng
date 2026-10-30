@@ -290,6 +290,7 @@ The result is clamped to 40…120\. Thresholds and deltas live in configuration,
 - Sorted by accuracy, best to worst\. Three records are visible; the rest scroll inside the card\.
 - Pattern never played: an empty state\.
 - The list refreshes when the user returns from a session, without restarting the app\.
+- AppContainer wires one shared SwiftDataSessionRepository into a RecordsViewModel for each pattern. PatternListView passes the selected model into PatternCardView, which embeds RecordsView; its view task reloads records when the card appears. Storage initialization failures show the records error state. Previews use the same schema with in-memory storage.
 - Ties in accuracy are broken by the more recent session \[Assumption\]\.
 
 ### 3\.4 Persistence
