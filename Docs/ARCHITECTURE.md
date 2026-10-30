@@ -117,9 +117,9 @@ func reduce(_ state: PracticeState, _ event: PracticeEvent) -> PracticeState {
 
 US3 implementation: the list routes to Listen's information state, followed by the looping audio
 example. `ListenViewModel` owns `ListenState` and a pure reducer; `ListenPatternPlayer` isolates
-audio output. `GuitarListenPlayer` composes a loop from the supplied mono Down/Up WAV files,
-overlaps their decays, preserves silent rest slots, and exposes AVAudioPlayerNode sample time to
-drive the marker. Ready unlocks after one full loop, and routes through AppRouter into the existing
+audio output. `SynthListenPlayer` plays the pattern on the synthesised guitar (`GuitarEngine`, a
+C chord for every strum), scheduling each strum a little ahead on the host clock; rest slots stay
+silent, and the time since the first strum drives the marker. Ready unlocks after one full loop, and routes through AppRouter into the existing
 Play session/count-in. Pause preserves playback position; Restart resets the first-loop requirement;
 Back returns to the pattern list. Leaving the screen, backgrounding, or an audio interruption stops
 or pauses playback. Audio files are bundled under Resources/Audio; direction labels follow the
