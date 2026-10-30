@@ -103,7 +103,7 @@ final class ReplayViewModelTests: XCTestCase {
     func test_pause_freezesSongTime() {
         let vm = makeViewModel(events: [])
         vm.send(.play)
-        vm.advanceTime(by: 1.0)
+        currentTime += 1.0
 
         let songTimeBeforePause = vm.songTime()
         vm.send(.pause)
@@ -116,13 +116,32 @@ final class ReplayViewModelTests: XCTestCase {
         XCTAssertEqual(vm.songTime(), songTimeBeforePause)
 
         // Resume playback
-        vm.send(.play)
+        vm.send(.resume)
         XCTAssertEqual(vm.state, .playing)
         XCTAssertEqual(vm.songTime(), songTimeBeforePause)
 
         // Host time moves by 0.5s after resume
         currentTime += 0.5
         XCTAssertEqual(vm.songTime(), songTimeBeforePause + 0.5, accuracy: 0.001)
+    }
+
+    func test_resume_continuesFromPausedPosition() {
+        let vm = makeViewModel(events: [])
+        vm.send(.play)
+        currentTime += 2.0
+
+        let timeAtPause = vm.songTime()
+        vm.send(.pause)
+
+        currentTime += 10.0
+        XCTAssertEqual(vm.songTime(), timeAtPause)
+
+        vm.send(.resume)
+        XCTAssertEqual(vm.state, .playing)
+        XCTAssertEqual(vm.songTime(), timeAtPause)
+
+        currentTime += 1.0
+        XCTAssertEqual(vm.songTime(), timeAtPause + 1.0, accuracy: 0.001)
     }
 
     func test_restart_resetsPlaybackToInitialTime() {

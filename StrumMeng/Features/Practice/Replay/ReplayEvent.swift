@@ -11,6 +11,7 @@ import Foundation
 enum ReplayEvent: Equatable, Sendable {
     case play
     case pause
+    case resume
     case restart
     case finish
     case backToSummary

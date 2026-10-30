@@ -146,7 +146,7 @@ final class ReplayViewModel {
                 songTimeAtAnchor = initialSongTime
                 currentSongTime = initialSongTime
             } else {
-                songTimeAtAnchor = songTime()
+                songTimeAtAnchor = currentSongTime
             }
             hostTimeAnchor = now()
 
@@ -174,9 +174,9 @@ final class ReplayViewModel {
     // MARK: - Logika Waktu Playback
 
     /// Mengembalikan posisi waktu lagu saat ini (dalam detik, di mana 0 adalah ketukan pertama).
-    /// Jika sedang `.playing`, waktu dihitung secara dinamis dari selisih `now() - hostTimeAnchor`.
+    /// Jika `hostTimeAnchor` aktif (sedang berjalan), waktu dihitung secara dinamis dari selisih `now() - hostTimeAnchor`.
     func songTime() -> TimeInterval {
-        if state == .playing, let hostTimeAnchor {
+        if let hostTimeAnchor {
             let elapsed = now() - hostTimeAnchor
             let calculated = songTimeAtAnchor + elapsed
             if calculated >= duration {
@@ -197,7 +197,9 @@ final class ReplayViewModel {
         } else {
             currentSongTime = target
             songTimeAtAnchor = target
-            hostTimeAnchor = now()
+            if hostTimeAnchor != nil {
+                hostTimeAnchor = now()
+            }
         }
     }
 

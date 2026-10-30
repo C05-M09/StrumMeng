@@ -21,6 +21,10 @@ final class ReplayReducerTests: XCTestCase {
         XCTAssertEqual(reduce(ReplayState.paused, .play), .playing)
     }
 
+    func test_resume_fromPaused_resumesPlaying() {
+        XCTAssertEqual(reduce(ReplayState.paused, .resume), .playing)
+    }
+
     func test_finish_fromPlaying_transitionsToFinished() {
         XCTAssertEqual(reduce(ReplayState.playing, .finish), .finished)
     }

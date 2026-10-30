@@ -74,7 +74,7 @@ struct ReplayView: View {
                     if viewModel.state == .playing {
                         viewModel.send(.pause)
                     } else if viewModel.state == .paused {
-                        viewModel.send(.play)
+                        viewModel.send(.resume)
                     }
                 }
             }
@@ -177,7 +177,7 @@ struct ReplayView: View {
 
                     Button("Resume") {
                         withAnimation(.easeOut(duration: 0.2)) {
-                            viewModel.send(.play)
+                            viewModel.send(.resume)
                         }
                     }
                     .buttonStyle(

@@ -20,7 +20,7 @@ func reduce(_ state: ReplayState, _ event: ReplayEvent) -> ReplayState {
     case (.playing, .pause):
         return .paused
 
-    case (.paused, .play):
+    case (.paused, .play), (.paused, .resume):
         return .playing
 
     case (.playing, .finish):
