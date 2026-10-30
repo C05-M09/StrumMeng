@@ -112,15 +112,28 @@ final class AppContainerTests: XCTestCase {
         XCTAssertEqual(router.path, expected)
     }
 
+    /// Waits until the stack is the practice list with a Listen on top, and returns that Listen.
+    private func waitForListen(on router: AppRouter) async throws -> AppRoute? {
+        for _ in 0..<200 {
+            if router.path.count == 2, router.path.first == .practiceList,
+               case .listen = router.path.last {
+                return router.path.last
+            }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        XCTFail("Expected [practiceList, listen], got \(router.path)")
+        return nil
+    }
+
     func test_finishedSession_replacesPlayWithSummary() {
         let container = AppContainer(router: router, inMemory: true)
-        router.path = [.practiceList, .listen(patternID: "foundation", bpm: 80), .play(patternID: "foundation", bpm: 80)]
+        let listen = AppRoute.listen(patternID: "foundation", bpm: 80)
+        router.path = [.practiceList, listen, .play(patternID: "foundation", bpm: 80)]
         let session = finishedSession()
 
         container.sessionFinished(session)
 
-        XCTAssertEqual(router.path, [.practiceList, .listen(patternID: "foundation", bpm: 80),
-                                     .summary(sessionID: session.id)])
+        XCTAssertEqual(router.path, [.practiceList, listen, .summary(sessionID: session.id)])
         XCTAssertEqual(container.makeSummaryViewModel(sessionID: session.id)?.result, session)
     }
 
@@ -144,22 +157,30 @@ final class AppContainerTests: XCTestCase {
         }
         summary.send(.acceptRecommendation)
 
-        let bpm = recommendation.targetBPM
-        try await waitForPath([.practiceList, .listen(patternID: "foundation", bpm: bpm)], on: router)
-        XCTAssertEqual(list.state.selectedBPM, bpm)
+        let route = try await waitForListen(on: router)
+        guard case let .listen(patternID, bpm, _) = route else { return }
+        XCTAssertEqual(patternID, "foundation")
+        XCTAssertEqual(bpm, recommendation.targetBPM)
+        XCTAssertEqual(list.state.selectedBPM, recommendation.targetBPM)
     }
 
-    func test_retryAtTheSameTempo_listensAgainAtThatTempo() async throws {
+    /// Regression: keeping the same tempo used to show the old, finished Listen screen (frozen).
+    func test_retryAtTheSameTempo_opensANewListenScreen() async throws {
         let container = AppContainer(router: router, inMemory: true)
         let session = finishedSession(bpm: 75)
-        router.path = [.practiceList, .listen(patternID: "foundation", bpm: 75), .play(patternID: "foundation", bpm: 75)]
+        let firstListen = AppRoute.listen(patternID: "foundation", bpm: 75)
+        router.path = [.practiceList, firstListen, .play(patternID: "foundation", bpm: 75)]
         container.sessionFinished(session)
         let summary = try XCTUnwrap(container.makeSummaryViewModel(sessionID: session.id))
 
         summary.send(.tapRetry)
         summary.send(.rejectRecommendation)
 
-        try await waitForPath([.practiceList, .listen(patternID: "foundation", bpm: 75)], on: router)
+        let route = try await waitForListen(on: router)
+        XCTAssertNotEqual(route, firstListen, "Must be a new screen, not the one already used")
+        guard case let .listen(patternID, bpm, _) = route else { return }
+        XCTAssertEqual(patternID, "foundation")
+        XCTAssertEqual(bpm, 75)
     }
 
     func test_backToMain_returnsToThePracticeList() async throws {

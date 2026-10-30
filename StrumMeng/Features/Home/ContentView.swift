@@ -32,19 +32,24 @@ struct ContentView: View {
                     case .practiceList:
                         PatternListView(viewModel: patternListViewModel)
 
-                    case let .listen(patternID, bpm):
+                    case let .listen(patternID, bpm, _):
                         if let pattern = PatternCatalog.all.first(where: { $0.id == patternID }) {
+                            // A screen per route value: at the same stack position, SwiftUI would
+                            // otherwise keep the previous Listen and its finished view model.
                             ListenRoute(pattern: pattern, bpm: bpm, container: container)
+                                .id(route)
                         }
 
                     case let .play(patternID, bpm):
                         if let pattern = PatternCatalog.all.first(where: { $0.id == patternID }) {
                             PlayRoute(pattern: pattern, bpm: bpm, container: container)
+                                .id(route)
                                 .navigationBarBackButtonHidden()
                         }
 
                     case let .summary(sessionID):
                         SummaryRoute(sessionID: sessionID, container: container)
+                            .id(route)
                             .navigationBarBackButtonHidden()
                     }
                 }
