@@ -10,6 +10,7 @@ import SwiftUI
 struct SummaryView: View {
     let viewModel: SummaryViewModel
     var onNavigate: ((SummaryDestination) -> Void)?
+    @State private var activeReplayResult: SessionResult?
 
     var body: some View {
         GeometryReader { proxy in
@@ -51,8 +52,21 @@ struct SummaryView: View {
                         }
                     )
                 }
+
+                // 4. Layar Replay (Slide)
+                if let replayResult = activeReplayResult {
+                    ReplayView(viewModel: ReplayViewModel(result: replayResult)) {
+                        withAnimation(.easeInOut(duration: 0.35)) {
+                            activeReplayResult = nil
+                        }
+                        viewModel.send(.returnFromReplay)
+                    }
+                    .transition(.slide)
+                    .zIndex(100)
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .animation(.easeInOut(duration: 0.35), value: activeReplayResult != nil)
         }
         .ignoresSafeArea()
         .statusBarHidden(true)
@@ -63,6 +77,11 @@ struct SummaryView: View {
         }
         .onChange(of: viewModel.state) { _, newState in
             if case .navigating(let destination) = newState {
+                if case .replay(let result) = destination {
+                    withAnimation(.easeInOut(duration: 0.35)) {
+                        activeReplayResult = result
+                    }
+                }
                 onNavigate?(destination)
             }
         }

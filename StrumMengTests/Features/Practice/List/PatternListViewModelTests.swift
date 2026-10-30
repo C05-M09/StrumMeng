@@ -42,6 +42,30 @@ final class PatternListViewModelTests: XCTestCase {
         XCTAssertTrue(didRequestBack)
     }
 
+    func test_selectingPattern_usesItsOwnRecordsWithoutChangingTempoRules() async {
+        let repository = MockSessionRepository()
+        let records = Dictionary(uniqueKeysWithValues: PatternCatalog.all.map {
+            ($0.id, RecordsViewModel(patternID: $0.id, repository: repository))
+        })
+        let viewModel = PatternListViewModel(
+            recordsViewModels: records,
+            onListenRequested: { _, _ in },
+            onBackRequested: {}
+        )
+
+        for pattern in PatternCatalog.all {
+            viewModel.send(.selectPattern(id: pattern.id))
+            viewModel.send(.increaseBPM)
+            let selectedID = viewModel.state.selectedPatternID ?? ""
+            await viewModel.recordsViewModels[selectedID]?.load()
+        }
+
+        let calls = await repository.topRecordsCalls
+        XCTAssertEqual(calls.map(\.patternID), PatternCatalog.all.map(\.id))
+        XCTAssertTrue(calls.allSatisfy { $0.limit == nil && $0.sortedBy == .accuracy })
+        XCTAssertEqual(viewModel.state.selectedBPM, 85)
+    }
+
     private func makeViewModel<S: Sequence>(patterns: S) -> PatternListViewModel
     where S.Element == StrumPattern {
         PatternListViewModel(

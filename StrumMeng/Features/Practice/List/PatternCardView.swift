@@ -5,6 +5,8 @@ struct PatternCardView: View {
     let bpm: Int
     let onDecreaseBPM: () -> Void
     let onIncreaseBPM: () -> Void
+    var recordsViewModel: RecordsViewModel? = nil
+    var recordsFallbackState: RecordsViewState = .empty
 
     var body: some View {
         ZStack {
@@ -60,11 +62,15 @@ struct PatternCardView: View {
             .position(x: 555, y: 220)
             .accessibilityLabel("Session duration \(sessionDurationLabel)")
 
-            Text("no records history yet")
-                .font(AppTypography.dmMono(size: 17))
-                .foregroundStyle(AppColors.recordOutline)
-                .position(x: 335, y: 470)
-                .accessibilityLabel("No playing record yet")
+            Group {
+                if let recordsViewModel {
+                    RecordsView(viewModel: recordsViewModel)
+                } else {
+                    RecordsContentView(state: recordsFallbackState)
+                }
+            }
+            .frame(width: 570)
+            .position(x: 331, y: 478)
         }
         .frame(width: 662.03, height: 742.38)
     }
