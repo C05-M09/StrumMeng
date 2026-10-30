@@ -10,7 +10,7 @@ struct PlayLaneView: View {
 
     var body: some View {
         let lane = layout.laneRect
-        let laneTime = PlayTimeline.laneTime(songTime: model.songTime, slotInterval: model.slotInterval)
+        let laneTime = PlayTimeline.laneTime(songTime: model.songTime, readyLead: layout.readyLeadTime)
         let railY = layout.railY - lane.minY
         let hitX = layout.hitX - lane.minX
 
@@ -64,7 +64,7 @@ struct PlayLaneView: View {
 
     private func nodeX(_ node: PlayLaneNode, laneTime: TimeInterval) -> CGFloat {
         PlayTimeline.nodeX(nodeTime: node.time, songTime: laneTime, slotInterval: model.slotInterval,
-                           hitX: layout.hitX, slotSpacing: layout.slotSpacing)
+                           hitX: layout.hitX, slotSpacing: layout.slotSpacing(slotInterval: model.slotInterval))
     }
 
     private func visibleNodes(laneTime: TimeInterval) -> [PlayLaneNode] {

@@ -16,11 +16,12 @@ final class PlayViewModelTests: XCTestCase {
                                latencyOffset: TimeInterval = 0,
                                strumArrivalGrace: TimeInterval = 0,
                                touchInput: TouchStrumInput? = nil,
-                               controller: ControllerLink? = nil) throws -> PlayViewModel {
+                               controller: ControllerLink? = nil,
+                               requiresController: Bool = true) throws -> PlayViewModel {
         let pattern = try XCTUnwrap(PatternCatalog.all.first { $0.id == patternID })
         return PlayViewModel(
             pattern: pattern, bpm: 80, clock: clock, input: MockStrumInputService(), touchInput: touchInput,
-            controller: controller, latencyOffset: latencyOffset, strumArrivalGrace: strumArrivalGrace, repetitions: repetitions,
+            controller: controller, requiresController: requiresController, latencyOffset: latencyOffset, strumArrivalGrace: strumArrivalGrace, repetitions: repetitions,
             now: { [unowned self] in self.currentTime },
             waitUntil: { _ in try? await Task.sleep(for: .seconds(3600)) },
             makeID: { UUID(uuidString: "00000000-0000-0000-0000-000000000001") ?? UUID() },
@@ -143,6 +144,16 @@ final class PlayViewModelTests: XCTestCase {
         tick(viewModel, 7)                                          // step 1 is a rest: nothing to judge
         strum(viewModel, at: time(ofTick: 7))
         XCTAssertEqual(viewModel.screenModel().lastStrumTime ?? -1, step, accuracy: 1e-9)
+    }
+
+    func test_aStrumArrivingLate_makesTheRingReactWhenItArrives_butIsJudgedByTouchTime() async throws {
+        let viewModel = try makeViewModel()
+        await startPlaying(viewModel)
+        // Touched on the beat, delivered 80 ms later over the network.
+        currentTime = time(ofTick: 6) + 0.08
+        viewModel.handle(PracticeFixtures.strum(at: time(ofTick: 6), .down))
+        XCTAssertEqual(viewModel.screenModel().lastStrumTime ?? -1, 0.08, accuracy: 1e-9)
+        XCTAssertEqual(nodeResult(viewModel, step: 0), .perfect)
     }
 
     func test_wrongDirection_turnsTheNodeMissRightAway() async throws {
@@ -441,5 +452,33 @@ final class PlayViewModelTests: XCTestCase {
         currentTime = time(ofTick: 6) + 0.25
         viewModel.closeWindows(upTo: currentTime)
         XCTAssertEqual(nodeResult(viewModel, step: 0), .miss)
+    }
+
+    // MARK: Optional controller (on-screen swipes work too)
+
+    func test_optionalController_readyWorksWithoutTheIPhone() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try makeViewModel(controller: controller, requiresController: false)
+        await viewModel.handle(.searching)
+        await viewModel.send(.tapReady)
+        XCTAssertEqual(viewModel.state, .countIn(3))
+    }
+
+    func test_optionalController_sessionWithoutTheIPhone_ignoresItDropping() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try makeViewModel(controller: controller, requiresController: false)
+        await viewModel.handle(.searching)
+        await startPlaying(viewModel)
+        await viewModel.handle(.reconnecting)
+        XCTAssertEqual(viewModel.state, .playing)
+    }
+
+    func test_optionalController_sessionStartedWithTheIPhone_pausesWhenItDrops() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try makeViewModel(controller: controller, requiresController: false)
+        await viewModel.handle(.connected(latencyMs: 5))
+        await startPlaying(viewModel)
+        await viewModel.handle(.reconnecting)
+        XCTAssertEqual(viewModel.state, .paused)
     }
 }

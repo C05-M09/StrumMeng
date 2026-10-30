@@ -42,9 +42,16 @@ nonisolated struct ClientMessageHandler: Sendable {
         .ping(sentAt: sentAt, latencyMs: clock.latencyMs)
     }
 
-    /// How long to wait after sending ping number `count` (1-based): quick at first, then every second.
-    static func pingDelay(afterPing count: Int) -> Duration {
-        count < quickPingCount ? .milliseconds(150) : .seconds(1)
+    /// Ping interval while a session is playing. Steady traffic keeps both Wi-Fi radios out of
+    /// power save, which otherwise holds a strum for up to a beacon interval (~100 ms) after a
+    /// quiet moment. It also keeps the clock samples fresh during play.
+    static let playingPingInterval: Duration = .milliseconds(50)
+
+    /// How long to wait after sending ping number `count` (1-based): fast while playing, otherwise
+    /// quick at first and then every second to save battery.
+    static func pingDelay(afterPing count: Int, sessionActive: Bool) -> Duration {
+        if sessionActive { return playingPingInterval }
+        return count < quickPingCount ? .milliseconds(150) : .seconds(1)
     }
 
     /// Call when a new connection becomes ready. Old clock samples and session state no longer apply.
