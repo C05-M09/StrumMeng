@@ -8,7 +8,13 @@ struct CompanionTouchpadView: View {
 
     var body: some View {
         ZStack {
-            CompanionGuitarPlaceholderView()
+            // The neck runs up the screen and the sound hole sits at the bottom, so strumming crosses
+            // the strings left and right. Filled, because iPhones differ slightly in shape.
+            Image("Companion_Guitar")
+                .resizable()
+                .scaledToFill()
+                .ignoresSafeArea()
+                .accessibilityHidden(true)
 
             CompanionTouchSurface(
                 onMove: { dx, touchAge in viewModel.swipe(dx: dx, touchAge: touchAge) },
