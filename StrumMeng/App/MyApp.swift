@@ -4,6 +4,8 @@ import SwiftUI
     #if DEBUG
     /// Stays on across launches from the home screen, which carry no launch arguments.
     @AppStorage("playWithController") private var playWithController = false
+    /// Keeps the link test screen reachable on the iPhone while the companion screens are dummies.
+    @AppStorage("companionLinkTest") private var companionLinkTest = false
     #endif
 
     init() {
@@ -19,33 +21,51 @@ import SwiftUI
     var body: some Scene {
         WindowGroup {
             #if DEBUG
-            // Until the controller screens exist: the iPhone, or an iPad launched with
-            // -controllerLinkDebug, opens the link test screen; -playWithController opens Play
-            // driven by the iPhone until its status bar's App button turns it off.
+            // The iPhone opens the dummy companion screens and its Link test button opens the link
+            // test screen; so does an iPad launched with -controllerLinkDebug. -playWithController
+            // opens Play driven by the iPhone until its status bar's App button turns it off.
             if DeviceRole.current == .host, playWithController {
                 ControllerPlayDebugView(onLeave: { playWithController = false })
-            } else if DeviceRole.current == .controller
+            } else if companionLinkTest && DeviceRole.current == .controller
                         || ProcessInfo.processInfo.arguments.contains("-controllerLinkDebug") {
                 ControllerLinkDebugView(model: ControllerLinkDebugModel(
                     role: DeviceRole.current, deviceName: UIDevice.current.name))
+                    .overlay(alignment: .bottomTrailing) {
+                        if DeviceRole.current == .controller {
+                            debugButton("Dummy UI") { companionLinkTest = false }
+                        }
+                    }
             } else if DeviceRole.current == .host {
                 // The way back to controller gameplay after the status bar's App button.
                 ContentView()
                     .overlay(alignment: .topTrailing) {
-                        Button("Controller play") { playWithController = true }
-                            .font(.caption.monospaced())
-                            .foregroundStyle(AppColor.ink)
-                            .padding(.horizontal, AppSpacing.m)
-                            .padding(.vertical, AppSpacing.xs)
-                            .background(AppColor.paper, in: Capsule())
-                            .padding(AppSpacing.m)
+                        debugButton("Controller play") { playWithController = true }
                     }
+            } else {
+                CompanionRootView()
+                    .overlay(alignment: .bottomTrailing) {
+                        debugButton("Link test") { companionLinkTest = true }
+                    }
+            }
+            #else
+            if DeviceRole.current == .controller {
+                CompanionRootView()
             } else {
                 ContentView()
             }
-            #else
-            ContentView()
             #endif
         }
     }
+
+    #if DEBUG
+    private func debugButton(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(title, action: action)
+            .font(.caption.monospaced())
+            .foregroundStyle(AppColor.ink)
+            .padding(.horizontal, AppSpacing.m)
+            .padding(.vertical, AppSpacing.xs)
+            .background(AppColor.paper, in: Capsule())
+            .padding(AppSpacing.m)
+    }
+    #endif
 }
