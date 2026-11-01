@@ -154,7 +154,7 @@ Rules:
 - FeedbackEngine emits each BeatEvent as soon as that beat's window closes, not at the end of the<br>session\.
 - Latency offset \(from calibration, stored in SettingsStore\) is applied inside TimingJudge\. Do not<br>apply it anywhere else\. It compensates for audio output delay \(for example Bluetooth headphones\)<br>and how the player perceives the beat, not for network delay \(that is handled by the clock offset\)\.
 - The metronome and the pattern example are scheduled by the same BeatClock, never by a second clock\.
-- The guitar sound and metronome play on the iPad only\. The iPhone controller is silent\.
+- During a session, from the count\-in on, the guitar sound and metronome play on the iPad only and<br>the iPhone is silent\. Outside a session the iPhone plays its own strums \(ARCHITECTURE\.md decision 20\)\.<br>The metronome never plays on the iPhone\.
 - Wi\-Fi Aware publishing has a time limit\. When the session is old, the link is refreshed before<br>the count\-in, never during playing\.
 - Contracts are shared between developers and must not change unilaterally: BeatResult, BeatEvent,<br>StrumEvent, SessionResult, ControllerLink, BeatClock, SessionRepository, SettingsStore\. If one must<br>change, discuss it first and update ARCHITECTURE\.md\.
 - Replay does not take controller input and does not re\-judge\. It re\-plays stored \[BeatEvent\]<br>visually and audibly\. The colour sequence must match the original session exactly\.
@@ -177,7 +177,6 @@ Rules:
 - Showtime \(song selection, scrolling chords, star ratings\)\. Its button exists on Home and must have<br>no action: no navigation, no "Coming Soon" message\.
 - A separate History screen\. History is the records on pattern cards\.
 - Microphone input or audio strum detection\.
-- Guitar sound on the iPhone controller\.
 - Any backend, internet call, account, or cloud sync\.
 - Chord recognition\. Practice never requires playing a chord\.
 - Locking patterns behind progress\. All patterns are open\.
