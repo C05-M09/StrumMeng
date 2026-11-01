@@ -16,11 +16,6 @@ struct DeviceSetupView: View {
                 BackButton { viewModel.send(.tapBack) }
                     .position(BackButton.referenceCenter)
                 lane.position(x: size.width / 2, y: 520)
-                ChunkyButton(title: "Next state (dummy)", style: .secondary, fontSize: 28,
-                             width: 470, height: 96, hasDropShadow: true) {
-                    viewModel.send(.simulateNextState)
-                }
-                .position(x: 400, y: 884)
                 ChunkyButton(title: "Done", fontSize: 44, width: 294, height: 96, hasDropShadow: true) {
                     viewModel.send(.tapDone)
                 }
@@ -36,6 +31,8 @@ struct DeviceSetupView: View {
         .ignoresSafeArea()
         .navigationBarBackButtonHidden()
         .statusBarHidden()
+        .onAppear { viewModel.appear() }
+        .onDisappear { viewModel.disappear() }
     }
 
     private var title: some View {
@@ -56,21 +53,28 @@ struct DeviceSetupView: View {
                 PairCodeSlotsView(code: viewModel.pairCode, slotSize: CGSize(width: 120, height: 150))
                 steps
             }
-        case .connected:
+        case let .connected(latencyMs):
             VStack(spacing: AppSpacing.l) {
                 heading("Connected", color: AppColor.perfect, size: 92)
-                Text("iPhone is ready to strum")
-                    .font(AppTypography.dmMono(size: 34))
-                    .foregroundStyle(AppColor.titleText)
+                detail("iPhone is ready to strum (\(Int(latencyMs.rounded())) ms)")
             }
         case .reconnecting:
             VStack(spacing: AppSpacing.l) {
                 heading("Reconnecting...", color: AppColor.tooEarly, size: 72)
-                Text("Keep StrumMeng open on your iPhone")
-                    .font(AppTypography.dmMono(size: 34))
-                    .foregroundStyle(AppColor.titleText)
+                detail("Keep StrumMeng open on your iPhone")
+            }
+        case .failed:
+            VStack(spacing: AppSpacing.l) {
+                heading("Could not start", color: AppColor.miss, size: 72)
+                detail("Allow Local Network in Settings, then open this again")
             }
         }
+    }
+
+    private func detail(_ text: String) -> some View {
+        Text(text)
+            .font(AppTypography.dmMono(size: 34))
+            .foregroundStyle(AppColor.titleText)
     }
 
     private func heading(_ text: String, color: Color, size: CGFloat = 44) -> some View {
@@ -89,14 +93,31 @@ struct DeviceSetupView: View {
     }
 }
 
+#if DEBUG
+/// Stands in for the link in previews, which only show the state they are given.
+private struct PreviewControllerLink: ControllerLink {
+    let pairCode = PairCode("482913") ?? .random()
+    var strums: AsyncStream<StrumEvent> { AsyncStream { $0.finish() } }
+    var connectionStates: AsyncStream<ControllerConnectionState> { AsyncStream { $0.finish() } }
+    func start() async throws {}
+    func refreshIfNeeded() async throws {}
+    func setSessionActive(_ active: Bool) async {}
+    func stop() async {}
+}
+
 #Preview("Searching", traits: .landscapeLeft) {
-    DeviceSetupView(viewModel: DeviceSetupViewModel(state: .searching, onClose: {}))
+    DeviceSetupView(viewModel: DeviceSetupViewModel(link: PreviewControllerLink(), state: .searching, onClose: {}))
 }
 
 #Preview("Connected", traits: .landscapeLeft) {
-    DeviceSetupView(viewModel: DeviceSetupViewModel(state: .connected, onClose: {}))
+    DeviceSetupView(viewModel: DeviceSetupViewModel(link: PreviewControllerLink(), state: .connected(latencyMs: 12), onClose: {}))
 }
 
 #Preview("Reconnecting", traits: .landscapeLeft) {
-    DeviceSetupView(viewModel: DeviceSetupViewModel(state: .reconnecting, onClose: {}))
+    DeviceSetupView(viewModel: DeviceSetupViewModel(link: PreviewControllerLink(), state: .reconnecting, onClose: {}))
 }
+
+#Preview("Failed", traits: .landscapeLeft) {
+    DeviceSetupView(viewModel: DeviceSetupViewModel(link: PreviewControllerLink(), state: .failed, onClose: {}))
+}
+#endif

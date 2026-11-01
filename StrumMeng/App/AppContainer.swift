@@ -18,6 +18,8 @@ final class AppContainer {
     }()
     private var guitarSound: any GuitarSound { guitar ?? SilentGuitarSound() }
     private var metronomeSound: any MetronomeSound { guitar ?? SilentGuitarSound() }
+    /// One link for the whole app session: reconnecting takes seconds, so sessions never restart it.
+    private var controllerLink: (any ControllerLink)?
 
     init(
         router: AppRouter,
@@ -145,6 +147,20 @@ final class AppContainer {
     }
 
     func makeDeviceSetupViewModel() -> DeviceSetupViewModel {
-        DeviceSetupViewModel(onClose: { [weak router] in router?.pop() })
+        DeviceSetupViewModel(link: sharedControllerLink(), onClose: { [weak router] in router?.pop() })
+    }
+
+    /// Made on first use, so an AppContainer that never needs the iPhone never opens the network.
+    private func sharedControllerLink() -> any ControllerLink {
+        if let controllerLink { return controllerLink }
+        let link = BonjourControllerLink(pairCode: UserDefaultsPairCodeStore().hostPairCode())
+        controllerLink = link
+        return link
+    }
+
+    func stopControllerLink() {
+        guard let link = controllerLink else { return }
+        controllerLink = nil
+        Task { await link.stop() }
     }
 }
