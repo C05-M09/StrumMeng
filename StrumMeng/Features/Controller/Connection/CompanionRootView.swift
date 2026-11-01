@@ -13,7 +13,7 @@ struct CompanionRootView: View {
             switch viewModel.state {
             case .connected, .reconnecting:
                 CompanionTouchpadView(viewModel: viewModel)
-            case .enteringCode, .connecting:
+            case .enteringCode, .connecting, .notFound:
                 CompanionPairingView(viewModel: viewModel)
             }
         }
@@ -30,6 +30,10 @@ struct CompanionRootView: View {
 
 #Preview("Connecting") {
     CompanionRootView(viewModel: .preview(state: .connecting("482913")))
+}
+
+#Preview("iPad not found") {
+    CompanionRootView(viewModel: .preview(state: .notFound("482913")))
 }
 
 #Preview("Connected") {

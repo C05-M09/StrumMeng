@@ -48,6 +48,19 @@ final class CompanionReducerTests: XCTestCase {
         XCTAssertEqual(reduce(.reconnecting, .disconnect), .enteringCode(""))
     }
 
+    func test_aTimeout_showsNotFound_onlyWhileConnecting() {
+        XCTAssertEqual(reduce(.connecting("482913"), .connectionTimedOut), .notFound("482913"))
+        XCTAssertEqual(reduce(.connected, .connectionTimedOut), .connected)
+    }
+
+    func test_typingAfterNotFound_startsANewCode() {
+        XCTAssertEqual(reduce(.notFound("482913"), .typeDigit(7)), .enteringCode("7"))
+    }
+
+    func test_deleteAfterNotFound_clearsTheCode() {
+        XCTAssertEqual(reduce(.notFound("482913"), .deleteDigit), .enteringCode(""))
+    }
+
     func test_typingWhileConnectingOrConnected_isIgnored() {
         XCTAssertEqual(reduce(.connecting("482913"), .typeDigit(1)), .connecting("482913"))
         XCTAssertEqual(reduce(.connecting("482913"), .deleteDigit), .connecting("482913"))

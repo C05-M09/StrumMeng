@@ -41,9 +41,16 @@ struct CompanionPairingView: View {
                 .foregroundStyle(AppColor.titleText)
                 .multilineTextAlignment(.center)
             PairCodeSlotsView(code: typedCode, slotSize: CGSize(width: 38, height: 50))
-            Text("Same Wi-Fi as your iPad")
-                .font(AppFont.mono(13))
-                .foregroundStyle(AppColor.titleText)
+            if isConnecting {
+                ChunkyButton(title: "Cancel", style: .secondary, fontSize: 14, width: 110, height: 34,
+                             hasDropShadow: true) {
+                    viewModel.send(.disconnect)
+                }
+            } else {
+                Text(hint)
+                    .font(AppFont.mono(13))
+                    .foregroundStyle(AppColor.titleText)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, AppSpacing.l)
@@ -79,7 +86,16 @@ struct CompanionPairingView: View {
     }
 
     private var prompt: String {
-        isConnecting ? "CONNECTING..." : "ENTER THE CODE\nON YOUR IPAD"
+        switch viewModel.state {
+        case .connecting: "CONNECTING..."
+        case .notFound: "IPAD NOT FOUND"
+        default: "ENTER THE CODE\nON YOUR IPAD"
+        }
+    }
+
+    private var hint: String {
+        if case .notFound = viewModel.state { return "Check the code and the Wi-Fi" }
+        return "Same Wi-Fi as your iPad"
     }
 
     private var isConnecting: Bool {
@@ -89,7 +105,7 @@ struct CompanionPairingView: View {
 
     private var typedCode: String {
         switch viewModel.state {
-        case let .enteringCode(code), let .connecting(code): code
+        case let .enteringCode(code), let .connecting(code), let .notFound(code): code
         case .connected, .reconnecting: ""
         }
     }
@@ -101,4 +117,8 @@ struct CompanionPairingView: View {
 
 #Preview("Connecting") {
     CompanionPairingView(viewModel: .preview(state: .connecting("482913")))
+}
+
+#Preview("iPad not found") {
+    CompanionPairingView(viewModel: .preview(state: .notFound("482913")))
 }

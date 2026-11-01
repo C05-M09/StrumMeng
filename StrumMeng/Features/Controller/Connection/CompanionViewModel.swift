@@ -18,19 +18,25 @@ final class CompanionViewModel {
     @ObservationIgnored private let client: any ControllerClient
     @ObservationIgnored private let pairCodes: any PairCodeStore
     @ObservationIgnored private let now: () -> TimeInterval
+    @ObservationIgnored private let connectTimeout: Duration
     @ObservationIgnored private var tracker = SwipeTracker()
     @ObservationIgnored private var linkTask: Task<Void, Never>?
+    @ObservationIgnored private var timeoutTask: Task<Void, Never>?
 
+    /// - Parameter connectTimeout: how long a typed code may look for the iPad. A saved code has no
+    ///   limit: the iPad may simply not be open yet, and Cancel is there if it never comes.
     init(
         client: any ControllerClient,
         pairCodes: any PairCodeStore,
         state: CompanionState = .enteringCode(""),
-        now: @escaping () -> TimeInterval = HostClock.now
+        now: @escaping () -> TimeInterval = HostClock.now,
+        connectTimeout: Duration = .seconds(10)
     ) {
         self.client = client
         self.pairCodes = pairCodes
         self.state = state
         self.now = now
+        self.connectTimeout = connectTimeout
     }
 
     /// Follows the link and goes back to the iPad it was last paired with.
@@ -50,6 +56,7 @@ final class CompanionViewModel {
     func stop() {
         linkTask?.cancel()
         linkTask = nil
+        cancelTimeout()
         Task { [client] in await client.disconnect() }
     }
 
@@ -57,17 +64,22 @@ final class CompanionViewModel {
         let previous = state
         state = reduce(state, event)
         guard state != previous else { return }
+        cancelTimeout()
 
         switch state {
         case let .connecting(text):
             if let code = PairCode(text) {
                 Task { [client] in await client.connect(pairCode: code) }
             }
+            if case .typeDigit = event { startTimeout() }
         case .connected:
             // Saved only now, so a code that never connected is not retried on the next launch.
             if case let .connecting(text) = previous {
                 pairCodes.setEnteredPairCode(PairCode(text))
             }
+        case .notFound:
+            // The link would otherwise keep looking for an iPad with the wrong code.
+            Task { [client] in await client.disconnect() }
         case .enteringCode, .reconnecting:
             tracker.reset()
         }
@@ -95,6 +107,19 @@ final class CompanionViewModel {
 
     func endSwipe() {
         tracker.reset()
+    }
+
+    private func startTimeout() {
+        timeoutTask = Task { [weak self, connectTimeout] in
+            try? await Task.sleep(for: connectTimeout)
+            guard !Task.isCancelled else { return }
+            self?.send(.connectionTimedOut)
+        }
+    }
+
+    private func cancelTimeout() {
+        timeoutTask?.cancel()
+        timeoutTask = nil
     }
 
     private func linkStateChanged(_ linkState: ControllerConnectionState) {

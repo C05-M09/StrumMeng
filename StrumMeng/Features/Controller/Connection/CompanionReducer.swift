@@ -13,6 +13,16 @@ func reduce(_ state: CompanionState, _ event: CompanionEvent) -> CompanionState 
     case let (.enteringCode, .resumePairing(code)):
         return .connecting(code)
 
+    case let (.connecting(code), .connectionTimedOut):
+        return .notFound(code)
+
+    // Typing after a failed code starts a new one.
+    case let (.notFound, .typeDigit(digit)):
+        return reduce(.enteringCode(""), .typeDigit(digit))
+
+    case (.notFound, .deleteDigit):
+        return .enteringCode("")
+
     case (.connecting, .linkConnected), (.reconnecting, .linkConnected):
         return .connected
 

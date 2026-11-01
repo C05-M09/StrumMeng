@@ -144,6 +144,67 @@ final class CompanionViewModelTests: XCTestCase {
         viewModel.stop()
     }
 
+    // MARK: Not finding the iPad
+
+    private func makeTimingOutViewModel(
+        saved: PairCode? = nil
+    ) -> (CompanionViewModel, MockControllerClient, MockPairCodeStore) {
+        let client = MockControllerClient()
+        let store = MockPairCodeStore(enteredPairCode: saved)
+        let viewModel = CompanionViewModel(client: client, pairCodes: store, state: .enteringCode("48291"),
+                                           connectTimeout: .zero)
+        return (viewModel, client, store)
+    }
+
+    func test_aTypedCodeThatFindsNoiPad_showsNotFound_andStopsLooking() async {
+        let (viewModel, client, store) = makeTimingOutViewModel()
+
+        viewModel.send(.typeDigit(3))
+        await waitUntil { viewModel.state == .notFound("482913") && client.disconnectCount == 1 }
+
+        XCTAssertEqual(viewModel.state, .notFound("482913"))
+        XCTAssertEqual(client.disconnectCount, 1)
+        XCTAssertNil(store.enteredPairCode)
+    }
+
+    func test_connectingInTime_cancelsTheTimeout() async throws {
+        let client = MockControllerClient()
+        let viewModel = CompanionViewModel(client: client, pairCodes: MockPairCodeStore(),
+                                           state: .enteringCode("48291"), connectTimeout: .milliseconds(10))
+
+        viewModel.send(.typeDigit(3))
+        viewModel.send(.linkConnected)
+        try await Task.sleep(for: .milliseconds(50))
+
+        XCTAssertEqual(viewModel.state, .connected)
+    }
+
+    func test_aSavedCode_keepsLookingWithNoTimeout() async throws {
+        let saved = try XCTUnwrap(PairCode("482913"))
+        let client = MockControllerClient()
+        let viewModel = CompanionViewModel(client: client, pairCodes: MockPairCodeStore(enteredPairCode: saved),
+                                           state: .enteringCode(""), connectTimeout: .milliseconds(10))
+
+        viewModel.appear()
+        try await Task.sleep(for: .milliseconds(50))
+
+        XCTAssertEqual(viewModel.state, .connecting("482913"))
+        viewModel.stop()
+    }
+
+    func test_cancel_whileLookingWithASavedCode_forgetsIt() async throws {
+        let saved = try XCTUnwrap(PairCode("482913"))
+        let (viewModel, client, store) = makeViewModel(state: .enteringCode(""), saved: saved)
+        viewModel.appear()
+
+        viewModel.send(.disconnect)
+        await waitUntil { client.disconnectCount == 1 }
+
+        XCTAssertEqual(viewModel.state, .enteringCode(""))
+        XCTAssertNil(store.enteredPairCode)
+        viewModel.stop()
+    }
+
     // MARK: Leaving
 
     func test_unpair_disconnects_andForgetsTheCode() async throws {
