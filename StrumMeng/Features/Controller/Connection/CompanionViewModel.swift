@@ -19,24 +19,34 @@ final class CompanionViewModel {
     @ObservationIgnored private let pairCodes: any PairCodeStore
     @ObservationIgnored private let now: () -> TimeInterval
     @ObservationIgnored private let connectTimeout: Duration
+    @ObservationIgnored private let makeGuitar: () -> (any GuitarSound)?
+    @ObservationIgnored private var guitar: (any GuitarSound)?
+    /// While the iPad has a session playing the sound comes from the iPad, so this iPhone stays silent.
+    @ObservationIgnored private var isSessionActive = false
     @ObservationIgnored private var tracker = SwipeTracker()
     @ObservationIgnored private var linkTask: Task<Void, Never>?
+    @ObservationIgnored private var sessionTask: Task<Void, Never>?
     @ObservationIgnored private var timeoutTask: Task<Void, Never>?
 
-    /// - Parameter connectTimeout: how long a typed code may look for the iPad. A saved code has no
-    ///   limit: the iPad may simply not be open yet, and Cancel is there if it never comes.
+    /// - Parameters:
+    ///   - connectTimeout: how long a typed code may look for the iPad. A saved code has no limit:
+    ///     the iPad may simply not be open yet, and Cancel is there if it never comes.
+    ///   - makeGuitar: called once on appear, not here: this view model can be made again on a
+    ///     redraw, and each real guitar starts its own audio engine.
     init(
         client: any ControllerClient,
         pairCodes: any PairCodeStore,
         state: CompanionState = .enteringCode(""),
         now: @escaping () -> TimeInterval = HostClock.now,
-        connectTimeout: Duration = .seconds(10)
+        connectTimeout: Duration = .seconds(10),
+        makeGuitar: @escaping () -> (any GuitarSound)? = { nil }
     ) {
         self.client = client
         self.pairCodes = pairCodes
         self.state = state
         self.now = now
         self.connectTimeout = connectTimeout
+        self.makeGuitar = makeGuitar
     }
 
     /// Follows the link and goes back to the iPad it was last paired with.
@@ -47,6 +57,15 @@ final class CompanionViewModel {
                 self?.linkStateChanged(linkState)
             }
         }
+        sessionTask = Task { [weak self, sessions = client.sessionActive] in
+            for await active in sessions {
+                self?.sessionChanged(active)
+            }
+        }
+        if guitar == nil, let made = makeGuitar() {
+            guitar = made
+            Task { await made.prepare() }
+        }
         if let saved = pairCodes.enteredPairCode {
             send(.resumePairing(saved.value))
         }
@@ -56,7 +75,10 @@ final class CompanionViewModel {
     func stop() {
         linkTask?.cancel()
         linkTask = nil
+        sessionTask?.cancel()
+        sessionTask = nil
         cancelTimeout()
+        guitar?.stopStrums()
         Task { [client] in await client.disconnect() }
     }
 
@@ -95,10 +117,14 @@ final class CompanionViewModel {
     /// across them: right is a down strum, left is an up strum.
     /// - Parameter touchAge: how long ago the touch event happened, so the strum keeps its real time.
     func swipe(dx: Double, touchAge: TimeInterval = 0) {
-        guard state == .connected,
+        guard state == .connected || state == .reconnecting,
               let direction = tracker.feed(dx, threshold: Self.swipeThreshold) else { return }
         lastStrum = direction
         strumCount += 1
+        if !isSessionActive {
+            guitar?.strum(direction, at: nil, accent: 1)
+        }
+        guard state == .connected else { return }
         let usable = (0...Self.maxTouchDelay).contains(touchAge) ? touchAge : 0
         let touchTime = now() - usable
         Task { [client] in await client.send(direction, touchTime: touchTime) }
@@ -106,6 +132,12 @@ final class CompanionViewModel {
 
     func endSwipe() {
         tracker.reset()
+    }
+
+    private func sessionChanged(_ active: Bool) {
+        isSessionActive = active
+        // Cuts any strum still ringing here, so it does not sound over the iPad's count-in.
+        if active { guitar?.stopStrums() }
     }
 
     private func startTimeout() {

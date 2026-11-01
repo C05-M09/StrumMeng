@@ -155,7 +155,8 @@ final class AppContainer {
     static func makeCompanionViewModel(deviceName: String) -> CompanionViewModel {
         CompanionViewModel(
             client: BonjourControllerClient(deviceName: deviceName),
-            pairCodes: UserDefaultsPairCodeStore()
+            pairCodes: UserDefaultsPairCodeStore(),
+            makeGuitar: { GuitarEngine() }
         )
     }
 

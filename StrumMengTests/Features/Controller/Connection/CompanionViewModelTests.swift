@@ -81,16 +81,97 @@ final class CompanionViewModelTests: XCTestCase {
         XCTAssertTrue(client.sentStrums.isEmpty)
     }
 
-    func test_swipeWhileNotConnected_isIgnored() async {
-        for state in [CompanionState.enteringCode(""), .reconnecting] {
-            let (viewModel, client, _) = makeViewModel(state: state)
+    func test_swipeBeforeConnecting_isIgnored() async {
+        let guitar = MockGuitarSound()
+        let client = MockControllerClient()
+        let viewModel = CompanionViewModel(client: client, pairCodes: MockPairCodeStore(),
+                                           state: .enteringCode(""), makeGuitar: { guitar })
+        viewModel.appear()
 
-            viewModel.swipe(dx: CompanionViewModel.swipeThreshold)
-            for _ in 0..<50 { await Task.yield() }
+        viewModel.swipe(dx: CompanionViewModel.swipeThreshold)
+        for _ in 0..<50 { await Task.yield() }
 
-            XCTAssertEqual(viewModel.strumCount, 0)
-            XCTAssertTrue(client.sentStrums.isEmpty)
-        }
+        XCTAssertEqual(viewModel.strumCount, 0)
+        XCTAssertTrue(client.sentStrums.isEmpty)
+        XCTAssertTrue(guitar.strums.isEmpty)
+        viewModel.stop()
+    }
+
+    // MARK: Sound
+
+    private func makeSoundingViewModel(
+        state: CompanionState = .connected
+    ) -> (CompanionViewModel, MockControllerClient, MockGuitarSound) {
+        let guitar = MockGuitarSound()
+        let client = MockControllerClient()
+        let viewModel = CompanionViewModel(client: client, pairCodes: MockPairCodeStore(), state: state,
+                                           now: { 100 }, makeGuitar: { guitar })
+        viewModel.appear()
+        return (viewModel, client, guitar)
+    }
+
+    func test_outsideASession_aSwipeSoundsOnTheiPhone_inItsDirection() {
+        let (viewModel, _, guitar) = makeSoundingViewModel()
+
+        viewModel.swipe(dx: CompanionViewModel.swipeThreshold)
+        viewModel.swipe(dx: -CompanionViewModel.swipeThreshold)
+
+        XCTAssertEqual(guitar.strums.map(\.direction), [.down, .up])
+        viewModel.stop()
+    }
+
+    func test_duringASession_theiPhoneIsSilent_andCutsWhatIsRinging() async {
+        let (viewModel, client, guitar) = makeSoundingViewModel()
+
+        client.emitSessionActive(true)
+        await waitUntil { guitar.stopStrumsCount == 1 }
+        viewModel.swipe(dx: CompanionViewModel.swipeThreshold)
+        await waitUntil { !client.sentStrums.isEmpty }
+
+        XCTAssertEqual(guitar.stopStrumsCount, 1)
+        XCTAssertTrue(guitar.strums.isEmpty)
+        XCTAssertEqual(client.sentStrums.map(\.direction), [.down])
+        viewModel.stop()
+    }
+
+    func test_afterASession_theiPhoneSoundsAgain() async {
+        let (viewModel, client, guitar) = makeSoundingViewModel()
+        client.emitSessionActive(true)
+        await waitUntil { guitar.stopStrumsCount == 1 }
+
+        client.emitSessionActive(false)
+        for _ in 0..<50 { await Task.yield() }
+        viewModel.swipe(dx: CompanionViewModel.swipeThreshold)
+
+        XCTAssertEqual(guitar.strums.map(\.direction), [.down])
+        viewModel.stop()
+    }
+
+    func test_whileReconnecting_aSwipeSounds_butIsNotSent() async {
+        let (viewModel, client, guitar) = makeSoundingViewModel(state: .reconnecting)
+
+        viewModel.swipe(dx: CompanionViewModel.swipeThreshold)
+        for _ in 0..<50 { await Task.yield() }
+
+        XCTAssertEqual(guitar.strums.count, 1)
+        XCTAssertTrue(client.sentStrums.isEmpty)
+        viewModel.stop()
+    }
+
+    func test_theGuitar_isMadeOnceOnAppear_andPrepared() async {
+        var made = 0
+        let guitar = MockGuitarSound()
+        let viewModel = CompanionViewModel(client: MockControllerClient(), pairCodes: MockPairCodeStore(),
+                                           makeGuitar: { made += 1; return guitar })
+        XCTAssertEqual(made, 0)
+
+        viewModel.appear()
+        viewModel.appear()
+        await waitUntil { guitar.prepareCount == 1 }
+
+        XCTAssertEqual(made, 1)
+        XCTAssertEqual(guitar.prepareCount, 1)
+        viewModel.stop()
     }
 
     // MARK: Pairing
