@@ -8,20 +8,15 @@ import Observation
 @MainActor
 @Observable
 final class ControllerLinkDebugModel {
-    private static let hostCodeKey = "debug.controllerLink.hostPairCode"
-    private static let enteredCodeKey = "debug.controllerLink.enteredPairCode"
     private static let logLimit = 30
     /// Points of travel that make one strum, the same as on-screen swipes on the iPad.
     private static let swipeThreshold: Double = 12
     /// The longest believable gap between a touch and its handling, as in PlayViewModel.
     private static let maxTouchDelay: TimeInterval = 0.1
 
-    /// The iPad's pair code, kept across launches so the iPhone does not need a new one each time.
+    /// The iPad's pair code, the same one the real screens use.
     static func savedHostPairCode() -> PairCode {
-        let defaults = UserDefaults.standard
-        let code = defaults.string(forKey: hostCodeKey).flatMap(PairCode.init) ?? PairCode.random()
-        defaults.set(code.value, forKey: hostCodeKey)
-        return code
+        UserDefaultsPairCodeStore().hostPairCode()
     }
 
     let role: DeviceRole
@@ -42,8 +37,7 @@ final class ControllerLinkDebugModel {
 
     init(role: DeviceRole, deviceName: String) {
         self.role = role
-        let defaults = UserDefaults.standard
-        enteredCode = defaults.string(forKey: Self.enteredCodeKey) ?? ""
+        enteredCode = UserDefaultsPairCodeStore().enteredPairCode?.value ?? ""
         switch role {
         case .host:
             let code = Self.savedHostPairCode()
@@ -112,7 +106,7 @@ final class ControllerLinkDebugModel {
             append("The code must be 6 digits")
             return
         }
-        UserDefaults.standard.set(code.value, forKey: Self.enteredCodeKey)
+        UserDefaultsPairCodeStore().setEnteredPairCode(code)
         connect(code)
     }
 
