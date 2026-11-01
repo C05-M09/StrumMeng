@@ -142,4 +142,8 @@ final class AppContainer {
             onBackRequested: onBackRequested
         )
     }
+
+    func makeDeviceSetupViewModel() -> DeviceSetupViewModel {
+        DeviceSetupViewModel(onClose: { [weak router] in router?.pop() })
+    }
 }
