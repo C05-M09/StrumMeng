@@ -58,6 +58,7 @@ struct ContentView: View {
                 }
         }
         .ignoresSafeArea()
+        .task { await container.startControllerLink() }
         // The DEBUG controller screens replace this view and bring their own link.
         .onDisappear { container.stopControllerLink() }
     }

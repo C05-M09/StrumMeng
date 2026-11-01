@@ -61,15 +61,20 @@ final class AppContainer {
     }
 
     func makePlayViewModel(pattern: StrumPattern, bpm: Int) -> PlayViewModel {
-        let input = TouchStrumInputService()
+        // Swipes on the iPad screen keep working next to the iPhone, so the iPhone is optional.
+        let touch = TouchStrumInputService()
+        let link = sharedControllerLink()
         return PlayViewModel(
             pattern: pattern,
             bpm: bpm,
             clock: AudioBeatClock(),
-            input: input,
-            touchInput: input,
+            input: MergedStrumInputService(sources: [link, touch]),
+            touchInput: touch,
+            controller: link,
+            requiresController: false,
             guitar: guitarSound,
             metronome: metronomeSound,
+            strumArrivalGrace: PlayViewModel.controllerStrumArrivalGrace,
             now: HostClock.now,
             waitUntil: { time in
                 let delay = time - HostClock.now()
@@ -156,6 +161,12 @@ final class AppContainer {
         let link = BonjourControllerLink(pairCode: UserDefaultsPairCodeStore().hostPairCode())
         controllerLink = link
         return link
+    }
+
+    /// Up from launch, so a paired iPhone reconnects before the player reaches Play. A failure stays
+    /// quiet here: on-screen swipes still work, and Set Up Device tries again and explains it.
+    func startControllerLink() async {
+        try? await sharedControllerLink().start()
     }
 
     func stopControllerLink() {
