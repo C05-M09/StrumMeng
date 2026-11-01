@@ -28,6 +28,8 @@ struct CompanionTouchpadView: View {
             pulse = true
             withAnimation(.easeOut(duration: 0.2)) { pulse = false }
         }
+        // The player's eyes are on the iPad, so the phone confirms each strum by feel.
+        .sensoryFeedback(.impact(weight: .light), trigger: viewModel.strumCount)
     }
 
     private var statusBar: some View {
