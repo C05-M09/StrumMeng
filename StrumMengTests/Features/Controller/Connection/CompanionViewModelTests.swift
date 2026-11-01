@@ -43,20 +43,32 @@ final class CompanionViewModelTests: XCTestCase {
     func test_aStrum_keepsTheTimeOfItsTouchEvent() async throws {
         let (viewModel, client, _) = makeViewModel()
 
-        viewModel.swipe(dx: CompanionViewModel.swipeThreshold, eventDate: Date().addingTimeInterval(-0.05))
+        viewModel.swipe(dx: CompanionViewModel.swipeThreshold, touchAge: 0.05)
         await waitUntil { !client.sentStrums.isEmpty }
 
-        let time = try XCTUnwrap(client.sentStrums.first?.touchTime)
-        XCTAssertEqual(time, 99.95, accuracy: 0.02)
+        XCTAssertEqual(try XCTUnwrap(client.sentStrums.first?.touchTime), 99.95, accuracy: 0.0001)
     }
 
-    func test_anUnbelievableTouchDelay_isIgnored() async throws {
+    func test_anUnbelievableTouchAge_isIgnored() async throws {
+        for age: TimeInterval in [5, -1] {
+            let (viewModel, client, _) = makeViewModel()
+
+            viewModel.swipe(dx: CompanionViewModel.swipeThreshold, touchAge: age)
+            await waitUntil { !client.sentStrums.isEmpty }
+
+            XCTAssertEqual(try XCTUnwrap(client.sentStrums.first?.touchTime), 100)
+        }
+    }
+
+    func test_coalescedMovement_strumsAtTheEventThatCrossedTheThreshold() async throws {
         let (viewModel, client, _) = makeViewModel()
 
-        viewModel.swipe(dx: CompanionViewModel.swipeThreshold, eventDate: Date().addingTimeInterval(-5))
+        viewModel.swipe(dx: CompanionViewModel.swipeThreshold / 2, touchAge: 0.016)
+        viewModel.swipe(dx: CompanionViewModel.swipeThreshold / 2, touchAge: 0.008)
         await waitUntil { !client.sentStrums.isEmpty }
 
-        XCTAssertEqual(try XCTUnwrap(client.sentStrums.first?.touchTime), 100)
+        XCTAssertEqual(client.sentStrums.count, 1)
+        XCTAssertEqual(try XCTUnwrap(client.sentStrums.first?.touchTime), 99.992, accuracy: 0.0001)
     }
 
     func test_swipeBelowTheThreshold_isNotAStrum() async {

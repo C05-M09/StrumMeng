@@ -93,14 +93,13 @@ final class CompanionViewModel {
 
     /// The pad is held in portrait with the strings running up the screen, so strumming moves
     /// across them: right is a down strum, left is an up strum.
-    /// - Parameter eventDate: the touch event's own timestamp, so the strum keeps its real time.
-    func swipe(dx: Double, eventDate: Date = Date()) {
+    /// - Parameter touchAge: how long ago the touch event happened, so the strum keeps its real time.
+    func swipe(dx: Double, touchAge: TimeInterval = 0) {
         guard state == .connected,
               let direction = tracker.feed(dx, threshold: Self.swipeThreshold) else { return }
         lastStrum = direction
         strumCount += 1
-        let delay = Date().timeIntervalSince(eventDate)
-        let usable = (0...Self.maxTouchDelay).contains(delay) ? delay : 0
+        let usable = (0...Self.maxTouchDelay).contains(touchAge) ? touchAge : 0
         let touchTime = now() - usable
         Task { [client] in await client.send(direction, touchTime: touchTime) }
     }

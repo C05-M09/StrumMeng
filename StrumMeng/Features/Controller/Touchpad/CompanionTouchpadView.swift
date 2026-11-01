@@ -1,18 +1,20 @@
 import SwiftUI
 
 /// iPhone strum pad: each swipe goes to the iPad and shows its direction here.
-/// The final pad will be a UIView using UITouch.timestamp (CLAUDE.md §2).
 struct CompanionTouchpadView: View {
     let viewModel: CompanionViewModel
 
-    @State private var lastX: CGFloat?
     @State private var pulse = false
 
     var body: some View {
         ZStack {
             CompanionGuitarPlaceholderView()
-                .contentShape(Rectangle())
-                .gesture(swipeGesture)
+
+            CompanionTouchSurface(
+                onMove: { dx, touchAge in viewModel.swipe(dx: dx, touchAge: touchAge) },
+                onEnd: { viewModel.endSwipe() }
+            )
+            .ignoresSafeArea()
 
             VStack {
                 statusBar
@@ -65,18 +67,6 @@ struct CompanionTouchpadView: View {
             }
         }
         .allowsHitTesting(false)
-    }
-
-    private var swipeGesture: some Gesture {
-        DragGesture(minimumDistance: 0)
-            .onChanged { value in
-                if let lastX { viewModel.swipe(dx: value.location.x - lastX, eventDate: value.time) }
-                lastX = value.location.x
-            }
-            .onEnded { _ in
-                lastX = nil
-                viewModel.endSwipe()
-            }
     }
 }
 
