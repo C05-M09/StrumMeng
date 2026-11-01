@@ -28,12 +28,14 @@ enum OptionCardLayout {
     static let titleTopPadding: CGFloat = 86
 
     /// Distance from the top of the card to the first row (icon and label).
-    static let rowsTopInset: CGFloat = 190
+    static let rowsTopInset: CGFloat = 150
 
-    static let rowSpacing: CGFloat = 56
+    static let rowSpacing: CGFloat = 24
     static let iconSize: CGFloat = 90
     static let iconColumnWidth: CGFloat = 130
     static let iconToSliderSpacing: CGFloat = 40
     static let sliderWidth: CGFloat = 386
     static let labelFontSize: CGFloat = 40
+    static let deviceButtonFontSize: CGFloat = 32
+    static let deviceButtonHeight: CGFloat = 76
 }

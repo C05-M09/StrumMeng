@@ -1,12 +1,14 @@
 import SwiftUI
 
-/// The Option card: the `Option_Card` artwork with a title and two volume sliders on top.
+/// The Option card: the `Option_Card` artwork with a title, two volume sliders and the device setup
+/// button on top.
 ///
 /// Fixed size (`OptionCardLayout.size`), so the screen places it with `.position`, like the Practice card.
 /// The card only edits the two bindings; saving them is the view model's job.
 struct OptionCardView: View {
     @Binding var soundVolume: Double
     @Binding var sfxVolume: Double
+    let onSetUpDevice: () -> Void
 
     var body: some View {
         // Everything is pinned to the top of the card, so nothing is centred or pushed down by spacers.
@@ -27,6 +29,7 @@ struct OptionCardView: View {
             VStack(alignment: .leading, spacing: OptionCardLayout.rowSpacing) {
                 OptionSliderRow(symbolName: "speaker.wave.2.fill", title: "Music", value: $soundVolume)
                 OptionSliderRow(symbolName: "music.note", title: "Sound Effects", value: $sfxVolume)
+                OptionDeviceRow(onSetUp: onSetUpDevice)
             }
             .padding(.top, OptionCardLayout.rowsTopInset)
         }
@@ -39,6 +42,6 @@ struct OptionCardView: View {
     @Previewable @State var sound = 0.5
     @Previewable @State var sfx = 0.5
 
-    OptionCardView(soundVolume: $sound, sfxVolume: $sfx)
+    OptionCardView(soundVolume: $sound, sfxVolume: $sfx, onSetUpDevice: {})
         .padding(60)
 }

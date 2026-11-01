@@ -139,7 +139,8 @@ final class AppContainer {
     func makeOptionViewModel(onBackRequested: @escaping () -> Void) -> OptionViewModel {
         OptionViewModel(
             settings: settings,
-            onBackRequested: onBackRequested
+            onBackRequested: onBackRequested,
+            onSetUpDeviceRequested: { [weak router] in router?.push(.deviceSetup) }
         )
     }
 

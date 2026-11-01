@@ -8,13 +8,16 @@ final class OptionViewModel {
 
     private let settings: any SettingsStore
     private let onBackRequested: () -> Void
+    private let onSetUpDeviceRequested: () -> Void
 
     init(
         settings: any SettingsStore,
-        onBackRequested: @escaping () -> Void
+        onBackRequested: @escaping () -> Void,
+        onSetUpDeviceRequested: @escaping () -> Void = {}
     ) {
         self.settings = settings
         self.onBackRequested = onBackRequested
+        self.onSetUpDeviceRequested = onSetUpDeviceRequested
         self.state = OptionState(
             soundVolume: settings.soundVolume,
             sfxVolume: settings.sfxVolume
@@ -32,6 +35,9 @@ final class OptionViewModel {
 
         case .changeSFXVolume:
             settings.setSFXVolume(state.sfxVolume)
+
+        case .tapSetUpDevice:
+            onSetUpDeviceRequested()
 
         case .tapBack:
             onBackRequested()
