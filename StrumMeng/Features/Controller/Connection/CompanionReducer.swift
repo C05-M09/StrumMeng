@@ -10,10 +10,16 @@ func reduce(_ state: CompanionState, _ event: CompanionEvent) -> CompanionState 
     case let (.enteringCode(code), .deleteDigit):
         return .enteringCode(String(code.dropLast()))
 
-    case (.connecting, .linkConnected):
+    case let (.enteringCode, .resumePairing(code)):
+        return .connecting(code)
+
+    case (.connecting, .linkConnected), (.reconnecting, .linkConnected):
         return .connected
 
-    case (.connecting, .disconnect), (.connected, .disconnect):
+    case (.connected, .linkLost):
+        return .reconnecting
+
+    case (.connecting, .disconnect), (.connected, .disconnect), (.reconnecting, .disconnect):
         return .enteringCode("")
 
     default:

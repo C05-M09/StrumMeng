@@ -151,6 +151,14 @@ final class AppContainer {
         )
     }
 
+    /// Static because the iPhone needs none of the iPad's storage, audio or routes.
+    static func makeCompanionViewModel(deviceName: String) -> CompanionViewModel {
+        CompanionViewModel(
+            client: BonjourControllerClient(deviceName: deviceName),
+            pairCodes: UserDefaultsPairCodeStore()
+        )
+    }
+
     func makeDeviceSetupViewModel() -> DeviceSetupViewModel {
         DeviceSetupViewModel(link: sharedControllerLink(), onClose: { [weak router] in router?.pop() })
     }

@@ -90,15 +90,15 @@ struct CompanionPairingView: View {
     private var typedCode: String {
         switch viewModel.state {
         case let .enteringCode(code), let .connecting(code): code
-        case .connected: ""
+        case .connected, .reconnecting: ""
         }
     }
 }
 
 #Preview("Entering code") {
-    CompanionPairingView(viewModel: CompanionViewModel(state: .enteringCode("48")))
+    CompanionPairingView(viewModel: .preview(state: .enteringCode("48")))
 }
 
 #Preview("Connecting") {
-    CompanionPairingView(viewModel: CompanionViewModel(state: .connecting("482913")))
+    CompanionPairingView(viewModel: .preview(state: .connecting("482913")))
 }

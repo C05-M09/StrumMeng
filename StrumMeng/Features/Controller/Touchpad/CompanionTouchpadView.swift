@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// iPhone strum pad. Dummy: swipes show their direction here and are not sent to the iPad yet.
-/// The real pad will be a UIView using UITouch.timestamp (CLAUDE.md §2).
+/// iPhone strum pad: each swipe goes to the iPad and shows its direction here.
+/// The final pad will be a UIView using UITouch.timestamp (CLAUDE.md §2).
 struct CompanionTouchpadView: View {
     let viewModel: CompanionViewModel
 
@@ -31,8 +31,10 @@ struct CompanionTouchpadView: View {
     private var statusBar: some View {
         HStack {
             HStack(spacing: AppSpacing.s) {
-                Circle().fill(AppColor.perfect).frame(width: 12, height: 12)
-                Text("Connected")
+                Circle()
+                    .fill(viewModel.state == .connected ? AppColor.perfect : AppColor.tooEarly)
+                    .frame(width: 12, height: 12)
+                Text(viewModel.state == .connected ? "Connected" : "Reconnecting...")
                     .font(AppFont.mono(14))
                     .foregroundStyle(AppColor.ink)
             }
@@ -68,7 +70,7 @@ struct CompanionTouchpadView: View {
     private var swipeGesture: some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { value in
-                if let lastX { viewModel.swipe(dx: value.location.x - lastX) }
+                if let lastX { viewModel.swipe(dx: value.location.x - lastX, eventDate: value.time) }
                 lastX = value.location.x
             }
             .onEnded { _ in
@@ -79,5 +81,9 @@ struct CompanionTouchpadView: View {
 }
 
 #Preview("Waiting for a swipe") {
-    CompanionTouchpadView(viewModel: CompanionViewModel(state: .connected))
+    CompanionTouchpadView(viewModel: .preview(state: .connected))
+}
+
+#Preview("Reconnecting") {
+    CompanionTouchpadView(viewModel: .preview(state: .reconnecting))
 }

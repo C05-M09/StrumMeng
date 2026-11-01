@@ -20,14 +20,32 @@ final class CompanionReducerTests: XCTestCase {
         XCTAssertEqual(reduce(.enteringCode(""), .deleteDigit), .enteringCode(""))
     }
 
-    func test_linkConnected_opensThePadOnlyWhileConnecting() {
+    func test_resumePairing_connectsWithTheSavedCode() {
+        XCTAssertEqual(reduce(.enteringCode(""), .resumePairing("482913")), .connecting("482913"))
+    }
+
+    func test_resumePairing_isIgnoredOnceConnected() {
+        XCTAssertEqual(reduce(.connected, .resumePairing("482913")), .connected)
+    }
+
+    func test_linkConnected_opensThePadWhileConnecting() {
         XCTAssertEqual(reduce(.connecting("482913"), .linkConnected), .connected)
         XCTAssertEqual(reduce(.enteringCode("48"), .linkConnected), .enteringCode("48"))
+    }
+
+    func test_linkLost_reconnectsOnlyAfterConnecting() {
+        XCTAssertEqual(reduce(.connected, .linkLost), .reconnecting)
+        XCTAssertEqual(reduce(.connecting("482913"), .linkLost), .connecting("482913"))
+    }
+
+    func test_linkConnected_endsReconnecting() {
+        XCTAssertEqual(reduce(.reconnecting, .linkConnected), .connected)
     }
 
     func test_disconnect_returnsToAnEmptyCode() {
         XCTAssertEqual(reduce(.connected, .disconnect), .enteringCode(""))
         XCTAssertEqual(reduce(.connecting("482913"), .disconnect), .enteringCode(""))
+        XCTAssertEqual(reduce(.reconnecting, .disconnect), .enteringCode(""))
     }
 
     func test_typingWhileConnectingOrConnected_isIgnored() {

@@ -1,70 +1,110 @@
 import Foundation
 import Observation
 
-/// Dummy iPhone flow: any six digits "connect" after a short wait, and swipes only move the pad's
-/// arrow. Nothing is sent to the iPad yet.
+/// The iPhone side: pairs with the iPad through ControllerClient and sends each swipe as a strum.
 @MainActor
 @Observable
 final class CompanionViewModel {
-    /// Finger travel for one strum, in points.
-    static let swipeThreshold: Double = 20
+    /// Finger travel for one strum, in points, the same as on-screen swipes on the iPad.
+    static let swipeThreshold: Double = 12
+    /// The longest believable gap between a touch and its handling, as in PlayViewModel.
+    private static let maxTouchDelay: TimeInterval = 0.1
 
     private(set) var state: CompanionState
     private(set) var lastStrum: StrumDirection?
     /// Goes up on every strum, so the same direction twice still animates.
     private(set) var strumCount = 0
 
-    private let connectDelay: Duration
-    private var tracker = SwipeTracker()
-    private var connectTask: Task<Void, Never>?
+    @ObservationIgnored private let client: any ControllerClient
+    @ObservationIgnored private let pairCodes: any PairCodeStore
+    @ObservationIgnored private let now: () -> TimeInterval
+    @ObservationIgnored private var tracker = SwipeTracker()
+    @ObservationIgnored private var linkTask: Task<Void, Never>?
 
-    init(state: CompanionState = .enteringCode(""), connectDelay: Duration = .seconds(1.2)) {
+    init(
+        client: any ControllerClient,
+        pairCodes: any PairCodeStore,
+        state: CompanionState = .enteringCode(""),
+        now: @escaping () -> TimeInterval = HostClock.now
+    ) {
+        self.client = client
+        self.pairCodes = pairCodes
         self.state = state
-        self.connectDelay = connectDelay
+        self.now = now
+    }
+
+    /// Follows the link and goes back to the iPad it was last paired with.
+    func appear() {
+        guard linkTask == nil else { return }
+        linkTask = Task { [weak self, states = client.connectionStates] in
+            for await linkState in states {
+                self?.linkStateChanged(linkState)
+            }
+        }
+        if let saved = pairCodes.enteredPairCode {
+            send(.resumePairing(saved.value))
+        }
+    }
+
+    /// The screen went away. Unlike Unpair, this keeps the saved code for the next launch.
+    func stop() {
+        linkTask?.cancel()
+        linkTask = nil
+        Task { [client] in await client.disconnect() }
     }
 
     func send(_ event: CompanionEvent) {
+        let previous = state
         state = reduce(state, event)
+        guard state != previous else { return }
 
-        if case .connecting = state {
-            startConnecting()
-        } else {
-            cancelConnecting()
-        }
-        if state != .connected {
+        switch state {
+        case let .connecting(text):
+            if let code = PairCode(text) {
+                Task { [client] in await client.connect(pairCode: code) }
+            }
+        case .connected:
+            // Saved only now, so a code that never connected is not retried on the next launch.
+            if case let .connecting(text) = previous {
+                pairCodes.setEnteredPairCode(PairCode(text))
+            }
+        case .enteringCode, .reconnecting:
             tracker.reset()
+        }
+
+        if event == .disconnect {
             lastStrum = nil
+            pairCodes.setEnteredPairCode(nil)
+            Task { [client] in await client.disconnect() }
         }
     }
 
     /// The pad is held in portrait with the strings running up the screen, so strumming moves
     /// across them: right is a down strum, left is an up strum.
-    func swipe(dx: Double) {
+    /// - Parameter eventDate: the touch event's own timestamp, so the strum keeps its real time.
+    func swipe(dx: Double, eventDate: Date = Date()) {
         guard state == .connected,
               let direction = tracker.feed(dx, threshold: Self.swipeThreshold) else { return }
         lastStrum = direction
         strumCount += 1
+        let delay = Date().timeIntervalSince(eventDate)
+        let usable = (0...Self.maxTouchDelay).contains(delay) ? delay : 0
+        let touchTime = now() - usable
+        Task { [client] in await client.send(direction, touchTime: touchTime) }
     }
 
     func endSwipe() {
         tracker.reset()
     }
 
-    func stop() {
-        cancelConnecting()
-    }
-
-    private func startConnecting() {
-        guard connectTask == nil else { return }
-        connectTask = Task { [weak self, connectDelay] in
-            try? await Task.sleep(for: connectDelay)
-            guard !Task.isCancelled else { return }
-            self?.send(.linkConnected)
+    private func linkStateChanged(_ linkState: ControllerConnectionState) {
+        switch linkState {
+        case .connected:
+            send(.linkConnected)
+        case .reconnecting:
+            send(.linkLost)
+        case .unpaired, .pairing, .searching:
+            break
         }
-    }
-
-    private func cancelConnecting() {
-        connectTask?.cancel()
-        connectTask = nil
     }
 }

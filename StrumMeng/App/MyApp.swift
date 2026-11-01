@@ -21,8 +21,8 @@ import SwiftUI
     var body: some Scene {
         WindowGroup {
             #if DEBUG
-            // The iPhone opens the dummy companion screens and its Link test button opens the link
-            // test screen; so does an iPad launched with -controllerLinkDebug. -playWithController
+            // The iPhone opens the companion screens and its Link test button opens the link test
+            // screen; so does an iPad launched with -controllerLinkDebug. -playWithController
             // opens Play driven by the iPhone until its status bar's App button turns it off.
             if DeviceRole.current == .host, playWithController {
                 ControllerPlayDebugView(onLeave: { playWithController = false })
@@ -32,7 +32,7 @@ import SwiftUI
                     role: DeviceRole.current, deviceName: UIDevice.current.name))
                     .overlay(alignment: .bottomTrailing) {
                         if DeviceRole.current == .controller {
-                            debugButton("Dummy UI") { companionLinkTest = false }
+                            debugButton("Companion") { companionLinkTest = false }
                         }
                     }
             } else if DeviceRole.current == .host {
@@ -42,14 +42,14 @@ import SwiftUI
                         debugButton("Controller play") { playWithController = true }
                     }
             } else {
-                CompanionRootView()
+                CompanionRootView(viewModel: AppContainer.makeCompanionViewModel(deviceName: UIDevice.current.name))
                     .overlay(alignment: .bottomTrailing) {
                         debugButton("Link test") { companionLinkTest = true }
                     }
             }
             #else
             if DeviceRole.current == .controller {
-                CompanionRootView()
+                CompanionRootView(viewModel: AppContainer.makeCompanionViewModel(deviceName: UIDevice.current.name))
             } else {
                 ContentView()
             }
