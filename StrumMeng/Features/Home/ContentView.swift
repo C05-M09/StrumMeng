@@ -6,6 +6,7 @@ struct ContentView: View {
     @State private var homeViewModel: HomeViewModel
     @State private var patternListViewModel: PatternListViewModel
     @State private var optionViewModel: OptionViewModel
+    @State private var guidebookViewModel: GuidebookViewModel
 
     init(inMemory:Bool = false) {
         let router = AppRouter()
@@ -20,13 +21,20 @@ struct ContentView: View {
         _optionViewModel = State(initialValue: container.makeOptionViewModel { [weak homeViewModel] in
             homeViewModel?.send(.dismissOverlay)
         })
+        _guidebookViewModel = State(initialValue: container.makeGuidebookViewModel { [weak homeViewModel] in
+            homeViewModel?.send(.dismissOverlay)
+        })
     }
 
     var body: some View {
         @Bindable var router = router
 
         NavigationStack(path: $router.path) {
-            HomeView(viewModel: homeViewModel, optionViewModel: optionViewModel)
+            HomeView(
+                viewModel: homeViewModel,
+                optionViewModel: optionViewModel,
+                guidebookViewModel: guidebookViewModel
+            )
                 .navigationDestination(for: AppRoute.self) { route in
                     switch route {
                     case .practiceList:

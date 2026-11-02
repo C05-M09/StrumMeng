@@ -183,4 +183,13 @@ final class AppContainer {
         controllerLink = nil
         Task { await link.stop() }
     }
+
+    /// Guidebook is an overlay on Home, so whoever shows it decides what "back" means
+    /// (close the overlay), instead of popping the router.
+    func makeGuidebookViewModel(onBackRequested: @escaping () -> Void) -> GuidebookViewModel {
+        GuidebookViewModel(
+            player: SynthListenPlayer(sound: guitarSound, metronome: metronomeSound),
+            onBackRequested: onBackRequested
+        )
+    }
 }
