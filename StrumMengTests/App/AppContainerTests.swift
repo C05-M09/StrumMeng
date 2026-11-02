@@ -205,4 +205,28 @@ final class AppContainerTests: XCTestCase {
 
         XCTAssertEqual(router.path, [.practiceList])
     }
+
+    // MARK: - Guidebook
+
+    func test_guidebookViewModel_dismiss_callsInjectedAction() {
+        var backCount = 0
+        let guidebook = sut.makeGuidebookViewModel { backCount += 1 }
+
+        guidebook.dismiss()
+
+        XCTAssertEqual(backCount, 1)
+    }
+
+    func test_guidebookOverlay_closesThroughHomeViewModel() {
+        let home = sut.makeHomeViewModel()
+        let guidebook = sut.makeGuidebookViewModel { [weak home] in
+            home?.send(.dismissOverlay)
+        }
+        home.send(.tapGuidebook)
+        XCTAssertEqual(home.presentedOverlay, .guidebook)
+
+        guidebook.dismiss()
+
+        XCTAssertNil(home.presentedOverlay)
+    }
 }

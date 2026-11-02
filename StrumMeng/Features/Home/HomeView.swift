@@ -13,6 +13,7 @@ import SwiftUI
 struct HomeView: View {
     let viewModel: HomeViewModel
     let optionViewModel: OptionViewModel
+    let guidebookViewModel: GuidebookViewModel
 
     var body: some View {
         GeometryReader { proxy in
@@ -118,7 +119,7 @@ struct HomeView: View {
                 case .option:
                     OptionView(viewModel: optionViewModel)
                 case .guidebook:
-                    GuidebookPlaceholderView(onBack: { viewModel.send(.dismissOverlay) })
+                    GuidebookView(viewModel: guidebookViewModel)
                 }
             }
             .transition(.opacity)
@@ -133,5 +134,12 @@ struct HomeView: View {
         settings: UserDefaultsSettingsStore(),
         onBackRequested: { [weak home] in home?.send(.dismissOverlay) }
     )
-    return HomeView(viewModel: home, optionViewModel: option)
+    let guidebook = GuidebookViewModel(
+        onBackRequested: { [weak home] in home?.send(.dismissOverlay) }
+    )
+    return HomeView(
+        viewModel: home,
+        optionViewModel: option,
+        guidebookViewModel: guidebook
+    )
 }
