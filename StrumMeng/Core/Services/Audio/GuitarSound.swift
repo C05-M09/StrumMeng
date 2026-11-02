@@ -1,6 +1,7 @@
 import Foundation
 
-/// The guitar the iPad plays: the Listen example and the player's own strums in Play.
+/// The synthesised guitar. The iPad plays the Listen example and the player's own strums in Play;
+/// the iPhone plays its strums while no session is running.
 @MainActor
 protocol GuitarSound: AnyObject {
     /// Synthesises the notes ahead of time, so the first strum is not late. Safe to call again.

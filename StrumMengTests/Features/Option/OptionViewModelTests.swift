@@ -75,6 +75,22 @@ final class OptionViewModelTests: XCTestCase {
         XCTAssertEqual(second.state, OptionState(soundVolume: 0.1, sfxVolume: 0.6))
     }
 
+    func test_tapSetUpDevice_requestsTheSetupScreen_andKeepsTheVolumes() {
+        let store = UserDefaultsSettingsStore(defaults: defaults)
+        var didRequestSetup = false
+        let viewModel = OptionViewModel(
+            settings: store,
+            onBackRequested: {},
+            onSetUpDeviceRequested: { didRequestSetup = true }
+        )
+        let before = viewModel.state
+
+        viewModel.send(.tapSetUpDevice)
+
+        XCTAssertTrue(didRequestSetup)
+        XCTAssertEqual(viewModel.state, before)
+    }
+
     func test_tapBack_requestsRouterPop() {
         var didRequestBack = false
         let (viewModel, _) = makeViewModel(onBackRequested: { didRequestBack = true })

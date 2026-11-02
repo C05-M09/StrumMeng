@@ -51,10 +51,16 @@ struct ContentView: View {
                         SummaryRoute(sessionID: sessionID, container: container)
                             .id(route)
                             .navigationBarBackButtonHidden()
+
+                    case .deviceSetup:
+                        DeviceSetupRoute(container: container)
                     }
                 }
         }
         .ignoresSafeArea()
+        .task { await container.startControllerLink() }
+        // The DEBUG controller screens replace this view and bring their own link.
+        .onDisappear { container.stopControllerLink() }
     }
 }
 
@@ -82,6 +88,19 @@ private struct PlayRoute: View {
 
     var body: some View {
         PracticePlaySessionView(viewModel: viewModel, startImmediately: true)
+    }
+}
+
+/// Same idea for Set Up Device, so a redraw cannot reset what it shows.
+private struct DeviceSetupRoute: View {
+    @State private var viewModel: DeviceSetupViewModel
+
+    init(container: AppContainer) {
+        _viewModel = State(initialValue: container.makeDeviceSetupViewModel())
+    }
+
+    var body: some View {
+        DeviceSetupView(viewModel: viewModel)
     }
 }
 

@@ -7,6 +7,8 @@ final class MockControllerLink: ControllerLink {
     private(set) var refreshCount = 0
     private(set) var stopCount = 0
     private(set) var sessionActiveCalls: [Bool] = []
+    /// When set, start() throws it.
+    var startError: Error?
 
     let pairCode: PairCode
 
@@ -20,7 +22,10 @@ final class MockControllerLink: ControllerLink {
     var strums: AsyncStream<StrumEvent> { strumChannel.stream }
     var connectionStates: AsyncStream<ControllerConnectionState> { stateChannel.stream }
 
-    func start() async throws { startCount += 1 }
+    func start() async throws {
+        startCount += 1
+        if let startError { throw startError }
+    }
     func refreshIfNeeded() async throws { refreshCount += 1 }
     func setSessionActive(_ active: Bool) async { sessionActiveCalls.append(active) }
     func stop() async { stopCount += 1 }

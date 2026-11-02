@@ -14,7 +14,7 @@ func reduce(_ state: OptionState, _ event: OptionEvent) -> OptionState {
             sfxVolume: VolumeConfig.clamped(volume)
         )
 
-    case .tapBack:
+    case .tapSetUpDevice, .tapBack:
         return state
     }
 }

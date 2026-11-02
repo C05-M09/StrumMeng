@@ -236,8 +236,8 @@ Every type above has a mock \(MockControllerLink emits scripted strums: on\-time
 
 #### 3\.2\.3 Controller link and strum input
 
-- Gesture \(iPhone\): a swipe with N fingers \(default 2\) past a distance threshold is one strum; the<br>direction comes from the swipe\. Single\-finger touches are ignored so the palm can rest on the screen\.<br>Sensitivity, finger count and invert are controller settings stored on the iPhone\.
-- Transport: Wi\-Fi Aware \(iOS 26\) is the primary path: the devices are paired once with the system<br>pairing UI \(DeviceDiscoveryUI\), then connect directly without a router\. Regular Wi\-Fi via Bonjour<br>with a 6\-digit pair code is the fallback\. Both use the same message format\.
+- Gesture \(iPhone\): a swipe with N fingers \(default 2\) past a distance threshold is one strum; the<br>direction comes from the swipe\. Single\-finger touches are ignored so the palm can rest on the screen\.<br>Sensitivity, finger count and invert are controller settings stored on the iPhone\.<br>Built so far: the iPhone is locked to portrait with the strings running up the screen, so a strum is a one\-finger left or right swipe \(right is down, left is up\)\. CompanionTouchSurface, a UIView, reads UITouch\.timestamp and the coalesced touches and follows the newest finger, so a resting palm does not block the strumming hand\. Each strum gives a light haptic\. Outside a session the iPhone also plays the strum on its own GuitarEngine, using the sessionActive stream as the switch \(decision 20\)\.
+- Transport: Wi\-Fi Aware \(iOS 26\) is the primary path: the devices are paired once with the system<br>pairing UI \(DeviceDiscoveryUI\), then connect directly without a router\. Regular Wi\-Fi via Bonjour<br>with a 6\-digit pair code is the fallback\. Both use the same message format\.<br>Built so far: Bonjour only\. The Wi\-Fi Aware entitlement needs a paid developer team, and the team has only Personal teams\.
 - Messages: UDP\. Each strum is sent several times \(3 copies\) so one lost packet does not lose the<br>strum; the iPad de\-duplicates them inside the link before they become a StrumEvent\.
 - Message format: ControllerMessage \(hello, startSession, stopSession, strum, ping, pong\), JSON over<br>one datagram each\. ping carries the latency the iPhone measured so the iPad can show it; pong<br>repeats whether a session is playing, so a lost startSession/stopSession corrects itself within a<br>second\. Start/stop are also sent as 3 copies\.
 - Session gating: the iPad calls setSessionActive when a session starts or ends\. The iPhone sends<br>strums only while a session is playing, and the iPad also drops any strum outside one\.
@@ -255,6 +255,8 @@ Every type above has a mock \(MockControllerLink emits scripted strums: on\-time
 #### 3\.2\.4 Connection state and indicator \(US 6\)
 
 ControllerConnectionState machine: \.unpaired, \.pairing, \.searching, \.connected\(latencyMs\),<br>\.reconnecting\. Before the first session the iPad explains how to set up the iPhone \(open the app on<br>the iPhone, pair once\)\. A small indicator on the iPad shows whether a controller is connected; the<br>iPhone shows its own connection status and the measured latency\. The system local\-network / pairing<br>prompts are shown by iOS; if the user declines, a message explains how to allow it in Settings\.
+
+Setup flow as built: AppContainer owns one link, started at launch so a paired iPhone reconnects before Play\. On the iPad, Option → Set Up Device shows the pair code and the connection state \(DeviceSetupState: searching, connected, reconnecting, failed\)\. On the iPhone, CompanionState goes enteringCode → connecting → connected, with notFound and reconnecting\. PairCodeStore keeps the iPad's code and the iPhone's last connected code across launches, apart from SettingsStore because these are not settings the player edits\. A typed code gets 10 seconds, because the two sides never say a code is wrong; a saved code has no limit, because the iPad may simply not be open yet\. The iPhone is optional in Play: on\-screen swipes keep working, and only a session started with the iPhone pauses when it drops\.
 
 ### 3\.3 Results: Summary, Replay, Retry, records \(US 4, US 8\)
 
@@ -339,7 +341,7 @@ Three read\-only pages: Counting Beats, Practice Tempo, How to Strum\. Content i
 - Option: two sliders \(Sound, Sound Effects\), latency calibration, and the controller connection\.
     - Sound: metronome and pattern example volume\.
     - Sound Effects: effect volume\.
-    - Controller: connection type \(Wi\-Fi Aware / Wi\-Fi\), pairing, and status\.
+    - Controller: connection type \(Wi\-Fi Aware / Wi\-Fi\), pairing, and status\. Built so far: a Set Up Device button that opens the pairing screen \(§3\.2\.4\)\.
     - The Microphone slider in the current design has no function without mic input and should be<br>removed or replaced by the controller section \(design change, needs the Designer\)\.
     - Changes apply immediately, even during a session, and persist across launches\.
 - Latency calibration: CalibrationState: idle, instructions, measuring\(n/total\), computing,<br>done\(offsetMs\), failed\. The app plays a beat, the user swipes along on the iPhone, the app collects<br>samples \(8 \[Assumption\]\), takes the median difference between strum and beat as the offset, and<br>discards outliers\. Network delay is already removed by the clock offset \(§3\.2\.3\), so this measures<br>audio output delay \(for example Bluetooth headphones\) and the player's perception\. The offset is<br>saved in SettingsStore and used by TimingJudge\. When it appears \(manual only, or also on first<br>launch\) is still undecided\.
@@ -478,6 +480,8 @@ Accepted risk: users with colour\-vision deficiency may find it hard to tell res
 | 16 | Which test framework? | XCTest for now\. May move to Swift Testing if the whole team is on Xcode 16\+\. |
 | 17 | How long is a Practice session? | Repeat the selected pattern 10 times; calculate duration from its beat count and selected BPM\. |
 | 18 | Is strum direction judged? | Yes\. Each step must be strummed in its direction; a wrong\-direction strum inside the step's window makes it a Miss immediately, even if a right one follows\. Results stay Perfect, Too Early, Miss\. |
+| 19 | Where is the iPhone set up? | From Option, on its own Set Up Device screen: Home has no free slot in the hi\-fi\. The iPhone holds portrait and strums with left and right swipes\. |
+| 20 | Does the iPhone make sound? | Only outside a session, so swiping there feels like a guitar\. From the count\-in on, the sound comes from the iPad alone and the iPhone cuts anything still ringing\. The metronome stays on the iPad\. |
 
 ## 11\. Suggested implementation order
 

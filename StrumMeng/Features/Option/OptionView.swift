@@ -39,7 +39,11 @@ struct OptionView: View {
 
     private var content: some View {
         ZStack {
-            OptionCardView(soundVolume: soundVolume, sfxVolume: sfxVolume)
+            OptionCardView(
+                soundVolume: soundVolume,
+                sfxVolume: sfxVolume,
+                onSetUpDevice: { viewModel.send(.tapSetUpDevice) }
+            )
                 .position(
                     x: AppLayout.referenceSize.width / 2,
                     y: AppLayout.referenceSize.height / 2
