@@ -12,6 +12,7 @@ final class SynthListenPlayer: ListenPatternPlayer {
     private static let pollInterval: Duration = .milliseconds(25)
 
     private let sound: any GuitarSound
+    private let metronome: (any MetronomeSound)?
     private let now: () -> TimeInterval
     private var strokes: [Stroke] = []
     private var stepInterval: TimeInterval = 0
@@ -21,8 +22,13 @@ final class SynthListenPlayer: ListenPatternPlayer {
     private var nextStep = 0
     private var loop: Task<Void, Never>?
 
-    init(sound: any GuitarSound, now: @escaping () -> TimeInterval = HostClock.now) {
+    init(
+        sound: any GuitarSound,
+        metronome: (any MetronomeSound)? = nil,
+        now: @escaping () -> TimeInterval = HostClock.now
+    ) {
         self.sound = sound
+        self.metronome = metronome
         self.now = now
     }
 
@@ -67,11 +73,21 @@ final class SynthListenPlayer: ListenPatternPlayer {
         while true {
             let time = startTime + Double(nextStep) * stepInterval
             guard time < now() + Self.lookahead else { return }
-            switch strokes[nextStep % strokes.count] {
+
+            // Strum sound
+            let stepIndex = nextStep % strokes.count
+            switch strokes[stepIndex] {
             case .down: sound.strum(.down, at: time, accent: 1)
             case .up: sound.strum(.up, at: time, accent: 0.9)
             case .rest: break
             }
+
+            // Metronome click on quarter-note downbeats: 1, 2, 3, 4 (even steps: 0, 2, 4, 6 in an 8-stroke 4/4 bar)
+            if let metronome, nextStep % 2 == 0 {
+                let isAccent = stepIndex == 0
+                metronome.click(at: time, accent: isAccent)
+            }
+
             nextStep += 1
         }
     }
@@ -94,6 +110,7 @@ final class SynthListenPlayer: ListenPatternPlayer {
         loop = nil
         startTime = nil
         sound.stopStrums()
+        metronome?.cancelClicks()
     }
 
     private enum ListenPlaybackError: Error {

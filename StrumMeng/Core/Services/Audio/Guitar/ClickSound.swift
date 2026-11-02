@@ -9,7 +9,7 @@ nonisolated enum ClickSound {
     static func samples(frequency: Double, sampleRate fs: Double) -> [Float] {
         (0..<Int(fs * duration)).map { n in
             let t = Double(n) / fs
-            return Float(sin(2 * .pi * frequency * t) * exp(-t / 0.007) * 0.5)
+            return Float(sin(2 * .pi * frequency * t) * exp(-t / 0.012) * 0.9)
         }
     }
 }

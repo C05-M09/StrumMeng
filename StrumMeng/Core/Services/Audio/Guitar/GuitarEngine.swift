@@ -168,7 +168,7 @@ final class GuitarEngine: GuitarSound, MetronomeSound {
 
         // The metronome skips the guitar's EQ and reverb.
         engine.connect(clickPlayer, to: engine.mainMixerNode, format: format)
-        clickPlayer.volume = 0.3
+        clickPlayer.volume = 0.95
         accentClick = makeBuffer(ClickSound.samples(frequency: ClickSound.accentFrequency, sampleRate: sampleRate))
         beatClick = makeBuffer(ClickSound.samples(frequency: ClickSound.beatFrequency, sampleRate: sampleRate))
     }
