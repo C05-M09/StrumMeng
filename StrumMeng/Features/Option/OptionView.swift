@@ -91,6 +91,7 @@ struct OptionView: View {
             settings: UserDefaultsSettingsStore(
                 defaults: UserDefaults(suiteName: "preview.option") ?? .standard
             ),
+            sounds: AVMenuSoundService(),
             onBackRequested: {}
         )
     )

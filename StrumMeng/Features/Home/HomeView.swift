@@ -135,6 +135,7 @@ struct HomeView: View {
     let home = HomeViewModel(onPracticeRequested: {})
     let option = OptionViewModel(
         settings: UserDefaultsSettingsStore(),
+        sounds: AVMenuSoundService(),
         onBackRequested: { [weak home] in home?.send(.dismissOverlay) }
     )
     let guidebook = GuidebookViewModel(
