@@ -25,7 +25,7 @@ enum OptionCardLayout {
     /// Set to false if the `Option_Card` artwork already draws the "OPTION" title.
     static let drawsTitle = true
     static let titleFontSize: CGFloat = 50
-    static let titleTopPadding: CGFloat = 86
+    static let titleTopPadding: CGFloat = 60
 
     /// Distance from the top of the card to the first row (icon and label).
     static let rowsTopInset: CGFloat = 150
