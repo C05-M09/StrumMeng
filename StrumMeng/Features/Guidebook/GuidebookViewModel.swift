@@ -115,6 +115,7 @@ final class GuidebookViewModel {
     }
 
     func stopSound() {
+        guard isPlayingAudio else { return }
         player?.stop()
         isPlayingAudio = false
     }

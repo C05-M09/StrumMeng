@@ -59,10 +59,14 @@ enum PlayTimeline {
     }
 
     /// 0...1, how far into the current count-in number we are (drives its pop animation).
-    static func countInBeatProgress(songTime: TimeInterval, slotInterval: TimeInterval) -> Double {
+    static func countInBeatProgress(songTime: TimeInterval, slotInterval: TimeInterval,
+                                    leadInSlots: Int = 0) -> Double {
         guard songTime < 0, slotInterval > 0 else { return 1 }
         let quarter = slotInterval * 2
-        let intoBeat = (songTime + Double(countInSlots) * slotInterval).truncatingRemainder(dividingBy: quarter)
+        let totalSlots = Double(countInSlots + leadInSlots)
+        let elapsed = songTime + totalSlots * slotInterval
+        guard elapsed >= 0 else { return 0 }
+        let intoBeat = elapsed.truncatingRemainder(dividingBy: quarter)
         return min(1, max(0, intoBeat / quarter))
     }
 

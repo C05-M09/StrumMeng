@@ -16,6 +16,15 @@ final class PlayViewModel {
     /// already be a Miss. Must stay well below one step (250 ms at 120 BPM).
     static let controllerStrumArrivalGrace: TimeInterval = 0.15
 
+    /// Default lead-in steps between countdown completion and the first beat, so nodes glide
+    /// in from the right edge and arrive in the hit ring exactly on step 0. Always an even number of
+    /// steps (quarter notes) to keep metronome clicks in musical sync.
+    static func defaultLeadInSteps(bpm: Int) -> Int {
+        let slot = AudioBeatClock.stepInterval(bpm: bpm)
+        let quarters = max(1, Int((PlayScreenLayout.designReadyLeadTime / (slot * 2)).rounded()))
+        return quarters * 2
+    }
+
     let pattern: StrumPattern
     let bpm: Int
 
@@ -53,6 +62,8 @@ final class PlayViewModel {
 
     @ObservationIgnored let stepInterval: TimeInterval
     @ObservationIgnored let totalSteps: Int
+    @ObservationIgnored let leadInSteps: Int
+    @ObservationIgnored let leadInTime: TimeInterval
     @ObservationIgnored private let duration: TimeInterval
     @ObservationIgnored private let laneNodes: [PlayLaneNode]
 
@@ -61,6 +72,8 @@ final class PlayViewModel {
     @ObservationIgnored private var judgedAt: [Int: TimeInterval] = [:]
     /// Clock tick index of the first count-in tick of the current count-in.
     @ObservationIgnored private var countInFirstIndex: Int?
+    /// Expected time of the first count-in tick, for smooth beat progress animations.
+    @ObservationIgnored private var countInStartTime: TimeInterval?
     /// tick index - step index, fixed at each count-in (it shifts after a resume).
     @ObservationIgnored private var stepOffset = countInSteps
     /// The step the next count-in leads into: 0 at the start, the first unjudged step after a pause.
@@ -70,6 +83,8 @@ final class PlayViewModel {
     @ObservationIgnored private var anchorTime: TimeInterval?
     /// Session time frozen while paused or finished.
     @ObservationIgnored private var frozenSongTime: TimeInterval?
+    /// Exact song time at the moment pause was tapped, so resume continues with zero jump.
+    @ObservationIgnored private var pausedSongTime: TimeInterval?
     /// Session time of the latest swipe in a running session, judged or not (the ring reacts to it).
     @ObservationIgnored private var lastStrumSongTime: TimeInterval?
 
@@ -105,6 +120,7 @@ final class PlayViewModel {
          tolerance: ToleranceConfig = .standard,
          latencyOffset: TimeInterval = 0,
          strumArrivalGrace: TimeInterval = 0,
+         leadInSteps: Int? = nil,
          repetitions: Int = PracticeSessionConfig.patternRepetitions,
          now: @escaping () -> TimeInterval,
          waitUntil: @escaping (TimeInterval) async -> Void,
@@ -135,6 +151,10 @@ final class PlayViewModel {
         stepInterval = AudioBeatClock.stepInterval(bpm: bpm)
         totalSteps = pattern.strokes.count * max(1, repetitions)
         duration = Double(totalSteps) * stepInterval
+        let steps = leadInSteps ?? Self.defaultLeadInSteps(bpm: bpm)
+        self.leadInSteps = steps
+        self.leadInTime = Double(steps) * stepInterval
+        stepOffset = Self.countInSteps + steps
         laneNodes = PlayTimeline.makeNodes(pattern: pattern.strokes.map(Self.arrow(for:)),
                                            slotInterval: stepInterval, duration: duration)
         engine = FeedbackEngine(config: tolerance, latencyOffset: latencyOffset, stepInterval: stepInterval)
@@ -229,10 +249,11 @@ final class PlayViewModel {
         switch state {
         case .countIn:
             let first = countInFirstIndex ?? tick.index
+            let lead = resumeStep == 0 ? leadInSteps : 0
             if countInFirstIndex == nil {
                 countInFirstIndex = first
-                stepOffset = first + Self.countInSteps - resumeStep
-                frozenSongTime = nil
+                countInStartTime = tick.expectedTime
+                stepOffset = first + Self.countInSteps + lead - resumeStep
                 // Nothing scheduled the first count-in click ahead of time.
                 scheduleClick(forStep: tick.index - stepOffset, at: tick.expectedTime)
             }
@@ -245,6 +266,12 @@ final class PlayViewModel {
                 }
                 return
             }
+            if let pausedTime = pausedSongTime {
+                anchorTime = tick.expectedTime - pausedTime
+            }
+            frozenSongTime = nil
+            pausedSongTime = nil
+            countInStartTime = nil
             state = reduce(state, .countInDone)
             playStep(tick)
         case .playing:
@@ -312,7 +339,18 @@ final class PlayViewModel {
         }
         return PlayScreenModel(title: pattern.name, bpm: bpm, duration: duration,
                                slotInterval: stepInterval, songTime: songTime, phase: phase,
-                               nodes: nodes, lastJudgement: last, lastStrumTime: lastStrumSongTime)
+                               nodes: nodes, lastJudgement: last, lastStrumTime: lastStrumSongTime,
+                               readyLeadTime: leadInTime, leadInSlots: leadInSteps,
+                               countInBeatProgress: currentCountInBeatProgress())
+    }
+
+    private func currentCountInBeatProgress() -> Double? {
+        guard case .countIn = state, let startTime = countInStartTime else { return nil }
+        let quarter = stepInterval * 2
+        guard quarter > 0 else { return 1 }
+        let elapsed = max(0, now() - startTime)
+        let intoBeat = elapsed.truncatingRemainder(dividingBy: quarter)
+        return min(1, max(0, intoBeat / quarter))
     }
 
     private var phase: PlayScreenPhase {
@@ -327,18 +365,20 @@ final class PlayViewModel {
     private func currentSongTime() -> TimeInterval {
         if let frozenSongTime { return frozenSongTime }
         if let anchorTime { return now() - anchorTime }
-        return -Double(Self.countInSteps) * stepInterval
+        return -Double(Self.countInSteps + leadInSteps) * stepInterval
     }
 
     // MARK: Game loop
 
     private func playStep(_ tick: BeatTick) {
         let step = tick.index - stepOffset
+        guard step >= 0 else { return }
         apply(engine.close(upTo: tick.expectedTime - strumArrivalGrace))
         if step < totalSteps {
             nextStep = step + 1
             if let direction = Self.direction(for: pattern.strokes[step % pattern.strokes.count]) {
-                apply(engine.addBeat(BeatTarget(index: step, expectedTime: tick.expectedTime,
+                let expected = anchorTime.map { $0 + Double(step) * stepInterval } ?? tick.expectedTime
+                apply(engine.addBeat(BeatTarget(index: step, expectedTime: expected,
                                                 direction: direction)))
             }
             armWindowTimer()
@@ -397,7 +437,9 @@ final class PlayViewModel {
         windowTask?.cancel()
         metronome?.cancelClicks()
         await clock.pause()
-        frozenSongTime = currentSongTime()
+        let time = currentSongTime()
+        frozenSongTime = time
+        pausedSongTime = time
         apply(engine.close(upTo: now() - strumArrivalGrace))
         // Beats still open when the player paused are played again after the re-count.
         let dropped = engine.discardOpenBeats()
@@ -405,6 +447,7 @@ final class PlayViewModel {
         nextStep = resumeStep
         anchorTime = nil
         countInFirstIndex = nil
+        countInStartTime = nil
     }
 
     private func resetSession() {
@@ -413,11 +456,13 @@ final class PlayViewModel {
         beatEvents = []
         judgedAt = [:]
         countInFirstIndex = nil
-        stepOffset = Self.countInSteps
+        countInStartTime = nil
+        stepOffset = Self.countInSteps + leadInSteps
         resumeStep = 0
         nextStep = 0
         anchorTime = nil
         frozenSongTime = nil
+        pausedSongTime = nil
         lastStrumSongTime = nil
     }
 

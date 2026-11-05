@@ -15,4 +15,7 @@ struct PlayScreenModel: Equatable {
     let lastJudgement: PlayJudgement?
     /// Session time of the player's latest swipe, judged or not, so the ring can react to every swipe.
     var lastStrumTime: TimeInterval?
+    var readyLeadTime: TimeInterval? = nil
+    var leadInSlots: Int = 0
+    var countInBeatProgress: Double? = nil
 }
