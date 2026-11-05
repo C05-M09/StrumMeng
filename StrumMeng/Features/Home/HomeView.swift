@@ -23,11 +23,14 @@ struct HomeView: View {
             )
 
             ZStack {
-                Image(HomeLayout.coverAsset)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .ignoresSafeArea()
+                FrameAnimationView(
+                    framePrefix: HomeLayout.coverAnimationPrefix,
+                    frameCount: HomeLayout.coverAnimationFrameCount,
+                    framesPerSecond: HomeLayout.coverAnimationFPS
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+                .ignoresSafeArea()
 
                 content
                     .frame(
