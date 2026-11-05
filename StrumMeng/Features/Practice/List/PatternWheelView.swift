@@ -11,7 +11,7 @@ struct PatternWheelView: View {
     @State private var interactionGeneration = 0
 
     private let pivot = CGPoint(x: -260, y: 516)
-    private let highlightRadius: CGFloat = 730
+    private let highlightRadius: CGFloat = 720
     private let angleBetweenPatterns = 30.0
     private let lineInnerRadius: CGFloat = 555
     private let lineOuterRadius: CGFloat = 930
