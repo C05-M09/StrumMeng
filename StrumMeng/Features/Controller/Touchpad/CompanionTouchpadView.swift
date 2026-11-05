@@ -67,6 +67,7 @@ struct CompanionTouchpadView: View {
             if let strum = viewModel.lastStrum {
                 BeatNodeView(arrow: strum == .down ? .down : .up, size: 96)
                     .scaleEffect(pulse ? 1.25 : 1)
+                    .rotationEffect(.degrees(-90))
             } else {
                 Text("SWIPE LEFT OR RIGHT\nTO STRUM")
                     .font(AppFont.display(20))
