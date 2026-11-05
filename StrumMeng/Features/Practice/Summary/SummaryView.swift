@@ -44,6 +44,11 @@ struct SummaryView: View {
                     BPMRecommendationOverlay(
                         recommendation: recommendation,
                         offTempoCount: viewModel.result.tooEarlyCount + viewModel.result.missCount,
+                        onBack: {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                viewModel.dismissRecommendation()
+                            }
+                        },
                         onKeepPrevious: {
                             viewModel.send(.rejectRecommendation)
                         },
