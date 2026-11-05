@@ -75,7 +75,9 @@ struct PracticePlayView: View {
 
     private func header(_ layout: PlayScreenLayout, _ model: PlayScreenModel) -> some View {
         ZStack(alignment: .topLeading) {
-            PauseButton(size: layout.pauseSize, isPaused: model.phase == .paused, action: onPause)
+            assetButton("Pause", normal: "Button_Pause_Normal", pressed: "Button_Pause_Pressed",
+                        size: CGSize(width: 90 * layout.unit, height: 98 * layout.unit),
+                        action: onPause)
                 .position(layout.pauseCenter)
 
             OutlinedText(text: model.title.uppercased(), font: AppFont.display(layout.titleFontSize),
@@ -93,6 +95,13 @@ struct PracticePlayView: View {
                 .frame(width: layout.size.width - layout.bpmTrailing, alignment: .trailing)
                 .position(x: (layout.size.width - layout.bpmTrailing) / 2, y: layout.bpmCenterY)
         }
+    }
+
+    private func assetButton(_ label: String, normal: String, pressed: String, size: CGSize,
+                             action: @escaping () -> Void) -> some View {
+        Button(label, action: action).buttonStyle(AssetButtonStyle(
+            normalAssetName: normal, pressedAssetName: pressed, size: size))
+        .accessibilityLabel(label)
     }
 
     // MARK: Board (every frame)
@@ -136,11 +145,14 @@ struct PracticePlayView: View {
                 // Only the number's pop animation needs the per-frame time.
                 TimelineView(.animation(minimumInterval: Self.frameInterval, paused: !isAnimating)) { _ in
                     let frame = liveModel()
+                    let progress = frame.countInBeatProgress ?? PlayTimeline.countInBeatProgress(
+                        songTime: frame.songTime,
+                        slotInterval: frame.slotInterval,
+                        leadInSlots: frame.leadInSlots)
                     PlayCalloutView(
                         text: "\(number)",
                         fontSize: 140 * layout.unit,
-                        beatProgress: PlayTimeline.countInBeatProgress(songTime: frame.songTime,
-                                                                       slotInterval: frame.slotInterval))
+                        beatProgress: progress)
                         .position(layout.calloutCenter)
                 }
             }
@@ -148,7 +160,7 @@ struct PracticePlayView: View {
             .transition(.opacity)
         case .paused:
             ZStack {
-                AppColor.dim.opacity(0.6)
+                AppColors.brownInk.opacity(0.65)
                 PauseMenuOverlay(unit: layout.unit, onResume: onResume, onRestart: onRestart,
                                  onBackToMenu: onBackToMenu)
                     .transition(.scale(scale: 0.9).combined(with: .opacity))

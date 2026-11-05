@@ -201,13 +201,13 @@ struct ReplayView: View {
                         )
                     )
 
-                    Button("Back to Menu") {
+                    Button("Back to Summary") {
                         viewModel.send(.backToSummary)
                     }
                     .buttonStyle(
                         AssetButtonStyle(
-                            normalAssetName: "Button_Back to Menu_Normal",
-                            pressedAssetName: "Button_Back to Menu_Pressed",
+                            normalAssetName: "Button_Back to Summary_Normal",
+                            pressedAssetName: "Button_Back to Summary_Pressed",
                             size: CGSize(width: 510, height: 88)
                         )
                     )

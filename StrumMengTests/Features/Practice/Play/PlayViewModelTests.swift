@@ -13,6 +13,7 @@ final class PlayViewModelTests: XCTestCase {
     /// Syncopation, "D - D U - U D U": step 0 judged, step 1 a rest.
     private func makeViewModel(patternID: String = "syncopation",
                                repetitions: Int = 10,
+                               leadInSteps: Int = 0,
                                latencyOffset: TimeInterval = 0,
                                strumArrivalGrace: TimeInterval = 0,
                                touchInput: TouchStrumInput? = nil,
@@ -23,7 +24,8 @@ final class PlayViewModelTests: XCTestCase {
         return PlayViewModel(
             pattern: pattern, bpm: 80, clock: clock, input: MockStrumInputService(), touchInput: touchInput,
             controller: controller, requiresController: requiresController,
-            guitar: sound, metronome: sound, latencyOffset: latencyOffset, strumArrivalGrace: strumArrivalGrace, repetitions: repetitions,
+            guitar: sound, metronome: sound, latencyOffset: latencyOffset, strumArrivalGrace: strumArrivalGrace,
+            leadInSteps: leadInSteps, repetitions: repetitions,
             now: { [unowned self] in self.currentTime },
             waitUntil: { _ in try? await Task.sleep(for: .seconds(3600)) },
             makeID: { UUID(uuidString: "00000000-0000-0000-0000-000000000001") ?? UUID() },
@@ -85,6 +87,28 @@ final class PlayViewModelTests: XCTestCase {
         tick(viewModel, 6)
         XCTAssertEqual(viewModel.state, .playing)
         XCTAssertEqual(viewModel.screenModel().songTime, 0, accuracy: 1e-9)
+    }
+
+    func test_countInWithLeadInSteps_glidesAfterCountdownAndPlaysAtStepZero() async throws {
+        let viewModel = try makeViewModel(leadInSteps: 2)
+        await viewModel.send(.tapReady)
+        for n in 0...5 { tick(viewModel, n) }
+        // Countdown finishes at tick 6: state is playing, but nodes glide in from -leadInTime
+        tick(viewModel, 6)
+        XCTAssertEqual(viewModel.state, .playing)
+        XCTAssertEqual(viewModel.screenModel().songTime, -2 * step, accuracy: 1e-9)
+        XCTAssertNil(nodeResult(viewModel, step: 0))
+
+        // Tick 7: still in lead-in glide
+        tick(viewModel, 7)
+        XCTAssertNil(nodeResult(viewModel, step: 0))
+
+        // Tick 8 (6 + 2): step 0 arrives in hit ring, songTime is 0, node is judged
+        tick(viewModel, 8)
+        XCTAssertEqual(viewModel.screenModel().songTime, 0, accuracy: 1e-9)
+        currentTime = time(ofTick: 8) + 0.06
+        viewModel.closeWindows(upTo: currentTime)
+        XCTAssertEqual(nodeResult(viewModel, step: 0), .miss)
     }
 
     func test_strumBeforeReady_isIgnored() throws {
@@ -240,6 +264,56 @@ final class PlayViewModelTests: XCTestCase {
         strum(viewModel, at: time(ofTick: 26))
         XCTAssertEqual(viewModel.beatEvents.map(\.stepIndex), [0])
         XCTAssertEqual(viewModel.beatEvents.map(\.result), [.perfect])
+    }
+
+    func test_resume_keepsNodesFrozenDuringCountdown_andMovesAfter() async throws {
+        let viewModel = try makeViewModel(leadInSteps: 2)
+        await viewModel.send(.tapReady)
+        for n in 0...8 { tick(viewModel, n) } // starts, glides, plays step 0 at tick 8
+        strum(viewModel, at: time(ofTick: 8))
+        tick(viewModel, 9) // step 1 (rest)
+        tick(viewModel, 10) // step 2
+        await viewModel.send(.tapPause)
+        XCTAssertEqual(viewModel.state, .paused)
+        let pausedTime = viewModel.screenModel().songTime
+        XCTAssertEqual(pausedTime, 2 * step, accuracy: 1e-9)
+
+        await viewModel.send(.tapResume)
+        XCTAssertEqual(viewModel.state, .countIn(3))
+
+        // During recount ticks 30...35, songTime MUST remain frozen at 2 * step
+        for n in 30...35 {
+            tick(viewModel, n)
+            XCTAssertEqual(viewModel.screenModel().songTime, pausedTime, accuracy: 1e-9)
+        }
+
+        // Tick 36: countdown finished, playing resumes, songTime starts moving from pausedTime
+        tick(viewModel, 36)
+        XCTAssertEqual(viewModel.state, .playing)
+        XCTAssertEqual(viewModel.screenModel().songTime, pausedTime, accuracy: 1e-9)
+        strum(viewModel, at: time(ofTick: 36))
+        XCTAssertEqual(viewModel.beatEvents.map(\.stepIndex), [0, 2])
+        XCTAssertEqual(viewModel.beatEvents.map(\.result), [.perfect, .perfect])
+    }
+
+    func test_pauseMidBeat_freezesAsIs_withoutSnappingToHitRing() async throws {
+        let viewModel = try makeViewModel(leadInSteps: 2)
+        await viewModel.send(.tapReady)
+        for n in 0...8 { tick(viewModel, n) }
+        currentTime = time(ofTick: 8) + 0.12 // mid-beat between step 0 and 1
+        await viewModel.send(.tapPause)
+        XCTAssertEqual(viewModel.state, .paused)
+        let pausedTime = viewModel.screenModel().songTime
+        // Verified: it did NOT snap to 0 or any other beat, it froze as-is at 0.12s!
+        XCTAssertEqual(pausedTime, 0.12, accuracy: 1e-9)
+
+        await viewModel.send(.tapResume)
+        XCTAssertEqual(viewModel.state, .countIn(3))
+        // During count-in, songTime stays frozen as-is at 0.12s
+        for n in 30...35 {
+            tick(viewModel, n)
+            XCTAssertEqual(viewModel.screenModel().songTime, 0.12, accuracy: 1e-9)
+        }
     }
 
     func test_restartFromPause_discardsTheSession() async throws {

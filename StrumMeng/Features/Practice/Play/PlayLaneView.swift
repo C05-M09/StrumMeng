@@ -10,7 +10,8 @@ struct PlayLaneView: View {
 
     var body: some View {
         let lane = layout.laneRect
-        let laneTime = PlayTimeline.laneTime(songTime: model.songTime, readyLead: layout.readyLeadTime)
+        let readyLead = model.readyLeadTime ?? layout.readyLeadTime
+        let laneTime = PlayTimeline.laneTime(songTime: model.songTime, readyLead: readyLead)
         let railY = layout.railY - lane.minY
         let hitX = layout.hitX - lane.minX
 
