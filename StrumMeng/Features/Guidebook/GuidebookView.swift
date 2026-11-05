@@ -54,6 +54,9 @@ struct GuidebookView: View {
 
     private var content: some View {
         ZStack {
+            // Side tap areas for left and right margins outside card stack
+            sideTapAreas
+
             // Interactive stacked paper deck
             cardStack
 
@@ -69,6 +72,28 @@ struct GuidebookView: View {
             height: AppLayout.referenceSize.height
         )
         .clipped()
+    }
+
+    private var sideTapAreas: some View {
+        HStack(spacing: 0) {
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    guard !isShuffling else { return }
+                    pullFromBackToFront(direction: 1)
+                }
+
+            Spacer()
+                .frame(width: 685)
+
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    guard !isShuffling else { return }
+                    shuffleToBack(direction: -1)
+                }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var cardStack: some View {
@@ -95,6 +120,15 @@ struct GuidebookView: View {
             x: AppLayout.referenceSize.width / 2,
             y: 510
         )
+        .contentShape(Rectangle())
+        .onTapGesture { location in
+            guard !isShuffling else { return }
+            if location.x < 685 / 2 {
+                pullFromBackToFront(direction: 1)
+            } else {
+                shuffleToBack(direction: -1)
+            }
+        }
         .gesture(
             DragGesture(minimumDistance: 15)
                 .onChanged { gesture in
