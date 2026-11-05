@@ -69,6 +69,13 @@ final class SummaryViewModel {
         }
     }
 
+    /// Dismisses the recommendation overlay and returns to showing the summary.
+    func dismissRecommendation() {
+        if case .showingRecommendation = state {
+            state = .showing(result)
+        }
+    }
+
     /// The one save of this session, started on first use and shared by every caller after that.
     private func save() -> Task<Void, Never> {
         if let saveTask { return saveTask }

@@ -14,6 +14,7 @@ import SwiftUI
 struct BPMRecommendationOverlay: View {
     let recommendation: RecommendedBPM
     let offTempoCount: Int
+    var onBack: () -> Void
     var onKeepPrevious: () -> Void
     var onStartRecommended: (Int) -> Void
 
@@ -26,11 +27,13 @@ struct BPMRecommendationOverlay: View {
     init(
         recommendation: RecommendedBPM,
         offTempoCount: Int,
+        onBack: @escaping () -> Void = {},
         onKeepPrevious: @escaping () -> Void = {},
         onStartRecommended: @escaping (Int) -> Void = { _ in }
     ) {
         self.recommendation = recommendation
         self.offTempoCount = offTempoCount
+        self.onBack = onBack
         self.onKeepPrevious = onKeepPrevious
         self.onStartRecommended = onStartRecommended
     }
@@ -113,6 +116,11 @@ struct BPMRecommendationOverlay: View {
             // 4. Action buttons below the speech bubble
             actionButtons
                 .offset(y: buttonsEntered ? 0 : 25)
+                .opacity(buttonsEntered ? 1.0 : 0.0)
+
+            // 5. Back button to return to summary
+            BackButton(action: onBack)
+                .position(BackButton.referenceCenter)
                 .opacity(buttonsEntered ? 1.0 : 0.0)
         }
         .frame(width: AppLayout.referenceSize.width, height: AppLayout.referenceSize.height)

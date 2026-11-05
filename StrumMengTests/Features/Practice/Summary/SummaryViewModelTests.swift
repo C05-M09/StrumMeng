@@ -92,6 +92,21 @@ final class SummaryViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.state, .navigating(.retry(bpm: 80)))
     }
 
+    func test_dismissRecommendation_returnsToShowingState() {
+        let repository = MockSessionRepository()
+        let result = makeSampleResult(accuracy: 0.90, bpm: 80)
+        let viewModel = SummaryViewModel(result: result, repository: repository)
+
+        viewModel.send(.tapRetry)
+        guard case .showingRecommendation = viewModel.state else {
+            XCTFail("Expected showingRecommendation state")
+            return
+        }
+
+        viewModel.dismissRecommendation()
+        XCTAssertEqual(viewModel.state, .showing(result))
+    }
+
     func test_send_tapReplay_navigatesToReplay() {
         let repository = MockSessionRepository()
         let result = makeSampleResult()
