@@ -7,7 +7,7 @@ import AVFoundation
 @MainActor
 final class AVMenuSoundService: MenuSoundService {
     /// The audio files to load, by name and extension.
-    struct Files {
+    nonisolated struct Files {
         let musicName: String
         let musicExtension: String
         let buttonName: String

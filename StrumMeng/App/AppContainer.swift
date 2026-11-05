@@ -53,6 +53,16 @@ final class AppContainer {
         }
     }
 
+    /// Plays or pauses the menu music for the screen on top. Called whenever the route stack or the
+    /// app's active state changes; `MenuMusicPolicy` decides.
+    func updateMenuMusic(for path: [AppRoute], isAppActive: Bool) {
+        if MenuMusicPolicy.playsMusic(on: path.last, isAppActive: isAppActive) {
+            menuSounds.startMusic()
+        } else {
+            menuSounds.pauseMusic()
+        }
+    }
+
     func makeHomeViewModel() -> HomeViewModel {
         HomeViewModel(
             onPracticeRequested: { [weak router] in

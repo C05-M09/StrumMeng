@@ -132,6 +132,39 @@ final class AppContainerTests: XCTestCase {
         XCTAssertEqual(sounds.musicVolumes.last, 0.6)
         XCTAssertEqual(sounds.effectsVolumes.last, 0.1)
     }
+
+    func test_updateMenuMusic_onHome_startsTheMusic() {
+        let sounds = MockMenuSoundService()
+        let container = AppContainer(router: router, menuSounds: sounds)
+
+        container.updateMenuMusic(for: [], isAppActive: true)
+
+        XCTAssertEqual(sounds.startMusicCount, 1)
+        XCTAssertEqual(sounds.pauseMusicCount, 0)
+    }
+
+    func test_updateMenuMusic_onListen_pausesTheMusic() {
+        let sounds = MockMenuSoundService()
+        let container = AppContainer(router: router, menuSounds: sounds)
+
+        container.updateMenuMusic(
+            for: [.practiceList, .listen(patternID: "p", bpm: 80)],
+            isAppActive: true
+        )
+
+        XCTAssertEqual(sounds.pauseMusicCount, 1)
+        XCTAssertEqual(sounds.startMusicCount, 0)
+    }
+
+    func test_updateMenuMusic_whenAppIsInactive_pausesTheMusic() {
+        let sounds = MockMenuSoundService()
+        let container = AppContainer(router: router, menuSounds: sounds)
+
+        container.updateMenuMusic(for: [], isAppActive: false)
+
+        XCTAssertEqual(sounds.pauseMusicCount, 1)
+        XCTAssertEqual(sounds.startMusicCount, 0)
+    }
     // MARK: - Practice session flow
 
     private func finishedSession(bpm: Int = 80) -> SessionResult {
