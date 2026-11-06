@@ -96,6 +96,75 @@ final class AppContainerTests: XCTestCase {
 
         XCTAssertNil(home.presentedOverlay)
     }
+
+    // MARK: - Menu sounds
+
+    /// A store in its own suite, so these tests never touch the real saved volumes.
+    private func makeIsolatedSettings() -> (UserDefaultsSettingsStore, String) {
+        let suiteName = "container-sound-tests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName) ?? .standard
+        return (UserDefaultsSettingsStore(defaults: defaults), suiteName)
+    }
+
+    func test_init_appliesTheSavedVolumesToTheMenuSounds() {
+        let (settings, suiteName) = makeIsolatedSettings()
+        defer { UserDefaults().removePersistentDomain(forName: suiteName) }
+        settings.setSoundVolume(0.2)
+        settings.setSFXVolume(0.9)
+        let sounds = MockMenuSoundService()
+
+        _ = AppContainer(router: router, settings: settings, menuSounds: sounds)
+
+        XCTAssertEqual(sounds.musicVolumes, [0.2])
+        XCTAssertEqual(sounds.effectsVolumes, [0.9])
+    }
+
+    func test_optionSliders_reachTheSharedMenuSounds() {
+        let (settings, suiteName) = makeIsolatedSettings()
+        defer { UserDefaults().removePersistentDomain(forName: suiteName) }
+        let sounds = MockMenuSoundService()
+        let container = AppContainer(router: router, settings: settings, menuSounds: sounds)
+        let option = container.makeOptionViewModel {}
+
+        option.send(.changeSoundVolume(0.6))
+        option.send(.changeSFXVolume(0.1))
+
+        XCTAssertEqual(sounds.musicVolumes.last, 0.6)
+        XCTAssertEqual(sounds.effectsVolumes.last, 0.1)
+    }
+
+    func test_updateMenuMusic_onHome_startsTheMusic() {
+        let sounds = MockMenuSoundService()
+        let container = AppContainer(router: router, menuSounds: sounds)
+
+        container.updateMenuMusic(for: [], isAppActive: true)
+
+        XCTAssertEqual(sounds.startMusicCount, 1)
+        XCTAssertEqual(sounds.pauseMusicCount, 0)
+    }
+
+    func test_updateMenuMusic_onListen_pausesTheMusic() {
+        let sounds = MockMenuSoundService()
+        let container = AppContainer(router: router, menuSounds: sounds)
+
+        container.updateMenuMusic(
+            for: [.practiceList, .listen(patternID: "p", bpm: 80)],
+            isAppActive: true
+        )
+
+        XCTAssertEqual(sounds.pauseMusicCount, 1)
+        XCTAssertEqual(sounds.startMusicCount, 0)
+    }
+
+    func test_updateMenuMusic_whenAppIsInactive_pausesTheMusic() {
+        let sounds = MockMenuSoundService()
+        let container = AppContainer(router: router, menuSounds: sounds)
+
+        container.updateMenuMusic(for: [], isAppActive: false)
+
+        XCTAssertEqual(sounds.pauseMusicCount, 1)
+        XCTAssertEqual(sounds.startMusicCount, 0)
+    }
     // MARK: - Practice session flow
 
     private func finishedSession(bpm: Int = 80) -> SessionResult {

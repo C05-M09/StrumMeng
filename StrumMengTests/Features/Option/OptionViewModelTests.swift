@@ -21,9 +21,17 @@ final class OptionViewModelTests: XCTestCase {
     private func makeViewModel(
         onBackRequested: @escaping () -> Void = {}
     ) -> (OptionViewModel, UserDefaultsSettingsStore) {
-        let store = UserDefaultsSettingsStore(defaults: defaults)
-        let viewModel = OptionViewModel(settings: store, onBackRequested: onBackRequested)
+        let (viewModel, store, _) = makeViewModelWithSounds(onBackRequested: onBackRequested)
         return (viewModel, store)
+    }
+
+    private func makeViewModelWithSounds(
+        onBackRequested: @escaping () -> Void = {}
+    ) -> (OptionViewModel, UserDefaultsSettingsStore, MockMenuSoundService) {
+        let store = UserDefaultsSettingsStore(defaults: defaults)
+        let sounds = MockMenuSoundService()
+        let viewModel = OptionViewModel(settings: store, sounds: sounds, onBackRequested: onBackRequested)
+        return (viewModel, store, sounds)
     }
 
     func test_init_showsTheSavedVolumes() {
@@ -75,11 +83,74 @@ final class OptionViewModelTests: XCTestCase {
         XCTAssertEqual(second.state, OptionState(soundVolume: 0.1, sfxVolume: 0.6))
     }
 
+    func test_changeSoundVolume_setsTheMusicVolumeRightAway() {
+        let (viewModel, _, sounds) = makeViewModelWithSounds()
+
+        viewModel.send(.changeSoundVolume(0.4))
+
+        XCTAssertEqual(sounds.musicVolumes, [0.4])
+        XCTAssertEqual(sounds.effectsVolumes, [])
+    }
+
+    func test_changeSFXVolume_setsTheEffectsVolumeRightAway() {
+        let (viewModel, _, sounds) = makeViewModelWithSounds()
+
+        viewModel.send(.changeSFXVolume(0.8))
+
+        XCTAssertEqual(sounds.effectsVolumes, [0.8])
+        XCTAssertEqual(sounds.musicVolumes, [])
+    }
+
+    func test_changeVolume_outOfRange_sendsTheClampedVolume() {
+        let (viewModel, _, sounds) = makeViewModelWithSounds()
+
+        viewModel.send(.changeSoundVolume(-1))
+        viewModel.send(.changeSFXVolume(5))
+
+        XCTAssertEqual(sounds.musicVolumes, [0])
+        XCTAssertEqual(sounds.effectsVolumes, [1])
+    }
+
+    func test_tapSetUpDevice_playsTheButtonSound() {
+        let (viewModel, _, sounds) = makeViewModelWithSounds()
+
+        viewModel.send(.tapSetUpDevice)
+
+        XCTAssertEqual(sounds.buttonSoundCount, 1)
+    }
+
+    func test_tapBack_leavesTheClickToTheOverlayDismiss() {
+        let (viewModel, _, sounds) = makeViewModelWithSounds()
+
+        viewModel.send(.tapBack)
+
+        XCTAssertEqual(sounds.buttonSoundCount, 0)
+    }
+
+    func test_sliderChanges_playNoButtonSound() {
+        let (viewModel, _, sounds) = makeViewModelWithSounds()
+
+        viewModel.send(.changeSoundVolume(0.3))
+        viewModel.send(.changeSFXVolume(0.3))
+
+        XCTAssertEqual(sounds.buttonSoundCount, 0)
+    }
+
+    func test_tapBack_doesNotChangeAnyVolume() {
+        let (viewModel, _, sounds) = makeViewModelWithSounds()
+
+        viewModel.send(.tapBack)
+
+        XCTAssertEqual(sounds.musicVolumes, [])
+        XCTAssertEqual(sounds.effectsVolumes, [])
+    }
+
     func test_tapSetUpDevice_requestsTheSetupScreen_andKeepsTheVolumes() {
         let store = UserDefaultsSettingsStore(defaults: defaults)
         var didRequestSetup = false
         let viewModel = OptionViewModel(
             settings: store,
+            sounds: MockMenuSoundService(),
             onBackRequested: {},
             onSetUpDeviceRequested: { didRequestSetup = true }
         )

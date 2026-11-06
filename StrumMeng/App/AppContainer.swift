@@ -6,6 +6,9 @@ final class AppContainer {
     private let router: AppRouter
     private let repository: SessionRepository?
     private let settings: any SettingsStore
+    /// One menu music and button click player for the whole app, so the music keeps its place
+    /// between screens.
+    private let menuSounds: any MenuSoundService
     private let results = SessionResultStore()
     /// The one pattern list of the app, so Retry can hand it the chosen tempo.
     private weak var patternListViewModel: PatternListViewModel?
@@ -24,10 +27,18 @@ final class AppContainer {
     init(
         router: AppRouter,
         inMemory: Bool = false,
-        settings: (any SettingsStore)? = nil
+        settings: (any SettingsStore)? = nil,
+        menuSounds: (any MenuSoundService)? = nil
     ) {
         self.router = router
-        self.settings = settings ?? UserDefaultsSettingsStore()
+        let settings = settings ?? UserDefaultsSettingsStore()
+        self.settings = settings
+
+        // The saved volumes apply from launch, before Option is ever opened.
+        let sounds = menuSounds ?? AVMenuSoundService()
+        sounds.setMusicVolume(settings.soundVolume)
+        sounds.setEffectsVolume(settings.sfxVolume)
+        self.menuSounds = sounds
 
         do {
             let modelContainer = try ModelContainerFactory.make(
@@ -42,8 +53,19 @@ final class AppContainer {
         }
     }
 
+    /// Plays or pauses the menu music for the screen on top. Called whenever the route stack or the
+    /// app's active state changes; `MenuMusicPolicy` decides.
+    func updateMenuMusic(for path: [AppRoute], isAppActive: Bool) {
+        if MenuMusicPolicy.playsMusic(on: path.last, isAppActive: isAppActive) {
+            menuSounds.startMusic()
+        } else {
+            menuSounds.pauseMusic()
+        }
+    }
+
     func makeHomeViewModel() -> HomeViewModel {
         HomeViewModel(
+            sounds: menuSounds,
             onPracticeRequested: { [weak router] in
                 router?.push(.practiceList)
             }
@@ -146,6 +168,7 @@ final class AppContainer {
     func makeOptionViewModel(onBackRequested: @escaping () -> Void) -> OptionViewModel {
         OptionViewModel(
             settings: settings,
+            sounds: menuSounds,
             onBackRequested: onBackRequested,
             onSetUpDeviceRequested: { [weak router] in router?.push(.deviceSetup) }
         )
