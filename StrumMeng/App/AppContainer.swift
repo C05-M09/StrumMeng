@@ -65,6 +65,7 @@ final class AppContainer {
 
     func makeHomeViewModel() -> HomeViewModel {
         HomeViewModel(
+            sounds: menuSounds,
             onPracticeRequested: { [weak router] in
                 router?.push(.practiceList)
             }
