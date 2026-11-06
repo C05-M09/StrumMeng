@@ -90,4 +90,53 @@ final class ReplaySoundTests: XCTestCase {
         XCTAssertGreaterThan(sound.stopStrumsCount, 0)
         XCTAssertGreaterThan(sound.cancelClicksCount, 0)
     }
+
+    // MARK: - Speed and seek
+
+    func test_halfSpeed_schedulesSoundsTwiceAsFarAhead() {
+        let viewModel = makeViewModel([])
+        viewModel.send(.cycleSpeed)                                   // 1.5x
+        viewModel.send(.cycleSpeed)                                   // 0.5x
+        viewModel.send(.play)
+        let start = viewModel.songTime()
+
+        advance(viewModel, by: (0.70 - start) / 0.5)                  // song time 0.70 s
+
+        // The click at 0.75 s is 0.05 song seconds away: 0.1 real seconds at half speed.
+        XCTAssertEqual(sound.clicks.last?.time ?? 0, hostClock + 0.1, accuracy: 1e-9)
+    }
+
+    func test_cycleSpeed_whilePlaying_dropsAndReschedulesSounds() {
+        let viewModel = makeViewModel([])
+        viewModel.send(.play)
+        advance(viewModel, by: -viewModel.songTime() + 0.5)
+        let cancelsBefore = sound.cancelClicksCount
+
+        viewModel.send(.cycleSpeed)
+
+        XCTAssertGreaterThan(sound.cancelClicksCount, cancelsBefore)
+    }
+
+    func test_seek_whilePlaying_schedulesFromTheNewPosition() {
+        let viewModel = makeViewModel([])
+        viewModel.send(.play)
+        advance(viewModel, by: -viewModel.songTime() + 0.1)
+
+        viewModel.send(.seek(progress: 1.5 / viewModel.duration))    // a click falls exactly at 1.5 s
+
+        XCTAssertEqual(sound.clicks.last?.time ?? 0, hostClock, accuracy: 1e-9)
+        XCTAssertGreaterThan(sound.stopStrumsCount, 0, "Strums from the old position are cut")
+    }
+
+    func test_seek_whilePaused_schedulesNothing_untilResume() {
+        let viewModel = makeViewModel([])
+        viewModel.send(.play)
+        viewModel.send(.pause)
+        let clicksBefore = sound.clicks.count
+
+        viewModel.send(.seek(progress: 1.5 / viewModel.duration))
+        viewModel.scheduleDueSounds()
+
+        XCTAssertEqual(sound.clicks.count, clicksBefore)
+    }
 }

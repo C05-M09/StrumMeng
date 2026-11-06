@@ -43,6 +43,9 @@ final class ReplayViewModel {
     /// Total durasi waktu seluruh sesi dalam detik (`totalSteps * stepInterval`).
     let duration: TimeInterval
 
+    /// Playback speed. Kept across pause and restart, so the player's choice stays until they change it.
+    private(set) var speed: ReplaySpeed = .normal
+
     // MARK: - Manajemen Waktu & Animasi (Private)
 
     /// Titik waktu awal pemutaran (bernilai negatif sebagai lead-in agar panah muncul dari kanan sebelum beat 0).
@@ -157,6 +160,18 @@ final class ReplayViewModel {
     /// Menerima dan memproses aksi pengguna (misal: tombol play, pause, restart, back).
     /// Mengalirkan event ke fungsi murni `reduce(state, event)` untuk menentukan state baru.
     func send(_ event: ReplayEvent) {
+        // Speed and seek move playback without changing the state, so they are handled here.
+        switch event {
+        case .cycleSpeed:
+            changeSpeed(to: speed.next)
+            return
+        case let .seek(progress):
+            seek(toProgress: progress)
+            return
+        default:
+            break
+        }
+
         let previous = state
         state = reduce(previous, event)
         guard state != previous || event == .restart else { return }
@@ -204,14 +219,47 @@ final class ReplayViewModel {
     /// Jika `hostTimeAnchor` aktif (sedang berjalan), waktu dihitung secara dinamis dari selisih `now() - hostTimeAnchor`.
     func songTime() -> TimeInterval {
         if let hostTimeAnchor {
-            let elapsed = now() - hostTimeAnchor
-            let calculated = songTimeAtAnchor + elapsed
-            if calculated >= duration {
-                return duration
-            }
-            return calculated
+            return ReplayTimeline.songTime(
+                anchor: songTimeAtAnchor,
+                elapsed: now() - hostTimeAnchor,
+                rate: speed.rate,
+                duration: duration
+            )
         }
         return currentSongTime
+    }
+
+    /// Changes the speed from the current position: the time played so far keeps its place, and
+    /// sounds already handed to the audio engine are dropped and rescheduled at the new speed.
+    private func changeSpeed(to newSpeed: ReplaySpeed) {
+        guard newSpeed != speed else { return }
+        guard hostTimeAnchor != nil else {
+            speed = newSpeed
+            return
+        }
+        let position = songTime()
+        speed = newSpeed
+        songTimeAtAnchor = position
+        currentSongTime = position
+        hostTimeAnchor = now()
+        startSound()
+    }
+
+    /// Jumps to a point on the progress bar. Works before Play, while playing and while paused;
+    /// once finished the screen is already closing, so it is ignored. Nothing is re-judged: the nodes
+    /// before the new position simply show their stored colours.
+    private func seek(toProgress progress: Double) {
+        guard state == .ready || state == .playing || state == .paused else { return }
+        let target = ReplayTimeline.seekTime(progress: progress, duration: duration)
+        currentSongTime = target
+        songTimeAtAnchor = target
+        if hostTimeAnchor != nil {
+            hostTimeAnchor = now()
+            startSound()
+        } else {
+            // Paused or not started: anything still ringing belongs to the old position.
+            guitar?.stopStrums()
+        }
     }
 
     /// Memajukan waktu secara manual sejumlah detik tertentu (berguna terutama saat Unit Testing).
@@ -305,9 +353,10 @@ final class ReplayViewModel {
         guard hostTimeAnchor != nil else { return }
         let songNow = songTime()
         let hostNow = soundClock()
-        while nextCue < cues.count, cues[nextCue].time < songNow + Self.soundLookahead {
+        let lookahead = ReplayTimeline.songLookahead(realLookahead: Self.soundLookahead, rate: speed.rate)
+        while nextCue < cues.count, cues[nextCue].time < songNow + lookahead {
             let cue = cues[nextCue]
-            let at = hostNow + (cue.time - songNow)
+            let at = hostNow + ReplayTimeline.realDelay(songDelta: cue.time - songNow, rate: speed.rate)
             switch cue.sound {
             case let .strum(direction): guitar?.strum(direction, at: at, accent: 1)
             case let .click(accent): metronome?.click(at: at, accent: accent)

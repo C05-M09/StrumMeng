@@ -175,4 +175,150 @@ final class ReplayViewModelTests: XCTestCase {
         XCTAssertEqual(vm.state, .dismissed)
         XCTAssertEqual(dismissCount, 1)
     }
+
+    // MARK: - Speed
+
+    func test_speed_startsAtNormal() {
+        let vm = makeViewModel(events: [])
+
+        XCTAssertEqual(vm.speed, .normal)
+    }
+
+    func test_cycleSpeed_changesTheSpeed_butNotTheState() {
+        let vm = makeViewModel(events: [])
+
+        vm.send(.cycleSpeed)
+        XCTAssertEqual(vm.speed, .oneAndHalf)
+        XCTAssertEqual(vm.state, .ready)
+
+        vm.send(.play)
+        vm.send(.cycleSpeed)
+        XCTAssertEqual(vm.speed, .half)
+        XCTAssertEqual(vm.state, .playing)
+    }
+
+    func test_halfSpeed_songTimeAdvancesHalfAsFast() {
+        let vm = makeViewModel(events: [])
+        vm.send(.play)
+        vm.send(.cycleSpeed)   // 1.5x
+        vm.send(.cycleSpeed)   // 0.5x
+        let start = vm.songTime()
+
+        currentTime += 2
+
+        XCTAssertEqual(vm.songTime(), start + 1, accuracy: 0.001)
+    }
+
+    func test_changingSpeed_whilePlaying_keepsThePosition() {
+        let vm = makeViewModel(events: [])
+        vm.send(.play)
+        currentTime += 1
+        let position = vm.songTime()
+
+        vm.send(.cycleSpeed)
+
+        XCTAssertEqual(vm.songTime(), position, accuracy: 0.001)
+        currentTime += 1
+        XCTAssertEqual(vm.songTime(), position + 1.5, accuracy: 0.001)
+    }
+
+    func test_speed_isKeptAcrossPauseAndRestart() {
+        let vm = makeViewModel(events: [])
+        vm.send(.play)
+        vm.send(.cycleSpeed)
+        vm.send(.pause)
+        vm.send(.restart)
+        let start = vm.songTime()
+
+        currentTime += 2
+
+        XCTAssertEqual(vm.speed, .oneAndHalf)
+        XCTAssertEqual(vm.songTime(), start + 3, accuracy: 0.001)
+    }
+
+    // MARK: - Seek
+
+    func test_seek_beforePlay_staysReady_andPlaybackStartsThere() {
+        let vm = makeViewModel(events: [])
+
+        vm.send(.seek(progress: 0.5))
+        XCTAssertEqual(vm.state, .ready)
+        XCTAssertEqual(vm.songTime(), vm.duration * 0.5, accuracy: 0.001)
+
+        vm.send(.play)
+        currentTime += 1
+        XCTAssertEqual(vm.songTime(), vm.duration * 0.5 + 1, accuracy: 0.001)
+    }
+
+    func test_seek_whilePlaying_continuesFromTheNewPosition() {
+        let vm = makeViewModel(events: [])
+        vm.send(.play)
+        currentTime += 1
+
+        vm.send(.seek(progress: 0.25))
+
+        XCTAssertEqual(vm.state, .playing)
+        XCTAssertEqual(vm.songTime(), vm.duration * 0.25, accuracy: 0.001)
+        currentTime += 1
+        XCTAssertEqual(vm.songTime(), vm.duration * 0.25 + 1, accuracy: 0.001)
+    }
+
+    func test_seek_whilePaused_movesThePosition_andStaysPaused() {
+        let vm = makeViewModel(events: [])
+        vm.send(.play)
+        vm.send(.pause)
+
+        vm.send(.seek(progress: 0.5))
+        currentTime += 5
+
+        XCTAssertEqual(vm.state, .paused)
+        XCTAssertEqual(vm.songTime(), vm.duration * 0.5, accuracy: 0.001)
+    }
+
+    func test_seek_showsStoredColoursUpToTheNewPosition_withoutRejudging() {
+        let events = [
+            BeatEvent(stepIndex: 0, result: .perfect, offsetMs: 0),
+            BeatEvent(stepIndex: 2, result: .tooEarly, offsetMs: -50)
+        ]
+        let vm = makeViewModel(events: events)
+        vm.send(.play)
+
+        vm.send(.seek(progress: 1.5 * vm.stepInterval / vm.duration))   // between step 0 and step 2
+        var screen = vm.screenModel()
+        XCTAssertEqual(screen.nodes[0].judgement?.feedback, .perfect)
+        XCTAssertNil(screen.nodes[2].judgement)
+
+        vm.send(.seek(progress: 2.5 * vm.stepInterval / vm.duration))   // just past step 2
+        screen = vm.screenModel()
+        XCTAssertEqual(screen.nodes[2].judgement?.feedback, .tooEarly)
+
+        vm.send(.seek(progress: 0))                                      // back to the start
+        screen = vm.screenModel()
+        XCTAssertNil(screen.nodes[2].judgement, "Seeking back hides colours not reached yet")
+    }
+
+    func test_seek_clampsOutOfRangeProgress() {
+        let vm = makeViewModel(events: [])
+        vm.send(.play)
+        vm.send(.pause)
+
+        vm.send(.seek(progress: -1))
+        XCTAssertEqual(vm.songTime(), 0, accuracy: 0.001)
+
+        vm.send(.seek(progress: 2))
+        XCTAssertEqual(vm.songTime(), vm.duration, accuracy: 0.001)
+    }
+
+    func test_seek_afterFinish_isIgnored() {
+        let vm = makeViewModel(events: [])
+        vm.send(.play)
+        vm.advanceTime(by: vm.duration - vm.songTime() + 1)   // from the lead-in to past the end
+        XCTAssertEqual(vm.state, .finished)
+
+        vm.send(.seek(progress: 0.1))
+
+        XCTAssertEqual(vm.state, .finished)
+        XCTAssertEqual(vm.songTime(), vm.duration, accuracy: 0.001)
+        XCTAssertEqual(dismissCount, 1)
+    }
 }
