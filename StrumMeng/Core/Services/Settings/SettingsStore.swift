@@ -7,10 +7,11 @@ import Foundation
 /// to a slider change straight away, even while a session is playing.
 @MainActor
 protocol SettingsStore: AnyObject {
-    /// Volume of the metronome and the pattern example, 0...1.
+    /// Volume of the menu background music (the Music slider), 0...1.
+    /// It first meant the metronome volume; see ARCHITECTURE.md decision 21.
     var soundVolume: Double { get }
 
-    /// Volume of the sound effects, 0...1.
+    /// Volume of the sound effects, such as the button click (the Sound Effects slider), 0...1.
     var sfxVolume: Double { get }
 
     /// Saves the value. Anything outside 0...1 is clamped first.
