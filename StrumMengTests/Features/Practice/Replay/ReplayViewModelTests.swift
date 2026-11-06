@@ -176,66 +176,6 @@ final class ReplayViewModelTests: XCTestCase {
         XCTAssertEqual(dismissCount, 1)
     }
 
-    // MARK: - Speed
-
-    func test_speed_startsAtNormal() {
-        let vm = makeViewModel(events: [])
-
-        XCTAssertEqual(vm.speed, .normal)
-    }
-
-    func test_cycleSpeed_changesTheSpeed_butNotTheState() {
-        let vm = makeViewModel(events: [])
-
-        vm.send(.cycleSpeed)
-        XCTAssertEqual(vm.speed, .oneAndHalf)
-        XCTAssertEqual(vm.state, .ready)
-
-        vm.send(.play)
-        vm.send(.cycleSpeed)
-        XCTAssertEqual(vm.speed, .half)
-        XCTAssertEqual(vm.state, .playing)
-    }
-
-    func test_halfSpeed_songTimeAdvancesHalfAsFast() {
-        let vm = makeViewModel(events: [])
-        vm.send(.play)
-        vm.send(.cycleSpeed)   // 1.5x
-        vm.send(.cycleSpeed)   // 0.5x
-        let start = vm.songTime()
-
-        currentTime += 2
-
-        XCTAssertEqual(vm.songTime(), start + 1, accuracy: 0.001)
-    }
-
-    func test_changingSpeed_whilePlaying_keepsThePosition() {
-        let vm = makeViewModel(events: [])
-        vm.send(.play)
-        currentTime += 1
-        let position = vm.songTime()
-
-        vm.send(.cycleSpeed)
-
-        XCTAssertEqual(vm.songTime(), position, accuracy: 0.001)
-        currentTime += 1
-        XCTAssertEqual(vm.songTime(), position + 1.5, accuracy: 0.001)
-    }
-
-    func test_speed_isKeptAcrossPauseAndRestart() {
-        let vm = makeViewModel(events: [])
-        vm.send(.play)
-        vm.send(.cycleSpeed)
-        vm.send(.pause)
-        vm.send(.restart)
-        let start = vm.songTime()
-
-        currentTime += 2
-
-        XCTAssertEqual(vm.speed, .oneAndHalf)
-        XCTAssertEqual(vm.songTime(), start + 3, accuracy: 0.001)
-    }
-
     // MARK: - Seek
 
     func test_seek_beforePlay_staysReady_andPlaybackStartsThere() {

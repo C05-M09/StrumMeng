@@ -35,8 +35,8 @@ func reduce(_ state: ReplayState, _ event: ReplayEvent) -> ReplayState {
     case (_, .backToSummary):
         return .dismissed
 
-    // Speed and position change where playback is, not which state it is in.
-    case (_, .cycleSpeed), (_, .seek):
+    // Seeking changes where playback is, not which state it is in.
+    case (_, .seek):
         return state
 
     default:

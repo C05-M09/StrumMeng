@@ -274,7 +274,7 @@ Replay plays the previous session again, visually and audibly, from the stored \
 
 Audio is reconstructed, not recorded: the metronome is re\-scheduled on every quarter note, and the<br>player's own strums are re\-played as guitar strums at their stored times \(ReplayCue, scheduled on the<br>host clock through GuitarSound and MetronomeSound\)\. BeatEvent does not store a strum's direction, so a<br>strum takes the direction of the note it was judged against; a Miss with no strum makes no sound\.<br>There is no microphone recording to play back\.
 
-Speed and seek \(decision 22\): a speed button cycles 0\.5×, 0\.75×, 1× and 1\.5×, and the progress bar can be<br>tapped or dragged to jump to any point\. Both are ReplayEvents \(cycleSpeed, seek\) that move playback without<br>changing the ReplayState\. The time maths is pure \(ReplayTimeline\): song time runs at the chosen rate, and<br>sounds are rescheduled from the new position with delays scaled by the speed\. Seeking never re\-judges:<br>nodes simply show their stored colours up to the new position\. Overshooting the end while dragging does<br>not end the replay; letting go at the end does\. The speed stays across pause and restart\.
+Seek \(decision 22\): the progress bar can be tapped or dragged to jump to any point\. Seek is a ReplayEvent<br>that moves playback without changing the ReplayState; the time maths is pure \(ReplayTimeline\), and sounds<br>are rescheduled from the new position\. Seeking never re\-judges: nodes simply show their stored colours up<br>to the new position\. Overshooting the end while dragging does not end the replay; letting go at the end<br>does\. There is no speed control: dragging the bar covers jumping to a moment\.
 
 #### 3\.3\.3 Retry and BPM recommendation
 
@@ -486,7 +486,7 @@ Accepted risk: users with colour\-vision deficiency may find it hard to tell res
 | 19 | Where is the iPhone set up? | From Option, on its own Set Up Device screen: Home has no free slot in the hi\-fi\. The iPhone holds portrait and strums with left and right swipes\. |
 | 20 | Does the iPhone make sound? | Only outside a session, so swiping there feels like a guitar\. From the count\-in on, the sound comes from the iPad alone and the iPhone cuts anything still ringing\. The metronome stays on the iPad\. |
 | 21 | What do the Option volume sliders control? | Music sets the menu background music \(SettingsStore\.soundVolume, which first meant the metronome volume\); Sound Effects sets the button click\. The music pauses from Listen on, so the metronome and guitar are heard clearly\. Changes the meaning of a shared contract value: needs team agreement\. |
-| 22 | Can Replay change speed and position? | Yes: 0\.5×, 0\.75×, 1× and 1\.5× on one cycling button, and a progress bar to tap or drag\. Slower speeds help the player see a mistake; colours are never re\-judged\. |
+| 22 | Can the player jump around in Replay? | Yes: the progress bar can be tapped or dragged to any point\. Colours are never re\-judged\. No speed control: dragging the bar is enough\. |
 
 ## 11\. Suggested implementation order
 

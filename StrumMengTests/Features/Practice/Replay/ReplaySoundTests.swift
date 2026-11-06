@@ -91,31 +91,7 @@ final class ReplaySoundTests: XCTestCase {
         XCTAssertGreaterThan(sound.cancelClicksCount, 0)
     }
 
-    // MARK: - Speed and seek
-
-    func test_halfSpeed_schedulesSoundsTwiceAsFarAhead() {
-        let viewModel = makeViewModel([])
-        viewModel.send(.cycleSpeed)                                   // 1.5x
-        viewModel.send(.cycleSpeed)                                   // 0.5x
-        viewModel.send(.play)
-        let start = viewModel.songTime()
-
-        advance(viewModel, by: (0.70 - start) / 0.5)                  // song time 0.70 s
-
-        // The click at 0.75 s is 0.05 song seconds away: 0.1 real seconds at half speed.
-        XCTAssertEqual(sound.clicks.last?.time ?? 0, hostClock + 0.1, accuracy: 1e-9)
-    }
-
-    func test_cycleSpeed_whilePlaying_dropsAndReschedulesSounds() {
-        let viewModel = makeViewModel([])
-        viewModel.send(.play)
-        advance(viewModel, by: -viewModel.songTime() + 0.5)
-        let cancelsBefore = sound.cancelClicksCount
-
-        viewModel.send(.cycleSpeed)
-
-        XCTAssertGreaterThan(sound.cancelClicksCount, cancelsBefore)
-    }
+    // MARK: - Seek
 
     func test_seek_whilePlaying_schedulesFromTheNewPosition() {
         let viewModel = makeViewModel([])

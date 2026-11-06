@@ -14,7 +14,7 @@ import SwiftUI
 ///   secara visual sesuai waktu aslinya.
 /// - Tidak ada penilaian ulang (*no re-judging*) dan tidak menerima input mic/controller.
 /// - Kontrol dasar: Play, Pause, Restart, dan tombol Kembali ke Summary.
-/// - Speed button (0.5×, 0.75×, 1×, 1.5×) and a progress bar that can be tapped or dragged to seek.
+/// - The progress bar can be tapped or dragged to jump to any point.
 struct ReplayView: View {
     @State private var viewModel: ReplayViewModel
     var onDismiss: (() -> Void)?
@@ -47,9 +47,9 @@ struct ReplayView: View {
                 // 3. Header: Tombol Back, Judul Pattern, dan Info BPM
                 header(layout, model)
 
-                // Seek and speed controls sit outside the per-frame TimelineView, so they are not
-                // rebuilt every frame and a drag is not interrupted.
-                controls(layout)
+                // The seek control sits outside the per-frame TimelineView, so it is not rebuilt
+                // every frame and a drag is not interrupted.
+                seekControl(layout)
 
                 // 4. Lapisan Overlay (Ready, Paused, Finished)
                 overlays(layout, scale: scale)
@@ -140,44 +140,27 @@ struct ReplayView: View {
         }
     }
 
-    // MARK: - Seek & Speed
+    // MARK: - Seek
 
-    private func controls(_ layout: PlayScreenLayout) -> some View {
+    private func seekControl(_ layout: PlayScreenLayout) -> some View {
         let u = layout.unit
         let bar = layout.progressRect
         // Taller than the drawn bar, so it is easy to grab with a finger.
         let touchPadding = 24 * u
-        let speedSize = CGSize(width: 120 * u, height: 48 * u)
 
-        return ZStack(alignment: .topLeading) {
-            Color.clear
-                .frame(width: bar.width, height: bar.height + touchPadding * 2)
-                .contentShape(Rectangle())
-                .gesture(seekGesture(barWidth: bar.width))
-                .offset(x: bar.minX, y: bar.minY - touchPadding)
-                .accessibilityElement()
-                .accessibilityLabel("Replay position")
-                .accessibilityValue(viewModel.clockLabel)
-                .accessibilityAdjustableAction { direction in
-                    let step = 0.1
-                    let target = viewModel.progress + (direction == .increment ? step : -step)
-                    viewModel.send(.seek(progress: target))
-                }
-
-            ChunkyButton(
-                title: viewModel.speed.label,
-                style: .secondary,
-                fontSize: 24 * u,
-                width: speedSize.width,
-                height: speedSize.height
-            ) {
-                viewModel.send(.cycleSpeed)
+        return Color.clear
+            .frame(width: bar.width, height: bar.height + touchPadding * 2)
+            .contentShape(Rectangle())
+            .gesture(seekGesture(barWidth: bar.width))
+            .offset(x: bar.minX, y: bar.minY - touchPadding)
+            .accessibilityElement()
+            .accessibilityLabel("Replay position")
+            .accessibilityValue(viewModel.clockLabel)
+            .accessibilityAdjustableAction { direction in
+                let step = 0.1
+                let target = viewModel.progress + (direction == .increment ? step : -step)
+                viewModel.send(.seek(progress: target))
             }
-            .accessibilityLabel("Replay speed")
-            .accessibilityValue(viewModel.speed.label)
-            .accessibilityHint("Changes to the next speed")
-            .offset(x: bar.maxX - speedSize.width, y: bar.maxY + 16 * u)
-        }
     }
 
     /// Tap or drag on the bar to jump there. While the finger is down, the replay follows it but
@@ -334,25 +317,7 @@ struct ReplayView: View {
     return ReplayView(viewModel: vm)
 }
 
-#Preview("5. Half Speed") {
-    let result = SessionResultBuilder.build(
-        id: UUID(),
-        patternID: "foundation",
-        bpm: 80,
-        beatEvents: [
-            BeatEvent(stepIndex: 0, result: .perfect, offsetMs: 0),
-            BeatEvent(stepIndex: 2, result: .tooEarly, offsetMs: -40)
-        ],
-        createdAt: Date()
-    )
-    let vm = ReplayViewModel(result: result)
-    vm.send(.play)
-    vm.send(.cycleSpeed)   // 1.5×
-    vm.send(.cycleSpeed)   // 0.5×
-    return ReplayView(viewModel: vm)
-}
-
-#Preview("6. Seeked Halfway") {
+#Preview("5. Seeked Halfway") {
     let result = SessionResultBuilder.build(
         id: UUID(),
         patternID: "foundation",
