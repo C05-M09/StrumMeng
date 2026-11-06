@@ -55,4 +55,11 @@ final class ReplayReducerTests: XCTestCase {
         XCTAssertEqual(reduce(ReplayState.finished, .finish), .finished)
         XCTAssertEqual(reduce(ReplayState.dismissed, .play), .dismissed)
     }
+
+    func test_seek_neverChangesTheState() {
+        let states: [ReplayState] = [.ready, .playing, .paused, .finished, .dismissed]
+        for state in states {
+            XCTAssertEqual(reduce(state, .seek(progress: 0.5)), state)
+        }
+    }
 }

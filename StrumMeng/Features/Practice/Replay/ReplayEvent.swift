@@ -15,4 +15,6 @@ enum ReplayEvent: Equatable, Sendable {
     case restart
     case finish
     case backToSummary
+    /// Jumps to a point on the progress bar (0 = first beat, 1 = the end). Does not change the state.
+    case seek(progress: Double)
 }

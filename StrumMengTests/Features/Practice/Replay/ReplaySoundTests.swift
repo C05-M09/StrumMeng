@@ -90,4 +90,29 @@ final class ReplaySoundTests: XCTestCase {
         XCTAssertGreaterThan(sound.stopStrumsCount, 0)
         XCTAssertGreaterThan(sound.cancelClicksCount, 0)
     }
+
+    // MARK: - Seek
+
+    func test_seek_whilePlaying_schedulesFromTheNewPosition() {
+        let viewModel = makeViewModel([])
+        viewModel.send(.play)
+        advance(viewModel, by: -viewModel.songTime() + 0.1)
+
+        viewModel.send(.seek(progress: 1.5 / viewModel.duration))    // a click falls exactly at 1.5 s
+
+        XCTAssertEqual(sound.clicks.last?.time ?? 0, hostClock, accuracy: 1e-9)
+        XCTAssertGreaterThan(sound.stopStrumsCount, 0, "Strums from the old position are cut")
+    }
+
+    func test_seek_whilePaused_schedulesNothing_untilResume() {
+        let viewModel = makeViewModel([])
+        viewModel.send(.play)
+        viewModel.send(.pause)
+        let clicksBefore = sound.clicks.count
+
+        viewModel.send(.seek(progress: 1.5 / viewModel.duration))
+        viewModel.scheduleDueSounds()
+
+        XCTAssertEqual(sound.clicks.count, clicksBefore)
+    }
 }
