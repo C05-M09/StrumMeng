@@ -7,6 +7,7 @@ struct ContentView: View {
     @State private var patternListViewModel: PatternListViewModel
     @State private var optionViewModel: OptionViewModel
     @State private var guidebookViewModel: GuidebookViewModel
+    @Environment(\.scenePhase) private var scenePhase
 
     init(inMemory:Bool = false) {
         let router = AppRouter()
@@ -67,6 +68,13 @@ struct ContentView: View {
         }
         .ignoresSafeArea()
         .task { await container.startControllerLink() }
+        // Menu music follows the screen on top, and pauses while the app is not active.
+        .onChange(of: router.path, initial: true) { _, path in
+            container.updateMenuMusic(for: path, isAppActive: scenePhase == .active)
+        }
+        .onChange(of: scenePhase) { _, phase in
+            container.updateMenuMusic(for: router.path, isAppActive: phase == .active)
+        }
         // The DEBUG controller screens replace this view and bring their own link.
         .onDisappear { container.stopControllerLink() }
     }

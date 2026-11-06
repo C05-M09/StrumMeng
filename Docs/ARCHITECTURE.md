@@ -134,7 +134,7 @@ The user hears the correct pattern before playing\. It can be replayed any numbe
 - If the Wi\-Fi Aware session is close to its time limit, it is refreshed after Ready and before the<br>count\-in, and the count\-in waits until the controller is back \(§3\.2\.3\)\.
 - After it, a 3\-2\-1 count\-in aligned to the beat interval at the chosen BPM\. After "1", the session<br>enters playing exactly on the first beat\.
 - Play renders the pattern as a row of beat nodes with a moving beat marker\. The marker is driven by<br>BeatClock ticks, never by its own timer\.
-- The metronome is scheduled by the same BeatClock: on each tick, the next quarter note's click is<br>scheduled on the host clock \(GuitarEngine, MetronomeSound\), and the first beat of a bar is<br>accented\. Every swipe also sounds the synthesised guitar \(a C chord in the swipe's direction,<br>GuitarSound\), in or out of a session\. Volume follows SettingsStore\.soundVolume \[not wired yet\]\.
+- The metronome is scheduled by the same BeatClock: on each tick, the next quarter note's click is<br>scheduled on the host clock \(GuitarEngine, MetronomeSound\), and the first beat of a bar is<br>accented\. Every swipe also sounds the synthesised guitar \(a C chord in the swipe's direction,<br>GuitarSound\), in or out of a session\. No slider sets their volume yet: the Music slider is the menu music \(§3\.6, decision 21\)\.
 - Beat node colours come from design tokens, not hard\-coded values\.
 
 ### 3\.2 Real\-time feedback engine \(US 1, US 6\)
@@ -274,6 +274,8 @@ Replay plays the previous session again, visually and audibly, from the stored \
 
 Audio is reconstructed, not recorded: the metronome is re\-scheduled on every quarter note, and the<br>player's own strums are re\-played as guitar strums at their stored times \(ReplayCue, scheduled on the<br>host clock through GuitarSound and MetronomeSound\)\. BeatEvent does not store a strum's direction, so a<br>strum takes the direction of the note it was judged against; a Miss with no strum makes no sound\.<br>There is no microphone recording to play back\.
 
+Seek \(decision 22\): the progress bar can be tapped or dragged to jump to any point\. Seek is a ReplayEvent<br>that moves playback without changing the ReplayState; the time maths is pure \(ReplayTimeline\), and sounds<br>are rescheduled from the new position\. Seeking never re\-judges: nodes simply show their stored colours up<br>to the new position\. Overshooting the end while dragging does not end the replay; letting go at the end<br>does\. There is no speed control: dragging the bar covers jumping to a moment\.
+
 #### 3\.3\.3 Retry and BPM recommendation
 
 RecommendationPolicy is a pure function: recommend\(accuracy:currentBPM:\) \-&gt; Recommendation\. Initial<br>rules \[Assumption: BPM deltas are placeholders\]:
@@ -338,12 +340,13 @@ Three read\-only pages: Counting Beats, Practice Tempo, How to Strum\. Content i
 - Home: Practice, Option, Guidebook icon, and a Showtime button that is visible but has no action\.
 - AppRouter: one @Observable object owning a NavigationPath and a single enum Route \(home,<br>practiceList, listen, ready, play, summary, replay, guidebook, option\)\. Methods: push, pop,<br>popToRoot, replaceLast \(Play → Summary\) and popTo \(back to the practice list\)\. Routes carry ids and primitive values only\. No scattered NavigationLinks\.
 - Back button: one shared BackButton component used on every screen\. No screen is a dead end\.
-- Option: two sliders \(Sound, Sound Effects\), latency calibration, and the controller connection\.
-    - Sound: metronome and pattern example volume\.
-    - Sound Effects: effect volume\.
+- Option: two sliders \(Music, Sound Effects\), latency calibration, and the controller connection\.
+    - Music: menu background music volume \(SettingsStore\.soundVolume\)\.
+    - Sound Effects: button click volume \(SettingsStore\.sfxVolume\)\.
     - Controller: connection type \(Wi\-Fi Aware / Wi\-Fi\), pairing, and status\. Built so far: a Set Up Device button that opens the pairing screen \(§3\.2\.4\)\.
     - The Microphone slider in the current design has no function without mic input and should be<br>removed or replaced by the controller section \(design change, needs the Designer\)\.
     - Changes apply immediately, even during a session, and persist across launches\.
+- Menu sounds \(decision 21\): MenuSoundService plays the looping background music and the button click<br>\(AVMenuSoundService, AVAudioPlayer, bundled files in Resources/Audio, placeholders for now\)\. AppContainer<br>owns one and applies the saved volumes at launch; OptionViewModel sends each slider change to it\.<br>MenuMusicPolicy plays the music on Home \(with Option and Guidebook\), the practice list and Set Up Device,<br>and pauses it on Listen, Play and Summary and while the app is not active\. Home's Practice, Option and<br>Guidebook buttons, closing an overlay, and Set Up Device play the click; Showtime stays silent\. iPad only\.
 - Latency calibration: CalibrationState: idle, instructions, measuring\(n/total\), computing,<br>done\(offsetMs\), failed\. The app plays a beat, the user swipes along on the iPhone, the app collects<br>samples \(8 \[Assumption\]\), takes the median difference between strum and beat as the offset, and<br>discards outliers\. Network delay is already removed by the clock offset \(§3\.2\.3\), so this measures<br>audio output delay \(for example Bluetooth headphones\) and the player's perception\. The offset is<br>saved in SettingsStore and used by TimingJudge\. When it appears \(manual only, or also on first<br>launch\) is still undecided\.
 
 ## 4\. Alternatives considered
@@ -377,7 +380,7 @@ StrumMeng/                         app target
 ├── Core/
 │   ├── Models/                    domain models and shared contracts
 │   ├── Services/
-│   │   ├── Audio/                 BeatClock, Metronome, PatternPlayer
+│   │   ├── Audio/                 BeatClock, Metronome, PatternPlayer, MenuSoundService
 │   │   ├── Connectivity/          ControllerLink, transports, clock sync, de-duplication
 │   │   ├── Practice/              TimingJudge, FeedbackEngine, SessionResultBuilder
 │   │   └── Settings/              SettingsStore
@@ -482,6 +485,8 @@ Accepted risk: users with colour\-vision deficiency may find it hard to tell res
 | 18 | Is strum direction judged? | Yes\. Each step must be strummed in its direction; a wrong\-direction strum inside the step's window makes it a Miss immediately, even if a right one follows\. Results stay Perfect, Too Early, Miss\. |
 | 19 | Where is the iPhone set up? | From Option, on its own Set Up Device screen: Home has no free slot in the hi\-fi\. The iPhone holds portrait and strums with left and right swipes\. |
 | 20 | Does the iPhone make sound? | Only outside a session, so swiping there feels like a guitar\. From the count\-in on, the sound comes from the iPad alone and the iPhone cuts anything still ringing\. The metronome stays on the iPad\. |
+| 21 | What do the Option volume sliders control? | Music sets the menu background music \(SettingsStore\.soundVolume, which first meant the metronome volume\); Sound Effects sets the button click\. The music pauses from Listen on, so the metronome and guitar are heard clearly\. Changes the meaning of a shared contract value: needs team agreement\. |
+| 22 | Can the player jump around in Replay? | Yes: the progress bar can be tapped or dragged to any point\. Colours are never re\-judged\. No speed control: dragging the bar is enough\. |
 
 ## 11\. Suggested implementation order
 

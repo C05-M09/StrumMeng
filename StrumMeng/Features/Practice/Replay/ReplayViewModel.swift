@@ -157,6 +157,12 @@ final class ReplayViewModel {
     /// Menerima dan memproses aksi pengguna (misal: tombol play, pause, restart, back).
     /// Mengalirkan event ke fungsi murni `reduce(state, event)` untuk menentukan state baru.
     func send(_ event: ReplayEvent) {
+        // Seek moves playback without changing the state, so it is handled here.
+        if case let .seek(progress) = event {
+            seek(toProgress: progress)
+            return
+        }
+
         let previous = state
         state = reduce(previous, event)
         guard state != previous || event == .restart else { return }
@@ -204,14 +210,30 @@ final class ReplayViewModel {
     /// Jika `hostTimeAnchor` aktif (sedang berjalan), waktu dihitung secara dinamis dari selisih `now() - hostTimeAnchor`.
     func songTime() -> TimeInterval {
         if let hostTimeAnchor {
-            let elapsed = now() - hostTimeAnchor
-            let calculated = songTimeAtAnchor + elapsed
-            if calculated >= duration {
-                return duration
-            }
-            return calculated
+            return ReplayTimeline.songTime(
+                anchor: songTimeAtAnchor,
+                elapsed: now() - hostTimeAnchor,
+                duration: duration
+            )
         }
         return currentSongTime
+    }
+
+    /// Jumps to a point on the progress bar. Works before Play, while playing and while paused;
+    /// once finished the screen is already closing, so it is ignored. Nothing is re-judged: the nodes
+    /// before the new position simply show their stored colours.
+    private func seek(toProgress progress: Double) {
+        guard state == .ready || state == .playing || state == .paused else { return }
+        let target = ReplayTimeline.seekTime(progress: progress, duration: duration)
+        currentSongTime = target
+        songTimeAtAnchor = target
+        if hostTimeAnchor != nil {
+            hostTimeAnchor = now()
+            startSound()
+        } else {
+            // Paused or not started: anything still ringing belongs to the old position.
+            guitar?.stopStrums()
+        }
     }
 
     /// Memajukan waktu secara manual sejumlah detik tertentu (berguna terutama saat Unit Testing).
