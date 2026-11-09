@@ -93,7 +93,7 @@ final class CompanionViewModel {
             if let code = PairCode(text) {
                 Task { [client] in await client.connect(pairCode: code) }
             }
-            if case .typeDigit = event { startTimeout() }
+            if event == .confirmCode { startTimeout() }
         case .connected:
             // Saved only now, so a code that never connected is not retried on the next launch.
             if case let .connecting(text) = previous {
@@ -106,12 +106,7 @@ final class CompanionViewModel {
             tracker.reset()
         }
 
-        // Clearing while connecting is a cancel: the link would otherwise keep looking for the iPad.
-        let cancelledConnecting: Bool = {
-            if case .connecting = previous { return event == .clearCode }
-            return false
-        }()
-        if event == .disconnect || cancelledConnecting {
+        if event == .disconnect {
             lastStrum = nil
             pairCodes.setEnteredPairCode(nil)
             Task { [client] in await client.disconnect() }
