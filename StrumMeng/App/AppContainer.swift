@@ -6,6 +6,7 @@ final class AppContainer {
     private let router: AppRouter
     private let repository: SessionRepository?
     private let settings: any SettingsStore
+    private let pairingIntroductionStore: any PairingIntroductionStore
     /// One menu music and button click player for the whole app, so the music keeps its place
     /// between screens.
     private let menuSounds: any MenuSoundService
@@ -28,9 +29,11 @@ final class AppContainer {
         router: AppRouter,
         inMemory: Bool = false,
         settings: (any SettingsStore)? = nil,
-        menuSounds: (any MenuSoundService)? = nil
+        menuSounds: (any MenuSoundService)? = nil,
+        pairingIntroductionStore: (any PairingIntroductionStore)? = nil
     ) {
         self.router = router
+        self.pairingIntroductionStore = pairingIntroductionStore ?? UserDefaultsPairingIntroductionStore()
         let settings = settings ?? UserDefaultsSettingsStore()
         self.settings = settings
 
@@ -61,6 +64,14 @@ final class AppContainer {
         } else {
             menuSounds.pauseMusic()
         }
+    }
+
+    func makePairingIntroductionViewModel(isEnabled: Bool = true) -> PairingIntroductionViewModel {
+        PairingIntroductionViewModel(
+            store: pairingIntroductionStore,
+            state: isEnabled ? .idle : .finished,
+            onSetupRequested: { [weak router] in router?.push(.deviceSetup) }
+        )
     }
 
     func makeHomeViewModel() -> HomeViewModel {

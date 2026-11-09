@@ -521,3 +521,19 @@ The riskiest piece \(link latency and reliability in the real environment\) is m
 - Not configured yet: CI, SwiftLint, SwiftFormat\. Follow the style rules in CLAUDE\.md manually until<br>tooling exists\.
 
 This document is the design reference\. CLAUDE\.md at the repository root is the companion that turns it<br>into day\-to\-day working rules for anyone, human or Claude, writing code here\.
+
+
+### US10: first-launch pairing invitation
+
+On the iPad host, Home waits 1.5 seconds on the first launch, then presents Meng
+using the shared ListenInformationEntrance animation and Listen illustration assets.
+The welcome remains visible until Next is tapped; taps outside the button do not
+dismiss it. Next asks AppRouter to open the existing deviceSetup route directly.
+Home input is blocked during the introduction. Backgrounding, leaving Home or opening another Home overlay
+cancels the pending presentation; returning starts the appearance delay again.
+PairingIntroductionViewModel owns a pure state reducer and a cancellable task.
+PairingIntroductionStore persists only whether the invitation led to setup; it does
+not claim that pairing succeeded. This separate protocol leaves SettingsStore and
+PairCodeStore contracts intact. Future launches retain Option → Set Up Device.
+The iPhone's existing companion entry flow is unchanged. Preview containers disable
+the invitation so Canvas cannot mutate the persisted first-launch flag.
