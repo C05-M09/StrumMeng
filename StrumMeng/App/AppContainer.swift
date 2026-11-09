@@ -5,6 +5,7 @@ final class AppContainer {
 
     private let router: AppRouter
     private let repository: SessionRepository?
+    private let sessionHistory: (any SessionHistoryChecking)?
     private let settings: any SettingsStore
     /// One menu music and button click player for the whole app, so the music keeps its place
     /// between screens.
@@ -44,12 +45,13 @@ final class AppContainer {
             let modelContainer = try ModelContainerFactory.make(
                 inMemory: inMemory
             )
-            repository = SwiftDataSessionRepository(
-                modelContainer: modelContainer
-            )
+            let sessions = SwiftDataSessionRepository(modelContainer: modelContainer)
+            repository = sessions
+            sessionHistory = sessions
         } catch {
             // Show a records error when storage cannot be initialized.
             repository = nil
+            sessionHistory = nil
         }
     }
 
@@ -77,6 +79,7 @@ final class AppContainer {
             pattern: pattern,
             bpm: bpm,
             player: SynthListenPlayer(sound: guitarSound),
+            history: sessionHistory ?? UnavailableSessionRepository(),
             onReady: { [weak router] in router?.push(.play(patternID: pattern.id, bpm: bpm)) },
             onBack: { [weak router] in router?.popTo(.practiceList) }
         )

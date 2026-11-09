@@ -3,7 +3,7 @@ import XCTest
 
 @MainActor
 final class ListenTests: XCTestCase {
-    func test_readyIsIgnoredUntilOneEntireLoopHasPlayed() {
+    func test_readyIsIgnoredUntilOneEntireLoopHasPlayed() async {
         let player = FakeListenPlayer()
         var readyCount = 0
         let model = makeModel(player: player, onReady: { readyCount += 1 })
@@ -18,6 +18,7 @@ final class ListenTests: XCTestCase {
         XCTAssertTrue(model.state.canProceed)
         XCTAssertEqual(model.state.step, 0)
         model.send(.ready)
+        for _ in 0..<1000 where readyCount == 0 { await Task.yield() }
         XCTAssertEqual(readyCount, 1)
         XCTAssertTrue(player.stopped)
     }
@@ -56,7 +57,7 @@ final class ListenTests: XCTestCase {
     func test_backStopsAudioAndRequestsMenu() {
         let player = FakeListenPlayer()
         var wentBack = false
-        let model = ListenViewModel(pattern: PatternCatalog.all[0], bpm: 80, player: player,
+        let model = ListenViewModel(pattern: PatternCatalog.all[0], bpm: 80, player: player, history: ExistingListenHistory(),
                                     onReady: {}, onBack: { wentBack = true })
         model.send(.next)
         model.send(.back)
@@ -72,7 +73,7 @@ final class ListenTests: XCTestCase {
     }
 
     private func makeModel(player: FakeListenPlayer, onReady: @escaping () -> Void = {}) -> ListenViewModel {
-        ListenViewModel(pattern: PatternCatalog.all[1], bpm: 80, player: player,
+        ListenViewModel(pattern: PatternCatalog.all[1], bpm: 80, player: player, history: ExistingListenHistory(),
                         onReady: onReady, onBack: {})
     }
 }
@@ -91,4 +92,8 @@ private final class FakeListenPlayer: ListenPatternPlayer {
     func pause() { paused = true }
     func resume() { paused = false }
     func stop() { stopped = true }
+}
+
+private struct ExistingListenHistory: SessionHistoryChecking {
+    func hasSavedSessions() async throws -> Bool { true }
 }
