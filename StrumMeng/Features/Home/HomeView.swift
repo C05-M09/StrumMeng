@@ -50,6 +50,12 @@ struct HomeView: View {
         .persistentSystemOverlays(.hidden)
         .toolbar(.hidden, for: .navigationBar)
         .overlay { presentedOverlayView }
+        .onAppear {
+            if viewModel.presentedOverlay == nil { viewModel.guidance?.send(.homeAppeared) }
+        }
+        .onChange(of: viewModel.presentedOverlay) { _, overlay in
+            if overlay == nil { viewModel.guidance?.send(.homeAppeared) }
+        }
         .animation(.easeInOut(duration: 0.2), value: viewModel.presentedOverlay)
     }
 
@@ -83,6 +89,13 @@ struct HomeView: View {
             width: AppLayout.referenceSize.width,
             height: AppLayout.referenceSize.height
         )
+        .overlay {
+            if let guidance = viewModel.guidance, guidance.state.isShowing {
+                HomeGuidanceView(state: guidance.state) { guidance.send(.advance) }
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.18), value: viewModel.guidance?.state.isShowing)
         .clipped()
     }
 

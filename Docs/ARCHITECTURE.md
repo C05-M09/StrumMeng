@@ -258,6 +258,26 @@ ControllerConnectionState machine: \.unpaired, \.pairing, \.searching, \.connect
 
 Setup flow as built: AppContainer owns one link, started at launch so a paired iPhone reconnects before Play\. On the iPad, Option → Set Up Device shows the pair code and the connection state \(DeviceSetupState: searching, connected, reconnecting, failed\)\. On the iPhone, CompanionState goes enteringCode → connecting → connected, with notFound and reconnecting\. PairCodeStore keeps the iPad's code and the iPhone's last connected code across launches, apart from SettingsStore because these are not settings the player edits\. A typed code gets 10 seconds, because the two sides never say a code is wrong; a saved code has no limit, because the iPad may simply not be open yet\. The iPhone is optional in Play: on\-screen swipes keep working, and only a session started with the iPhone pauses when it drops\.
 
+#### US7: Home guidance after first successful setup
+
+DeviceSetupViewModel invokes an injected onPairedDone callback only when Done is
+accepted in the connected state. AppContainer uses this callback to schedule a
+once-only Home tour through HomeGuidanceStore (separate from SettingsStore and
+PairCodeStore). Home displays Option guidance to the left of Option first, then Guidebook guidance
+to the left of its icon. Both white bubbles use content-driven heights, equal body
+padding, and a small hard shadow to the right and below. A full-canvas tap surface consumes each tap, advances one
+step and never activates the Home buttons beneath it. Guidance has no timeout.
+The tour starts only when Home is visible without Option/Guidebook overlays; if
+setup was opened from Option, close Option to reveal it. Completion is persisted
+only after the second tip. A pending tour survives an app relaunch.
+
+US7 now includes US10's first-launch invitation. The combined first-run flow is:
+Home → Meng invitation → Next → Set Up Device → connected Done → Home → Option tip
+→ Guidebook tip → normal Home. Returning launches skip the invitation and completed
+tour. Separate persisted invitation/tour flags allow interrupted setup to be retried
+from Option without falsely marking the tour complete. AppContainer accepts fake
+stores and a fake ControllerLink so the entire handoff can be tested without Wi-Fi.
+
 ### 3\.3 Results: Summary, Replay, Retry, records \(US 4, US 8\)
 
 #### 3\.3\.1 Summary
@@ -521,3 +541,19 @@ The riskiest piece \(link latency and reliability in the real environment\) is m
 - Not configured yet: CI, SwiftLint, SwiftFormat\. Follow the style rules in CLAUDE\.md manually until<br>tooling exists\.
 
 This document is the design reference\. CLAUDE\.md at the repository root is the companion that turns it<br>into day\-to\-day working rules for anyone, human or Claude, writing code here\.
+
+
+### US10: first-launch pairing invitation
+
+On the iPad host, Home waits 1.5 seconds on the first launch, then presents Meng
+using the shared ListenInformationEntrance animation and Listen illustration assets.
+The welcome remains visible until Next is tapped; taps outside the button do not
+dismiss it. Next asks AppRouter to open the existing deviceSetup route directly.
+Home input is blocked during the introduction. Backgrounding, leaving Home or opening another Home overlay
+cancels the pending presentation; returning starts the appearance delay again.
+PairingIntroductionViewModel owns a pure state reducer and a cancellable task.
+PairingIntroductionStore persists only whether the invitation led to setup; it does
+not claim that pairing succeeded. This separate protocol leaves SettingsStore and
+PairCodeStore contracts intact. Future launches retain Option → Set Up Device.
+The iPhone's existing companion entry flow is unchanged. Preview containers disable
+the invitation so Canvas cannot mutate the persisted first-launch flag.
