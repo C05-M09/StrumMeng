@@ -298,6 +298,32 @@ final class CompanionViewModelTests: XCTestCase {
         viewModel.stop()
     }
 
+    func test_clear_whileConnecting_stopsLooking_andForgetsTheCode() async throws {
+        let saved = try XCTUnwrap(PairCode("482913"))
+        let (viewModel, client, store) = makeViewModel(state: .enteringCode(""), saved: saved)
+        viewModel.appear()
+
+        viewModel.send(.clearCode)
+        await waitUntil { client.disconnectCount == 1 }
+
+        XCTAssertEqual(viewModel.state, .enteringCode(""))
+        XCTAssertEqual(client.disconnectCount, 1)
+        XCTAssertNil(store.enteredPairCode)
+        viewModel.stop()
+    }
+
+    func test_clear_whileTyping_onlyEmptiesTheCode() async throws {
+        let saved = try XCTUnwrap(PairCode("482913"))
+        let (viewModel, client, store) = makeViewModel(state: .enteringCode("482"), saved: saved)
+
+        viewModel.send(.clearCode)
+        for _ in 0..<50 { await Task.yield() }
+
+        XCTAssertEqual(viewModel.state, .enteringCode(""))
+        XCTAssertEqual(client.disconnectCount, 0)
+        XCTAssertEqual(store.enteredPairCode, saved)
+    }
+
     // MARK: Leaving
 
     func test_unpair_disconnects_andForgetsTheCode() async throws {

@@ -61,6 +61,21 @@ final class CompanionReducerTests: XCTestCase {
         XCTAssertEqual(reduce(.notFound("482913"), .deleteDigit), .enteringCode(""))
     }
 
+    func test_clear_emptiesTheCode_whileTypingOrAfterNotFound() {
+        XCTAssertEqual(reduce(.enteringCode("482"), .clearCode), .enteringCode(""))
+        XCTAssertEqual(reduce(.enteringCode(""), .clearCode), .enteringCode(""))
+        XCTAssertEqual(reduce(.notFound("482913"), .clearCode), .enteringCode(""))
+    }
+
+    func test_clear_whileConnecting_stopsAndEmptiesTheCode() {
+        XCTAssertEqual(reduce(.connecting("482913"), .clearCode), .enteringCode(""))
+    }
+
+    func test_clear_isIgnoredOnThePad() {
+        XCTAssertEqual(reduce(.connected, .clearCode), .connected)
+        XCTAssertEqual(reduce(.reconnecting, .clearCode), .reconnecting)
+    }
+
     func test_typingWhileConnectingOrConnected_isIgnored() {
         XCTAssertEqual(reduce(.connecting("482913"), .typeDigit(1)), .connecting("482913"))
         XCTAssertEqual(reduce(.connecting("482913"), .deleteDigit), .connecting("482913"))

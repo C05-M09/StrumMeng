@@ -106,7 +106,12 @@ final class CompanionViewModel {
             tracker.reset()
         }
 
-        if event == .disconnect {
+        // Clearing while connecting is a cancel: the link would otherwise keep looking for the iPad.
+        let cancelledConnecting: Bool = {
+            if case .connecting = previous { return event == .clearCode }
+            return false
+        }()
+        if event == .disconnect || cancelledConnecting {
             lastStrum = nil
             pairCodes.setEnteredPairCode(nil)
             Task { [client] in await client.disconnect() }

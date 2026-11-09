@@ -23,6 +23,9 @@ func reduce(_ state: CompanionState, _ event: CompanionEvent) -> CompanionState 
     case (.notFound, .deleteDigit):
         return .enteringCode("")
 
+    case (.enteringCode, .clearCode), (.notFound, .clearCode), (.connecting, .clearCode):
+        return .enteringCode("")
+
     case (.connecting, .linkConnected), (.reconnecting, .linkConnected):
         return .connected
 
