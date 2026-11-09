@@ -6,8 +6,31 @@ final class CompanionReducerTests: XCTestCase {
         XCTAssertEqual(reduce(.enteringCode("4"), .typeDigit(8)), .enteringCode("48"))
     }
 
-    func test_theSixthDigit_startsConnecting() {
-        XCTAssertEqual(reduce(.enteringCode("48291"), .typeDigit(3)), .connecting("482913"))
+    func test_theSixthDigit_completesTheCode_withoutConnecting() {
+        XCTAssertEqual(reduce(.enteringCode("48291"), .typeDigit(3)), .enteringCode("482913"))
+    }
+
+    func test_aSeventhDigit_isIgnored() {
+        XCTAssertEqual(reduce(.enteringCode("482913"), .typeDigit(7)), .enteringCode("482913"))
+    }
+
+    func test_confirm_connectsWithAFullCode() {
+        XCTAssertEqual(reduce(.enteringCode("482913"), .confirmCode), .connecting("482913"))
+    }
+
+    func test_confirm_isIgnoredWithAnIncompleteCode() {
+        XCTAssertEqual(reduce(.enteringCode("48291"), .confirmCode), .enteringCode("48291"))
+        XCTAssertEqual(reduce(.enteringCode(""), .confirmCode), .enteringCode(""))
+    }
+
+    func test_confirm_afterNotFound_triesTheSameCodeAgain() {
+        XCTAssertEqual(reduce(.notFound("482913"), .confirmCode), .connecting("482913"))
+    }
+
+    func test_confirm_isIgnoredWhileConnectingOrOnThePad() {
+        XCTAssertEqual(reduce(.connecting("482913"), .confirmCode), .connecting("482913"))
+        XCTAssertEqual(reduce(.connected, .confirmCode), .connected)
+        XCTAssertEqual(reduce(.reconnecting, .confirmCode), .reconnecting)
     }
 
     func test_aValueThatIsNotADigit_isIgnored() {
