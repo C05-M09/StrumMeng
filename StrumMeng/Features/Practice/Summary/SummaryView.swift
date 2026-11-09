@@ -11,32 +11,38 @@ struct SummaryView: View {
     let viewModel: SummaryViewModel
     var onNavigate: ((SummaryDestination) -> Void)?
     @State private var activeReplayResult: SessionResult?
+    @State private var isShowingFeedbackOverlay: Bool
+
+    init(
+        viewModel: SummaryViewModel,
+        showIntroOverlay: Bool = true,
+        onNavigate: ((SummaryDestination) -> Void)? = nil
+    ) {
+        self.viewModel = viewModel
+        self.onNavigate = onNavigate
+        self._isShowingFeedbackOverlay = State(initialValue: showIntroOverlay)
+    }
 
     var body: some View {
         GeometryReader { proxy in
-            let scale = max(
-                proxy.size.width / AppLayout.referenceSize.width,
-                proxy.size.height / AppLayout.referenceSize.height
-            )
+            let sx = proxy.size.width / AppLayout.referenceSize.width
+            let sy = proxy.size.height / AppLayout.referenceSize.height
 
             ZStack {
-                // 1. Background Penuh (Semua kotak & frame sudah ada di sini)
-                Image("Summary_BG")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // 1. Background Penuh
+                AppColors.cream
                     .ignoresSafeArea()
 
-                // 2. Konten Teks & Tombol di atas Background
+                // 2. Konten Teks & Tombol di atas Background (diskalakan pas ke ukuran layar)
                 mainCanvas
                     .frame(
                         width: AppLayout.referenceSize.width,
                         height: AppLayout.referenceSize.height
                     )
-                    .scaleEffect(scale)
+                    .scaleEffect(x: sx, y: sy)
                     .frame(
-                        width: AppLayout.referenceSize.width * scale,
-                        height: AppLayout.referenceSize.height * scale
+                        width: proxy.size.width,
+                        height: proxy.size.height
                     )
 
                 // 3. Pop-up Rekomendasi (Muncul saat tombol Retry ditekan)
@@ -69,6 +75,17 @@ struct SummaryView: View {
                     .transition(.slide)
                     .zIndex(100)
                 }
+
+                // 5. Intro Feedback Overlay (Muncul sebelum SummaryView penuh terlihat)
+                if isShowingFeedbackOverlay {
+                    SummaryFeedbackOverlay(result: viewModel.result) {
+                        withAnimation(.easeInOut(duration: 0.35)) {
+                            isShowingFeedbackOverlay = false
+                        }
+                    }
+                    .transition(.opacity)
+                    .zIndex(50)
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .animation(.easeInOut(duration: 0.35), value: activeReplayResult != nil)
@@ -96,10 +113,18 @@ struct SummaryView: View {
     @ViewBuilder
     private var mainCanvas: some View {
         ZStack {
+            // Background Artwork (Semua kotak & frame sudah ada di sini)
+            Image("Summary_BG")
+                .resizable()
+                .frame(
+                    width: AppLayout.referenceSize.width,
+                    height: AppLayout.referenceSize.height
+                )
+
             // JUDUL "SUMMARY" DI ATAS
             // 💡 Ubah y untuk geser ke atas/bawah
-            headerTitle
-                .position(x: 688, y: 120)
+//            headerTitle
+//                .position(x: 688, y: 120)
 
             // --- KOLOM KIRI ---
             leftColumnElements
@@ -111,21 +136,21 @@ struct SummaryView: View {
     }
 
     // MARK: - Header Title
-    private var headerTitle: some View {
-        OutlinedText(
-            text: "SUMMARY",
-            font: AppTypography.bungee(size: 70),
-            foregroundColor: AppColors.white,
-            outlineColor: AppColors.brownInk,
-            outlineWidth: 6,
-            shadowColor: AppColors.redAccent,
-            shadowOffset: CGSize(width: 0, height: 0)
-        )
-    }
+//    private var headerTitle: some View {
+//        OutlinedText(
+//            text: "SUMMARY",
+//            font: AppTypography.bungee(size: 70),
+//            foregroundColor: AppColors.white,
+//            outlineColor: AppColors.brownInk,
+//            outlineWidth: 6,
+//            shadowColor: AppColors.redAccent,
+//            shadowOffset: CGSize(width: 0, height: 0)
+//        )
+//    }
 
     // MARK: - Left Column Elements
     @ViewBuilder
-    private var leftColumnElements: some View {
+    private var rightColumnElements: some View {
         let pattern = PatternCatalog.pattern(forID: viewModel.result.patternID)
         let patternName = pattern?.name ?? "Foundation Strum"
         let duration = pattern.map {
@@ -141,7 +166,8 @@ struct SummaryView: View {
                 .lineSpacing(4)
         }
         .frame(width: 320, height: 180, alignment: .bottomLeading)
-        .position(x: 236, y: 500)
+        .position(x:1136, y: 420)
+
 
         // 2. Baris Durasi & BPM (di bawah kotak cokelat)
         // 💡 Atur x dan y untuk geser baris durasi & BPM
@@ -162,90 +188,12 @@ struct SummaryView: View {
                     .foregroundStyle(AppColors.brownInk)
             }
         }
-        .frame(width: 355)
-        .position(x: 236, y: 700)
-
-        // 3. Tombol "BACK TO MAIN" (di area bawah kiri)
-        // 💡 Atur x dan y untuk posisikan tombol back
-        Button {
-            viewModel.send(.tapBackToMain)
-        } label: {
-            Image("Button_Back to Main")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 340, height: 42)
-        }
-        .buttonStyle(ScaleOnlyButtonStyle())
-        .position(x: 232, y: 955)
-    }
-
-    // MARK: - Right Column Elements (Tanpa Background Tambahan)
-    @ViewBuilder
-    private var rightColumnElements: some View {
-        let result = viewModel.result
-        let offTempoCount = result.tooEarlyCount + result.missCount
-        let accuracyPercent = Int((result.accuracy * 100).rounded())
-
-        let headlineText: String = {
-            if result.accuracy >= 0.86 {
-                return "PERFECT"
-            } else if result.accuracy >= 0.66 {
-                return "GOOD JOB"
-            } else {
-                return "KEEP GOING"
-            }
-        }()
-
-        // 1. Header Banner Kanan ("AWESOME" & Panah >>>)
-        // 💡 Atur posisi y untuk sejajar di banner cokelat atas
-        VStack(alignment: .leading) {
-            Text(headlineText)
-                .font(AppTypography.bungee(size: 70))
-                .foregroundStyle(AppColors.white)
-                .lineSpacing(4)
-                .padding(.bottom, 50)
-            
-            Spacer()
-            
-            Text(
-                offTempoCount > 0
-                    ? "BUT YOU OFF TEMPO \(offTempoCount) TIMES."
-                    : "ALL ON TEMPO! PERFECT RHYTHM."
-            )
-            .font(AppTypography.bungee(size: 40))
-            .foregroundStyle(AppColors.brownInk)
-            
-            
-        }
-        .frame(width: 730, height: 160, alignment: .topLeading)
-        .position(x: 919, y: 370)
-
-        // 3. Accuracy Pill Capsule (di tengah area teal)
-        HStack(alignment: .firstTextBaseline, spacing: 16) {
-            Text("ACCURACY")
-                .font(AppTypography.dmMono(size: 30))
-                .foregroundStyle(AppColors.brownInk)
-
-            Text("\(accuracyPercent)%")
-                .font(AppTypography.bungee(size: 70))
-                .foregroundStyle(AppColors.brownInk)
-        }
-        .padding(.horizontal, 48)
-        .padding(.vertical, 14)
-        .position(x: 919, y: 635)
-
-        // 4. Statistik 3 Kolom (PERFECT, TOO EARLY, MISS)
-        HStack(spacing: 0) {
-            statColumn(count: result.perfectCount, label: "PERFECT")
-            statColumn(count: result.tooEarlyCount, label: "TOO EARLY")
-            statColumn(count: result.missCount, label: "MISS")
-        }
-        .frame(width: 700)
-        .position(x: 919, y: 770)
-
-        // 5. Tombol REPLAY & RETRY (di bawah area teal)
+        .frame(width: 325)
+        .position(x: 1136, y: 590)
+        
+        // 3. Tombol REPLAY & RETRY (di bawah area teal)
         // 💡 Atur posisi y untuk menaikkan/menurunkan kedua tombol ini
-        HStack(spacing: 24) {
+        VStack(spacing: 24) {
             Button {
                 viewModel.send(.tapReplay)
             } label: {
@@ -273,7 +221,108 @@ struct SummaryView: View {
             )
         }
         .frame(width: 760)
-        .position(x: 919, y: 940)
+        .position(x: 1133, y: 850)
+
+    }
+
+    // MARK: - Right Column Elements (Tanpa Background Tambahan)
+    @ViewBuilder
+    private var leftColumnElements: some View {
+        let result = viewModel.result
+        let offTempoCount = result.tooEarlyCount + result.missCount
+        let accuracyPercent = Int((result.accuracy * 100).rounded())
+
+        let headlineText: String = {
+            if result.accuracy >= 0.86 {
+                return "PURRFECT!"
+            } else if result.accuracy >= 0.66 {
+                return "NICE!!"
+            } else {
+                return "YOU GOOD?"
+            }
+        }()
+        
+        let charaImage: String = {
+            if result.accuracy >= 0.86 {
+                return "cat_purfect"
+            } else if result.accuracy >= 0.66 {
+                return "cat_oke"
+            } else {
+                return "cat_you good"
+            }
+        }()
+        
+        // 1. Tombol "BACK TO MAIN" (di area bawah kiri)
+        // 💡 Atur x dan y untuk posisikan tombol back
+        Button {
+            viewModel.send(.tapBackToMain)
+        } label: {
+            Image("Button_Back to Main")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 340, height: 42)
+        }
+        .buttonStyle(ScaleOnlyButtonStyle())
+        .position(x: 212, y: 120)
+
+        //Ekspresi Maskotnya
+        VStack(alignment: .leading) {
+            Image(charaImage)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 400)
+                .position(x: 190, y: 820)
+        }
+        
+        // 2. Header Banner Kiri ("AWESOME" & Panah >>>)
+        // 💡 Atur posisi y untuk sejajar di banner cokelat atas
+        VStack(alignment: .leading) {
+            Text(headlineText)
+                .font(AppTypography.bungee(size: 55))
+                .foregroundStyle(AppColors.white)
+                .lineSpacing(4)
+                .padding(.bottom, 50)
+        }
+        .frame(width: 730, height: 260, alignment: .topLeading)
+        .position(x: 760, y: 775)
+    
+        VStack(alignment: .leading){
+            /// TO DO: Bisa diubah pakai condition
+            Text(
+                offTempoCount > 0
+                ? "BUT YOU OFF TEMPO \(offTempoCount) TIMES. wiadiawdwijdwa awidjawd widjaw wa daw aw adw daw fdwa wdaa aw wawd wad."
+                : "ALL ON TEMPO! PERFECT RHYTHM."
+            )
+            .font(AppTypography.dmMono(size: 30))
+            .foregroundStyle(AppColors.brownInk)
+        }
+        .frame(width: 480, height: 160, alignment: .topLeading)
+        .position(x: 640, y: 860)
+
+        // 4. Accuracy Pill Capsule (di tengah area teal)
+        HStack(alignment: .firstTextBaseline, spacing: 16) {
+            Text("ACCURACY")
+                .font(AppTypography.dmMono(size: 30))
+                .foregroundStyle(AppColors.brownInk)
+
+            Spacer()
+            
+            Text("\(accuracyPercent)%")
+                .font(AppTypography.bungee(size: 70))
+                .foregroundStyle(AppColors.brownInk)
+        }
+        .frame(width: 400, height: 160, alignment: .topLeading)
+        .position(x: 475, y: 435)
+
+        // 4. Statistik 3 Kolom (PERFECT, TOO EARLY, MISS)
+        HStack(spacing: 0) {
+            statColumn(count: result.perfectCount, label: "PERFECT")
+            statColumn(count: result.tooEarlyCount, label: "TOO EARLY")
+            statColumn(count: result.missCount, label: "MISS")
+        }
+        .frame(width: 700)
+        .position(x: 490, y: 530)
+
     }
 
     // MARK: - Metric Column Helper
@@ -312,14 +361,14 @@ private struct PreviewSessionRepository: SessionRepository {
     ) async throws -> [SessionResult] { [] }
 }
 
-#Preview("Main Summary") {
+#Preview("Summary with Intro Overlay", traits: .landscapeLeft) {
     let repo = PreviewSessionRepository()
     let sampleResult = SessionResult(
         id: UUID(),
         patternID: "syncopation",
         songID: nil,
         bpm: 100,
-        accuracy: 0.90,
+        accuracy: 0.9,
         perfectCount: 15,
         tooEarlyCount: 1,
         missCount: 0,
@@ -327,7 +376,25 @@ private struct PreviewSessionRepository: SessionRepository {
         beatEvents: []
     )
     let vm = SummaryViewModel(result: sampleResult, repository: repo)
-    SummaryView(viewModel: vm)
+    SummaryView(viewModel: vm, showIntroOverlay: true)
+}
+
+#Preview("Main Summary Board (Direct / After Next)", traits: .landscapeLeft) {
+    let repo = PreviewSessionRepository()
+    let sampleResult = SessionResult(
+        id: UUID(),
+        patternID: "syncopation",
+        songID: nil,
+        bpm: 100,
+        accuracy: 0.9,
+        perfectCount: 15,
+        tooEarlyCount: 1,
+        missCount: 0,
+        createdAt: Date(),
+        beatEvents: []
+    )
+    let vm = SummaryViewModel(result: sampleResult, repository: repo)
+    SummaryView(viewModel: vm, showIntroOverlay: false)
 }
 
 #Preview("Summary with Recommendation", traits: .landscapeLeft) {
@@ -346,6 +413,6 @@ private struct PreviewSessionRepository: SessionRepository {
     )
     let vm = SummaryViewModel(result: sampleResult, repository: repo)
     let _ = vm.send(.tapRetry)
-    SummaryView(viewModel: vm)
+    SummaryView(viewModel: vm, showIntroOverlay: false)
 }
 
