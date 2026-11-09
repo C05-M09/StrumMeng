@@ -3,9 +3,12 @@ import Foundation
 func reduce(_ state: CompanionState, _ event: CompanionEvent) -> CompanionState {
     switch (state, event) {
     case let (.enteringCode(code), .typeDigit(digit)):
-        guard (0...9).contains(digit) else { return state }
-        let typed = code + String(digit)
-        return typed.count == PairCode.length ? .connecting(typed) : .enteringCode(typed)
+        guard (0...9).contains(digit), code.count < PairCode.length else { return state }
+        return .enteringCode(code + String(digit))
+
+    // A full code waits for the check key, so the player can see it before it is sent.
+    case let (.enteringCode(code), .confirmCode), let (.notFound(code), .confirmCode):
+        return code.count == PairCode.length ? .connecting(code) : state
 
     case let (.enteringCode(code), .deleteDigit):
         return .enteringCode(String(code.dropLast()))

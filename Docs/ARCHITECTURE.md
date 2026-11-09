@@ -257,7 +257,7 @@ Every type above has a mock \(MockControllerLink emits scripted strums: on\-time
 
 ControllerConnectionState machine: \.unpaired, \.pairing, \.searching, \.connected\(latencyMs\),<br>\.reconnecting\. Before the first session the iPad explains how to set up the iPhone \(open the app on<br>the iPhone, pair once\)\. A small indicator on the iPad shows whether a controller is connected; the<br>iPhone shows its own connection status and the measured latency\. The system local\-network / pairing<br>prompts are shown by iOS; if the user declines, a message explains how to allow it in Settings\.
 
-Setup flow as built: AppContainer owns one link, started at launch so a paired iPhone reconnects before Play\. On the iPad, Option → Set Up Device shows the pair code and the connection state \(DeviceSetupState: searching, connected, reconnecting, failed\)\. On the iPhone, CompanionState goes enteringCode → connecting → connected, with notFound and reconnecting\. PairCodeStore keeps the iPad's code and the iPhone's last connected code across launches, apart from SettingsStore because these are not settings the player edits\. A typed code gets 10 seconds, because the two sides never say a code is wrong; a saved code has no limit, because the iPad may simply not be open yet\. The iPhone is optional in Play: on\-screen swipes keep working, and only a session started with the iPhone pauses when it drops\.
+Setup flow as built: AppContainer owns one link, started at launch so a paired iPhone reconnects before Play\. On the iPad, Option → Set Up Device shows the pair code and the connection state \(DeviceSetupState: searching, connected, reconnecting, failed\)\. On the iPhone, CompanionState goes enteringCode → connecting → connected, with notFound and reconnecting\. A full code waits for the keypad's check key \(confirmCode\) instead of connecting on the sixth digit, so the player sees the code before it is sent; after notFound the check tries the same code again\. While connecting, the check becomes a cross that cancels \(disconnect\)\. PairCodeStore keeps the iPad's code and the iPhone's last connected code across launches, apart from SettingsStore because these are not settings the player edits\. A typed code gets 10 seconds, because the two sides never say a code is wrong; a saved code has no limit, because the iPad may simply not be open yet\. The iPhone is optional in Play: on\-screen swipes keep working, and only a session started with the iPhone pauses when it drops\.
 
 ### 3\.3 Results: Summary, Replay, Retry, records \(US 4, US 8\)
 
@@ -526,6 +526,7 @@ This document is the design reference\. CLAUDE\.md at the repository root is the
 
 ### US3: first Play instructions after Ready
 
+
 After a full Listen loop, Ready stops the example and checks whether any saved
 session exists. SwiftDataSessionRepository implements the additive read-only
 SessionHistoryChecking capability; SessionRepository's shared contract is unchanged.
@@ -539,3 +540,15 @@ FirstPlayInstructionsLayout.artworkAssetName is nil until designer artwork arriv
 Set it to the imageset name to replace the temporary content with one full-modal
 asset; the normal/pressed Next button remains separately interactive at bottom-right.
 The history task is cancelled on leaving Listen and ignores results after cancellation.
+On the iPad host, Home waits 1.5 seconds on the first launch, then presents Meng
+using the shared ListenInformationEntrance animation and Listen illustration assets.
+The welcome remains visible until Next is tapped; taps outside the button do not
+dismiss it. Next asks AppRouter to open the existing deviceSetup route directly.
+Home input is blocked during the introduction. Backgrounding, leaving Home or opening another Home overlay
+cancels the pending presentation; returning starts the appearance delay again.
+PairingIntroductionViewModel owns a pure state reducer and a cancellable task.
+PairingIntroductionStore persists only whether the invitation led to setup; it does
+not claim that pairing succeeded. This separate protocol leaves SettingsStore and
+PairCodeStore contracts intact. Future launches retain Option → Set Up Device.
+The iPhone's existing companion entry flow is unchanged. Preview containers disable
+the invitation so Canvas cannot mutate the persisted first-launch flag.

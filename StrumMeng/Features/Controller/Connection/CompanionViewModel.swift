@@ -93,7 +93,7 @@ final class CompanionViewModel {
             if let code = PairCode(text) {
                 Task { [client] in await client.connect(pairCode: code) }
             }
-            if case .typeDigit = event { startTimeout() }
+            if event == .confirmCode { startTimeout() }
         case .connected:
             // Saved only now, so a code that never connected is not retried on the next launch.
             if case let .connecting(text) = previous {

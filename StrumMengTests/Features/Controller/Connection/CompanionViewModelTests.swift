@@ -180,10 +180,34 @@ final class CompanionViewModelTests: XCTestCase {
         let (viewModel, client, _) = makeViewModel(state: .enteringCode("48291"))
 
         viewModel.send(.typeDigit(3))
+        viewModel.send(.confirmCode)
         await waitUntil { !client.connectedCodes.isEmpty }
 
         XCTAssertEqual(viewModel.state, .connecting("482913"))
         XCTAssertEqual(client.connectedCodes, [try XCTUnwrap(PairCode("482913"))])
+    }
+
+    func test_sixDigits_waitForTheCheckKey() async {
+        let (viewModel, client, _) = makeViewModel(state: .enteringCode("48291"))
+
+        viewModel.send(.typeDigit(3))
+        for _ in 0..<50 { await Task.yield() }
+
+        XCTAssertEqual(viewModel.state, .enteringCode("482913"))
+        XCTAssertTrue(client.connectedCodes.isEmpty)
+    }
+
+    func test_retryAfterNotFound_looksAgain_withATimeout() async throws {
+        let (viewModel, client, _) = makeTimingOutViewModel()
+        viewModel.send(.typeDigit(3))
+        viewModel.send(.confirmCode)
+        await waitUntil { viewModel.state == .notFound("482913") }
+
+        viewModel.send(.confirmCode)
+        await waitUntil { client.connectedCodes.count == 2 && viewModel.state == .notFound("482913") }
+
+        XCTAssertEqual(client.connectedCodes.count, 2)
+        XCTAssertEqual(viewModel.state, .notFound("482913"))
     }
 
     func test_theCode_isSavedOnlyOnceConnected() async throws {
@@ -191,6 +215,7 @@ final class CompanionViewModelTests: XCTestCase {
         viewModel.appear()
 
         viewModel.send(.typeDigit(3))
+        viewModel.send(.confirmCode)
         XCTAssertNil(store.enteredPairCode)
 
         client.emit(.connected(latencyMs: 5))
@@ -253,6 +278,7 @@ final class CompanionViewModelTests: XCTestCase {
         let (viewModel, client, store) = makeTimingOutViewModel()
 
         viewModel.send(.typeDigit(3))
+        viewModel.send(.confirmCode)
         await waitUntil { viewModel.state == .notFound("482913") && client.disconnectCount == 1 }
 
         XCTAssertEqual(viewModel.state, .notFound("482913"))
@@ -266,6 +292,7 @@ final class CompanionViewModelTests: XCTestCase {
                                            state: .enteringCode("48291"), connectTimeout: .milliseconds(10))
 
         viewModel.send(.typeDigit(3))
+        viewModel.send(.confirmCode)
         viewModel.send(.linkConnected)
         try await Task.sleep(for: .milliseconds(50))
 

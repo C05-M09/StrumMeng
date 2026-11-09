@@ -4,6 +4,7 @@ struct ContentView: View {
     @State private var router: AppRouter
     @State private var container: AppContainer
     @State private var homeViewModel: HomeViewModel
+    @State private var pairingIntroduction: PairingIntroductionViewModel
     @State private var patternListViewModel: PatternListViewModel
     @State private var optionViewModel: OptionViewModel
     @State private var guidebookViewModel: GuidebookViewModel
@@ -17,6 +18,8 @@ struct ContentView: View {
         _router = State(initialValue: router)
         _container = State(initialValue: container)
         _homeViewModel = State(initialValue: homeViewModel)
+        _pairingIntroduction = State(initialValue:
+            container.makePairingIntroductionViewModel(isEnabled: !inMemory))
         _patternListViewModel = State(initialValue: container.makePatternListViewModel())
         // Option is an overlay on Home, so "back" closes the overlay instead of popping the router.
         _optionViewModel = State(initialValue: container.makeOptionViewModel { [weak homeViewModel] in
@@ -36,6 +39,7 @@ struct ContentView: View {
                 optionViewModel: optionViewModel,
                 guidebookViewModel: guidebookViewModel
             )
+                .allowsHitTesting(!pairingIntroduction.state.blocksHome)
                 .navigationDestination(for: AppRoute.self) { route in
                     switch route {
                     case .practiceList:
@@ -67,6 +71,14 @@ struct ContentView: View {
                 }
         }
         .ignoresSafeArea()
+        .overlay {
+            if pairingIntroduction.state == .welcoming {
+                PairingIntroductionView { pairingIntroduction.send(.continueToSetup) }
+            }
+        }
+        .onChange(of: canPresentPairingIntroduction, initial: true) { _, active in
+            pairingIntroduction.setActive(active)
+        }
         .task { await container.startControllerLink() }
         // Menu music follows the screen on top, and pauses while the app is not active.
         .onChange(of: router.path, initial: true) { _, path in
@@ -76,7 +88,13 @@ struct ContentView: View {
             container.updateMenuMusic(for: router.path, isAppActive: phase == .active)
         }
         // The DEBUG controller screens replace this view and bring their own link.
-        .onDisappear { container.stopControllerLink() }
+        .onDisappear {
+            pairingIntroduction.setActive(false)
+            container.stopControllerLink()
+        }
+    }
+    private var canPresentPairingIntroduction: Bool {
+        scenePhase == .active && router.path.isEmpty && homeViewModel.presentedOverlay == nil
     }
 }
 
