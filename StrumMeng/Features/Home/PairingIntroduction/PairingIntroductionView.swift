@@ -29,12 +29,14 @@ struct PairingIntroductionView: View {
                     VStack(spacing: PairingIntroductionLayout.copySpacing) {
                         Text("Hey there, I'm Meng!")
                             .font(AppTypography.bungee(size: PairingIntroductionLayout.copyFontSize))
+                            .foregroundStyle(AppColors.brownInk)
                         Text("Let's pair your iPhone with this iPad\nbefore we start strumming!")
                             .font(AppTypography.dmMono(size: PairingIntroductionLayout.copyFontSize))
+                            .foregroundStyle(AppColors.brownInk)
                         Text("Tap Next when you’re ready.")
                             .font(AppTypography.dmMono(size: PairingIntroductionLayout.hintFontSize))
+                            .foregroundStyle(AppColors.yellowAccent)
                     }
-                    .foregroundStyle(AppColors.brownInk)
                     .multilineTextAlignment(.center)
                     .frame(width: PairingIntroductionLayout.textWidth)
                     .offset(PairingIntroductionLayout.textOffset)

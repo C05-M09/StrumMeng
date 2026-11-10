@@ -8,17 +8,20 @@ final class DeviceSetupViewModel {
 
     @ObservationIgnored private let link: any ControllerLink
     @ObservationIgnored private let onClose: () -> Void
+    @ObservationIgnored private let onPairedDone: () -> Void
     @ObservationIgnored private var linkTask: Task<Void, Never>?
     @ObservationIgnored private var startTask: Task<Void, Never>?
 
     init(
         link: any ControllerLink,
         state: DeviceSetupState = .searching,
-        onClose: @escaping () -> Void
+        onClose: @escaping () -> Void,
+        onPairedDone: @escaping () -> Void = {}
     ) {
         self.link = link
         self.state = state
         self.onClose = onClose
+        self.onPairedDone = onPairedDone
     }
 
     var pairCode: String { link.pairCode.value }
@@ -61,7 +64,10 @@ final class DeviceSetupViewModel {
         case .linkStateChanged, .linkFailed:
             break
         case .tapDone:
-            if canFinish { onClose() }
+            if canFinish {
+                onPairedDone()
+                onClose()
+            }
         case .tapBack:
             onClose()
         }

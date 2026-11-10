@@ -11,6 +11,8 @@ final class AppContainer {
     /// between screens.
     private let menuSounds: any MenuSoundService
     private let results = SessionResultStore()
+    private let enablesHomeGuidance: Bool
+    private let homeGuidanceStore: any HomeGuidanceStore
     /// The one pattern list of the app, so Retry can hand it the chosen tempo.
     private weak var patternListViewModel: PatternListViewModel?
     /// One synthesised guitar for the whole app, made when a screen first needs it. Notes are
@@ -30,9 +32,13 @@ final class AppContainer {
         inMemory: Bool = false,
         settings: (any SettingsStore)? = nil,
         menuSounds: (any MenuSoundService)? = nil,
-        pairingIntroductionStore: (any PairingIntroductionStore)? = nil
+        pairingIntroductionStore: (any PairingIntroductionStore)? = nil,
+        homeGuidanceStore: (any HomeGuidanceStore)? = nil,
+        controllerLink: (any ControllerLink)? = nil
     ) {
         self.router = router
+        self.homeGuidanceStore = homeGuidanceStore ?? UserDefaultsHomeGuidanceStore()
+        self.controllerLink = controllerLink
         self.pairingIntroductionStore = pairingIntroductionStore ?? UserDefaultsPairingIntroductionStore()
         let settings = settings ?? UserDefaultsSettingsStore()
         self.settings = settings
@@ -42,6 +48,7 @@ final class AppContainer {
         sounds.setMusicVolume(settings.soundVolume)
         sounds.setEffectsVolume(settings.sfxVolume)
         self.menuSounds = sounds
+        self.enablesHomeGuidance = !inMemory || homeGuidanceStore != nil
 
         do {
             let modelContainer = try ModelContainerFactory.make(
@@ -77,6 +84,7 @@ final class AppContainer {
     func makeHomeViewModel() -> HomeViewModel {
         HomeViewModel(
             sounds: menuSounds,
+            guidance: enablesHomeGuidance ? HomeGuidanceViewModel(store: homeGuidanceStore) : nil,
             onPracticeRequested: { [weak router] in
                 router?.push(.practiceList)
             }
@@ -195,7 +203,12 @@ final class AppContainer {
     }
 
     func makeDeviceSetupViewModel() -> DeviceSetupViewModel {
-        DeviceSetupViewModel(link: sharedControllerLink(), onClose: { [weak router] in router?.pop() })
+        let guidanceStore = homeGuidanceStore
+        return DeviceSetupViewModel(
+            link: sharedControllerLink(),
+            onClose: { [weak router] in router?.pop() },
+            onPairedDone: { guidanceStore.scheduleAfterPairing() }
+        )
     }
 
     /// Made on first use, so an AppContainer that never needs the iPhone never opens the network.
