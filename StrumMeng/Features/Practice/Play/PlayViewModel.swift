@@ -36,6 +36,7 @@ final class PlayViewModel {
     var isAnimating: Bool {
         switch state {
         case .countIn, .playing: true
+        case .finished: isWrappingUp
         default: false
         }
     }
@@ -59,6 +60,7 @@ final class PlayViewModel {
     @ObservationIgnored private let currentDate: () -> Date
     @ObservationIgnored private let onFinished: (SessionResult) -> Void
     @ObservationIgnored private let onExit: () -> Void
+    @ObservationIgnored private let finishBreak: TimeInterval
 
     @ObservationIgnored let stepInterval: TimeInterval
     @ObservationIgnored let totalSteps: Int
@@ -92,6 +94,9 @@ final class PlayViewModel {
     @ObservationIgnored private var strumTask: Task<Void, Never>?
     @ObservationIgnored private var windowTask: Task<Void, Never>?
     @ObservationIgnored private var controllerTask: Task<Void, Never>?
+    @ObservationIgnored private var finishTask: Task<Void, Never>?
+    /// True during the break after the last beat: the session is finished but the lane still moves.
+    private(set) var isWrappingUp = false
 
     /// - Parameters:
     ///   - controller: the iPhone link when it is the strum source. The view model tells it when a
@@ -122,6 +127,7 @@ final class PlayViewModel {
          strumArrivalGrace: TimeInterval = 0,
          leadInSteps: Int? = nil,
          repetitions: Int = PracticeSessionConfig.patternRepetitions,
+         finishBreak: TimeInterval = PlayViewModel.finishBreak,
          now: @escaping () -> TimeInterval,
          waitUntil: @escaping (TimeInterval) async -> Void,
          makeID: @escaping () -> UUID = UUID.init,
@@ -147,6 +153,7 @@ final class PlayViewModel {
         self.currentDate = currentDate
         self.onFinished = onFinished
         self.onExit = onExit
+        self.finishBreak = finishBreak
 
         stepInterval = AudioBeatClock.stepInterval(bpm: bpm)
         totalSteps = pattern.strokes.count * max(1, repetitions)
@@ -183,7 +190,8 @@ final class PlayViewModel {
 
     /// Leaving the screen discards an unfinished session and stops every task.
     func onDisappear() async {
-        [tickTask, strumTask, windowTask, controllerTask].forEach { $0?.cancel() }
+        [tickTask, strumTask, windowTask, controllerTask, finishTask].forEach { $0?.cancel() }
+        isWrappingUp = false
         metronome?.cancelClicks()
         await clock.stop()
         await controller?.setSessionActive(false)
@@ -229,6 +237,10 @@ final class PlayViewModel {
     /// The longest believable gap between a touch and its handling. A bigger (or negative) gap means
     /// the event timestamp is not on the wall clock, so it is ignored rather than trusted.
     static let maxTouchDelay: TimeInterval = 0.1
+
+    /// After the last beat the nodes keep sliding for this long before Summary opens, so the
+    /// session does not stop dead.
+    static let finishBreak: TimeInterval = 2
 
     /// - Parameter eventDate: the touch event's own timestamp. When it is plausible, it is turned into
     ///   host-clock time so a strum keeps its real time even if the main thread handled it a little
@@ -422,15 +434,28 @@ final class PlayViewModel {
         guard state == .playing, nextStep >= totalSteps, engine.openBeats.isEmpty else { return }
         windowTask?.cancel()
         metronome?.cancelClicks()
-        frozenSongTime = currentSongTime()
         let result = SessionResultBuilder.build(id: makeID(), patternID: pattern.id, bpm: bpm,
                                                 beatEvents: beatEvents, createdAt: currentDate())
+        // .finished from here on: strums in the break are ignored, not judged.
         state = reduce(state, .sessionEnded(result))
         Task { [clock, controller] in
             await clock.stop()
             await controller?.setSessionActive(false)
         }
-        onFinished(result)
+        guard finishBreak > 0 else {
+            frozenSongTime = currentSongTime()
+            onFinished(result)
+            return
+        }
+        // The song time is not frozen yet, so the nodes keep sliding past the hit line.
+        isWrappingUp = true
+        finishTask = Task { [weak self, waitUntil, now, finishBreak] in
+            await waitUntil(now() + finishBreak)
+            guard !Task.isCancelled, let self else { return }
+            self.frozenSongTime = self.currentSongTime()
+            self.isWrappingUp = false
+            self.onFinished(result)
+        }
     }
 
     private func pause() async {

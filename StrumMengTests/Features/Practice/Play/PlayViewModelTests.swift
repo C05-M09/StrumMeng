@@ -13,6 +13,7 @@ final class PlayViewModelTests: XCTestCase {
     /// Syncopation, "D - D U - U D U": step 0 judged, step 1 a rest.
     private func makeViewModel(patternID: String = "syncopation",
                                repetitions: Int = 10,
+                               finishBreak: TimeInterval = 0,
                                leadInSteps: Int = 0,
                                latencyOffset: TimeInterval = 0,
                                strumArrivalGrace: TimeInterval = 0,
@@ -25,7 +26,7 @@ final class PlayViewModelTests: XCTestCase {
             pattern: pattern, bpm: 80, clock: clock, input: MockStrumInputService(), touchInput: touchInput,
             controller: controller, requiresController: requiresController,
             guitar: sound, metronome: sound, latencyOffset: latencyOffset, strumArrivalGrace: strumArrivalGrace,
-            leadInSteps: leadInSteps, repetitions: repetitions,
+            leadInSteps: leadInSteps, repetitions: repetitions, finishBreak: finishBreak,
             now: { [unowned self] in self.currentTime },
             waitUntil: { _ in try? await Task.sleep(for: .seconds(3600)) },
             makeID: { UUID(uuidString: "00000000-0000-0000-0000-000000000001") ?? UUID() },
@@ -353,6 +354,26 @@ final class PlayViewModelTests: XCTestCase {
         XCTAssertEqual(result.patternID, "syncopation")
         XCTAssertEqual(result.bpm, 80)
         XCTAssertEqual(finished, [result])
+    }
+
+    func test_finishedSession_waitsForTheBreak_beforeOpeningSummary() async throws {
+        let viewModel = try makeViewModel(repetitions: 1, finishBreak: 2)
+        await startPlaying(viewModel)
+        for n in 7...14 { tick(viewModel, n) }
+
+        guard case .finished = viewModel.state else { return XCTFail("expected finished") }
+        XCTAssertTrue(viewModel.isAnimating, "the lane keeps moving during the break")
+        XCTAssertTrue(finished.isEmpty, "Summary opens only after the break")
+    }
+
+    func test_leavingDuringTheBreak_neverReportsAResult() async throws {
+        let viewModel = try makeViewModel(repetitions: 1, finishBreak: 2)
+        await startPlaying(viewModel)
+        for n in 7...14 { tick(viewModel, n) }
+
+        await viewModel.onDisappear()
+        XCTAssertFalse(viewModel.isAnimating)
+        XCTAssertTrue(finished.isEmpty)
     }
 
     func test_sameJudgingLogic_worksForEveryPattern() async throws {
