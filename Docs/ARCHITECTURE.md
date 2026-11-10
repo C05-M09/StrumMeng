@@ -259,6 +259,26 @@ ControllerConnectionState machine: \.unpaired, \.pairing, \.searching, \.connect
 
 Setup flow as built: AppContainer owns one link, started at launch so a paired iPhone reconnects before Play\. On the iPad, Option → Set Up Device shows the pair code and the connection state \(DeviceSetupState: searching, connected, reconnecting, failed\)\. On the iPhone, CompanionState goes enteringCode → connecting → connected, with notFound and reconnecting\. A full code waits for the keypad's check key \(confirmCode\) instead of connecting on the sixth digit, so the player sees the code before it is sent; after notFound the check tries the same code again\. While connecting, the check becomes a cross that cancels \(disconnect\)\. PairCodeStore keeps the iPad's code and the iPhone's last connected code across launches, apart from SettingsStore because these are not settings the player edits\. A typed code gets 10 seconds, because the two sides never say a code is wrong; a saved code has no limit, because the iPad may simply not be open yet\. The iPhone is optional in Play: on\-screen swipes keep working, and only a session started with the iPhone pauses when it drops\.
 
+#### US7: Home guidance after first successful setup
+
+DeviceSetupViewModel invokes an injected onPairedDone callback only when Done is
+accepted in the connected state. AppContainer uses this callback to schedule a
+once-only Home tour through HomeGuidanceStore (separate from SettingsStore and
+PairCodeStore). Home displays Option guidance to the left of Option first, then Guidebook guidance
+to the left of its icon. Both white bubbles use content-driven heights, equal body
+padding, and a small hard shadow to the right and below. A full-canvas tap surface consumes each tap, advances one
+step and never activates the Home buttons beneath it. Guidance has no timeout.
+The tour starts only when Home is visible without Option/Guidebook overlays; if
+setup was opened from Option, close Option to reveal it. Completion is persisted
+only after the second tip. A pending tour survives an app relaunch.
+
+US7 now includes US10's first-launch invitation. The combined first-run flow is:
+Home → Meng invitation → Next → Set Up Device → connected Done → Home → Option tip
+→ Guidebook tip → normal Home. Returning launches skip the invitation and completed
+tour. Separate persisted invitation/tour flags allow interrupted setup to be retried
+from Option without falsely marking the tour complete. AppContainer accepts fake
+stores and a fake ControllerLink so the entire handoff can be tested without Wi-Fi.
+
 ### 3\.3 Results: Summary, Replay, Retry, records \(US 4, US 8\)
 
 #### 3\.3\.1 Summary

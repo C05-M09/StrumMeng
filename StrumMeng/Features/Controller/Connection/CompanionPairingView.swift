@@ -108,10 +108,10 @@ struct CompanionPairingView: View {
         .keypadLocked(isConnecting)
     }
 
-    /// The key art has no pressed version, so the press shows as the button's shrink alone.
+    /// The key art has no pressed version, so the key sinks into its own thick bottom edge instead.
     private func key(_ asset: String, size: CGSize, label: String, action: @escaping () -> Void) -> some View {
         AssetPressButton(normalAsset: asset, pressedAsset: asset, size: size, accessibilityLabel: label,
-                         action: action)
+                         style: .raisedKey, action: action)
     }
 
     // MARK: Text per state

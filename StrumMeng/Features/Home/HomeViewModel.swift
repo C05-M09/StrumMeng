@@ -22,12 +22,15 @@ enum HomeOverlay: Equatable {
 @MainActor
 @Observable
 final class HomeViewModel {
+    let guidance: HomeGuidanceViewModel?
     private(set) var presentedOverlay: HomeOverlay?
 
     private let sounds: any MenuSoundService
     private let onPracticeRequested: () -> Void
 
-    init(sounds: any MenuSoundService, onPracticeRequested: @escaping () -> Void) {
+    init(sounds: any MenuSoundService, guidance: HomeGuidanceViewModel? = nil,
+         onPracticeRequested: @escaping () -> Void) {
+        self.guidance = guidance
         self.sounds = sounds
         self.onPracticeRequested = onPracticeRequested
     }

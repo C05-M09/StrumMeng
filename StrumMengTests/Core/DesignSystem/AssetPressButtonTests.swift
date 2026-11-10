@@ -15,6 +15,39 @@ final class AssetPressButtonTests: XCTestCase {
         XCTAssertFalse(AssetPressButton.isInside(CGPoint(x: 120, y: 48), size: size))
     }
 
+    func test_sameAssetForBothStates_isDrawnOnce() {
+        XCTAssertFalse(AssetPressButton.hasPressedArtwork(normalAsset: "Companion_Key_1",
+                                                          pressedAsset: "Companion_Key_1"))
+        XCTAssertTrue(AssetPressButton.hasPressedArtwork(normalAsset: "Button_Pause_Normal",
+                                                         pressedAsset: "Button_Pause_Pressed"))
+    }
+
+    func test_standardStyle_onlyShrinks_likeBefore() {
+        XCTAssertEqual(AssetPressStyle.standard,
+                       AssetPressStyle(scale: 0.94, sink: 0, brightness: 0, minimumPress: .zero))
+        XCTAssertEqual(AssetPressStyle.standard.releaseDelay(afterPressedFor: .milliseconds(10)), .zero)
+    }
+
+    func test_quickTap_staysPressedUntilTheMinimumPress() {
+        let style = AssetPressStyle.raisedKey
+        XCTAssertEqual(style.releaseDelay(afterPressedFor: .milliseconds(20)),
+                       style.minimumPress - .milliseconds(20))
+        XCTAssertEqual(style.releaseDelay(afterPressedFor: .zero), style.minimumPress)
+    }
+
+    func test_longPress_releasesAtOnce() {
+        let style = AssetPressStyle.raisedKey
+        XCTAssertEqual(style.releaseDelay(afterPressedFor: style.minimumPress), .zero)
+        XCTAssertEqual(style.releaseDelay(afterPressedFor: .seconds(1)), .zero)
+    }
+
+    func test_raisedKeyStyle_sinksAndDarkens() {
+        let style = AssetPressStyle.raisedKey
+        XCTAssertGreaterThan(style.sink, 0)
+        XCTAssertLessThan(style.brightness, 0)
+        XCTAssertLessThan(style.scale, 1)
+    }
+
     func test_pauseTouchArea_isCentredOnThePauseButton() {
         let layout = PlayScreenLayout(size: PlayScreenLayout.designSize)
         XCTAssertEqual(layout.pauseRect.midX, layout.pauseCenter.x, accuracy: 1e-9)
