@@ -2,7 +2,9 @@ import XCTest
 @testable import StrumMeng
 
 final class FeedbackEngineTests: XCTestCase {
-    private let step = AudioBeatClock.stepInterval(bpm: 80)    // 0.375 s
+    private let step = AudioBeatClock.stepInterval(bpm: 80)    // 0.375 s, windows not capped
+    /// The Perfect window, so these tests follow when the tolerance is tuned.
+    private let perfect = ToleranceConfig.standard.perfectWindowMs / 1000
 
     private func makeEngine(offset: TimeInterval = 0) -> FeedbackEngine {
         FeedbackEngine(config: .standard, latencyOffset: offset, stepInterval: step)
@@ -30,8 +32,8 @@ final class FeedbackEngineTests: XCTestCase {
         var engine = makeEngine()
         _ = engine.addStrum(PracticeFixtures.strum(at: 9.9))
         XCTAssertTrue(engine.addBeat(beat(0, at: 10)).isEmpty)
-        XCTAssertTrue(engine.close(upTo: 10.04).isEmpty)
-        XCTAssertEqual(engine.close(upTo: 10.05).map(\.result), [.tooEarly])
+        XCTAssertTrue(engine.close(upTo: 10 + perfect - 0.01).isEmpty)
+        XCTAssertEqual(engine.close(upTo: 10 + perfect).map(\.result), [.tooEarly])
     }
 
     func test_tooEarlyThenPerfect_inOneWindow_endsAsPerfect() {
@@ -58,15 +60,15 @@ final class FeedbackEngineTests: XCTestCase {
     func test_noStrum_isMissWhenTheWindowCloses() {
         var engine = makeEngine()
         _ = engine.addBeat(beat(0, at: 10))
-        XCTAssertEqual(engine.nextDeadline ?? 0, 10.05, accuracy: 1e-9)
-        XCTAssertEqual(engine.close(upTo: 10.05).map(\.result), [.miss])
+        XCTAssertEqual(engine.nextDeadline ?? 0, 10 + perfect, accuracy: 1e-9)
+        XCTAssertEqual(engine.close(upTo: 10 + perfect).map(\.result), [.miss])
         XCTAssertNil(engine.nextDeadline)
     }
 
     func test_lateStrum_closesTheBeatAsMiss() {
         var engine = makeEngine()
         _ = engine.addBeat(beat(0, at: 10))
-        XCTAssertEqual(engine.addStrum(PracticeFixtures.strum(at: 10.08)).map(\.result), [.miss])
+        XCTAssertEqual(engine.addStrum(PracticeFixtures.strum(at: 10 + perfect + 0.01)).map(\.result), [.miss])
     }
 
     func test_oneStrum_satisfiesOnlyOneBeat() {

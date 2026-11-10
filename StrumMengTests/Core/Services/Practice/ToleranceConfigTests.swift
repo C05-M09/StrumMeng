@@ -3,9 +3,10 @@ import XCTest
 
 final class ToleranceConfigTests: XCTestCase {
     func test_windowsAtNormalTempo_areNotScaled() {
-        let windows = ToleranceConfig.standard.windows(stepInterval: 0.375)
-        XCTAssertEqual(windows.perfect, 0.05, accuracy: 1e-9)
-        XCTAssertEqual(windows.early, 0.15, accuracy: 1e-9)
+        let config = ToleranceConfig.standard
+        let windows = config.windows(stepInterval: 0.375)
+        XCTAssertEqual(windows.perfect, config.perfectWindowMs / 1000, accuracy: 1e-9)
+        XCTAssertEqual(windows.early, config.earlyWindowMs / 1000, accuracy: 1e-9)
     }
 
     func test_windowsAtMaxBPM_stillFitInsideOneStep() {
@@ -15,8 +16,10 @@ final class ToleranceConfigTests: XCTestCase {
     }
 
     func test_windowsWhenTooWide_areScaledDownTogether() {
-        let windows = ToleranceConfig.standard.windows(stepInterval: 0.1)
+        let config = ToleranceConfig.standard
+        let windows = config.windows(stepInterval: 0.1)
         XCTAssertEqual(windows.perfect + windows.early, 0.09, accuracy: 1e-9)
-        XCTAssertEqual(windows.early / windows.perfect, 3, accuracy: 1e-9)
+        XCTAssertEqual(windows.early / windows.perfect, config.earlyWindowMs / config.perfectWindowMs,
+                       accuracy: 1e-9)
     }
 }

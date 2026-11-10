@@ -5,6 +5,8 @@ import XCTest
 final class PlayViewModelTests: XCTestCase {
     private let start: TimeInterval = 100
     private let step = AudioBeatClock.stepInterval(bpm: 80)    // 0.375 s
+    /// The Perfect window, so these tests follow when the tolerance is tuned.
+    private let perfect = ToleranceConfig.standard.perfectWindowMs / 1000
     private var currentTime: TimeInterval = 0
     private let clock = MockBeatClock()
     private var finished: [SessionResult] = []
@@ -107,7 +109,7 @@ final class PlayViewModelTests: XCTestCase {
         // Tick 8 (6 + 2): step 0 arrives in hit ring, songTime is 0, node is judged
         tick(viewModel, 8)
         XCTAssertEqual(viewModel.screenModel().songTime, 0, accuracy: 1e-9)
-        currentTime = time(ofTick: 8) + 0.06
+        currentTime = time(ofTick: 8) + perfect + 0.01
         viewModel.closeWindows(upTo: currentTime)
         XCTAssertEqual(nodeResult(viewModel, step: 0), .miss)
     }
@@ -145,7 +147,7 @@ final class PlayViewModelTests: XCTestCase {
         strum(viewModel, at: time(ofTick: 8) - 0.1)
         tick(viewModel, 8)
         XCTAssertNil(nodeResult(viewModel, step: 2))
-        currentTime = time(ofTick: 8) + 0.06
+        currentTime = time(ofTick: 8) + perfect + 0.01
         viewModel.closeWindows(upTo: currentTime)
         XCTAssertEqual(nodeResult(viewModel, step: 2), .tooEarly)
     }
@@ -153,7 +155,7 @@ final class PlayViewModelTests: XCTestCase {
     func test_noStrum_turnsTheNodeMiss() async throws {
         let viewModel = try makeViewModel()
         await startPlaying(viewModel)
-        currentTime = time(ofTick: 6) + 0.06
+        currentTime = time(ofTick: 6) + perfect + 0.01
         viewModel.closeWindows(upTo: currentTime)
         XCTAssertEqual(nodeResult(viewModel, step: 0), .miss)
     }
@@ -516,8 +518,8 @@ final class PlayViewModelTests: XCTestCase {
     func test_strumTouchedInTime_butArrivingAfterTheWindow_isPerfectWithAGrace() async throws {
         let viewModel = try makeViewModel(strumArrivalGrace: 0.15)
         await startPlaying(viewModel)
-        // The window has ended (beat + 50 ms) but the iPhone strum is still on its way.
-        currentTime = time(ofTick: 6) + 0.07
+        // The window has ended (beat + Perfect window) but the iPhone strum is still on its way.
+        currentTime = time(ofTick: 6) + perfect + 0.02
         viewModel.closeWindows(upTo: currentTime)
         XCTAssertNil(nodeResult(viewModel, step: 0))
         // It arrives, carrying the touch time inside the Perfect window.
@@ -528,7 +530,7 @@ final class PlayViewModelTests: XCTestCase {
     func test_withoutAGrace_aStrumArrivingAfterTheWindowIsTooLate() async throws {
         let viewModel = try makeViewModel()
         await startPlaying(viewModel)
-        currentTime = time(ofTick: 6) + 0.07
+        currentTime = time(ofTick: 6) + perfect + 0.02
         viewModel.closeWindows(upTo: currentTime)
         viewModel.handle(PracticeFixtures.strum(at: time(ofTick: 6) + 0.02, .down))
         XCTAssertEqual(nodeResult(viewModel, step: 0), .miss)
@@ -537,7 +539,7 @@ final class PlayViewModelTests: XCTestCase {
     func test_withAGrace_noStrumIsStillAMissOnceTheGraceHasPassed() async throws {
         let viewModel = try makeViewModel(strumArrivalGrace: 0.15)
         await startPlaying(viewModel)
-        currentTime = time(ofTick: 6) + 0.05 + 0.15
+        currentTime = time(ofTick: 6) + perfect + 0.15
         viewModel.closeWindows(upTo: currentTime)
         XCTAssertEqual(nodeResult(viewModel, step: 0), .miss)
     }
@@ -545,8 +547,8 @@ final class PlayViewModelTests: XCTestCase {
     func test_withAGrace_aLateTouchIsStillAMiss() async throws {
         let viewModel = try makeViewModel(strumArrivalGrace: 0.15)
         await startPlaying(viewModel)
-        viewModel.handle(PracticeFixtures.strum(at: time(ofTick: 6) + 0.08, .down))
-        currentTime = time(ofTick: 6) + 0.25
+        viewModel.handle(PracticeFixtures.strum(at: time(ofTick: 6) + perfect + 0.03, .down))
+        currentTime = time(ofTick: 6) + perfect + 0.2
         viewModel.closeWindows(upTo: currentTime)
         XCTAssertEqual(nodeResult(viewModel, step: 0), .miss)
     }

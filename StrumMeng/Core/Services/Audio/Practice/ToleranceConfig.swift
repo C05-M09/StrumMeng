@@ -11,7 +11,11 @@ struct ToleranceConfig: Sendable, Equatable {
     /// windows of neighbouring steps never overlap at high BPM.
     var maxWindowFraction: Double
 
-    static let standard = ToleranceConfig(perfectWindowMs: 50, earlyWindowMs: 150, maxWindowFraction: 0.9)
+    /// ±80 ms Perfect, Too Early up to 180 ms before. Players keep time slightly ahead of the beat
+    /// (typically 20–50 ms early), so the earlier ±50 ms marked about a quarter of a typical player's
+    /// strums Too Early. The iPhone input itself adds only a few ms (touch timestamps, clock sync).
+    /// Still to be confirmed with the offsets measured on a real iPad + iPhone.
+    static let standard = ToleranceConfig(perfectWindowMs: 80, earlyWindowMs: 180, maxWindowFraction: 0.9)
 
     /// Windows in seconds for a step interval, scaled down together when they would overlap.
     func windows(stepInterval: TimeInterval) -> (perfect: TimeInterval, early: TimeInterval) {
