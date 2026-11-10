@@ -119,8 +119,9 @@ US3 implementation: the list routes to Listen's information state, followed by t
 example. `ListenViewModel` owns `ListenState` and a pure reducer; `ListenPatternPlayer` isolates
 audio output. `SynthListenPlayer` plays the pattern on the synthesised guitar (`GuitarEngine`, a
 C chord for every strum), scheduling each strum a little ahead on the host clock; rest slots stay
-silent, and the time since the first strum drives the marker. Ready unlocks after one full loop, and routes through AppRouter into the existing
-Play session/count-in. Pause preserves playback position; Restart resets the first-loop requirement;
+silent, and the time since the first strum drives the marker. Ready unlocks after one full loop and checks saved history. With no records it first
+shows the positioning/feedback modal; Next routes through AppRouter into the existing
+Play session/count-in. Returning users with records proceed directly. Pause preserves playback position; Restart resets the first-loop requirement;
 Back returns to the pattern list. Leaving the screen, backgrounding, or an audio interruption stops
 or pauses playback. Audio files are bundled under Resources/Audio; direction labels follow the
 user-provided mapping, not automatic classification. The current Play route uses the existing
@@ -543,8 +544,24 @@ The riskiest piece \(link latency and reliability in the real environment\) is m
 This document is the design reference\. CLAUDE\.md at the repository root is the companion that turns it<br>into day\-to\-day working rules for anyone, human or Claude, writing code here\.
 
 
-### US10: first-launch pairing invitation
+### US3: first Play instructions after Ready
+After a full Listen loop, Ready stops the example and checks whether any saved
+session exists. SwiftDataSessionRepository implements the additive read-only
+SessionHistoryChecking capability; SessionRepository's shared contract is unchanged.
+The query has no pattern/song filter, so any saved record skips the introduction.
+An empty history shows positioning and feedback instructions until Next is tapped;
+Next routes to the existing Play/count-in with the same pattern and BPM. No record
+or permanent onboarding flag is written here: abandoning a first session means the
+instructions will appear again while history is empty. History failures offer retry
+and Back instead of treating a storage error as an empty history.
+FirstPlayInstructionsLayout lives alongside FirstPlayInstructionsView in the same
+Swift file so its values can be adjusted while viewing the Canvas. It uses the
+designer’s 2_Guidance artwork. The normal/pressed
+Next button is independently interactive and anchored to the artwork’s bottom-right,
+with insets accounting for its transparent margins.
+The history task is cancelled on leaving Listen and ignores results after cancellation.
 
+### US10: first-launch pairing invitation
 On the iPad host, Home waits 1.5 seconds on the first launch, then presents Meng
 using the shared ListenInformationEntrance animation and Listen illustration assets.
 The welcome remains visible until Next is tapped; taps outside the button do not

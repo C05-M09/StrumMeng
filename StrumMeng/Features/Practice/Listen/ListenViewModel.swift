@@ -8,15 +8,19 @@ final class ListenViewModel {
     let bpm: Int
     private(set) var state: ListenState = .information
     @ObservationIgnored private let player: ListenPatternPlayer
+    @ObservationIgnored private let history: any SessionHistoryChecking
     @ObservationIgnored private let onReady: () -> Void
     @ObservationIgnored private let onBack: () -> Void
     @ObservationIgnored private var progressTask: Task<Void, Never>?
+    @ObservationIgnored private var historyTask: Task<Void, Never>?
 
     init(pattern: StrumPattern, bpm: Int, player: ListenPatternPlayer,
+         history: any SessionHistoryChecking,
          onReady: @escaping () -> Void, onBack: @escaping () -> Void) {
         self.pattern = pattern
         self.bpm = bpm
         self.player = player
+        self.history = history
         self.onReady = onReady
         self.onBack = onBack
     }
@@ -33,8 +37,14 @@ final class ListenViewModel {
             if case .paused = state { player.pause(); progressTask?.cancel() }
         case .resume:
             if case .paused = previous { player.resume(); observeProgress() }
-        case .ready where previous.canProceed:
-            stop(); onReady()
+        case .ready, .retryHistory:
+            if case .checkingHistory = state, state != previous { checkHistory() }
+        case .historyChecked(let hasRecords):
+            if hasRecords, case .checkingHistory = previous, state == .departed {
+                stop(); onReady()
+            }
+        case .instructionsNext:
+            if case .instructions = previous { stop(); onReady() }
         case .back where previous != .departed:
             stop(); onBack()
         default: break
@@ -48,7 +58,27 @@ final class ListenViewModel {
         send(.progress(step: steps % pattern.strokes.count, completed: player.elapsed >= loopDuration))
     }
 
-    func stop() { progressTask?.cancel(); progressTask = nil; player.stop() }
+    func stop() {
+        progressTask?.cancel(); progressTask = nil
+        historyTask?.cancel(); historyTask = nil
+        player.stop()
+    }
+
+    private func checkHistory() {
+        stop()
+        historyTask = Task { [weak self, history] in
+            do {
+                let hasRecords = try await history.hasSavedSessions()
+                try Task.checkCancellation()
+                self?.send(.historyChecked(hasRecords: hasRecords))
+            } catch is CancellationError {
+                return
+            } catch {
+                guard !Task.isCancelled else { return }
+                self?.send(.historyCheckFailed("Your practice history couldn’t be checked. Please try again."))
+            }
+        }
+    }
 
     private func startPlayback() {
         progressTask?.cancel()
