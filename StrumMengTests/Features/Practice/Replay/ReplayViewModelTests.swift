@@ -49,6 +49,27 @@ final class ReplayViewModelTests: XCTestCase {
         XCTAssertTrue(screen.nodes.allSatisfy { $0.judgement == nil })
     }
 
+    func test_extraSwipe_turnsTheRingTheMissColour_atItsRecordedTime() {
+        // Foundation: down, rest, ... at 80 BPM a step is 0.375 s; step 1 is a rest.
+        let result = SessionResultBuilder.build(
+            id: UUID(), patternID: "foundation", bpm: 80,
+            beatEvents: [BeatEvent(stepIndex: 0, result: .perfect, offsetMs: 0)],
+            strums: [RecordedStrum(time: 0, direction: .down, isExtra: false),
+                     RecordedStrum(time: 0.375, direction: .down, isExtra: true)],
+            createdAt: Date(timeIntervalSince1970: 0))
+        let vm = ReplayViewModel(result: result, repetitions: 2, now: { [unowned self] in self.currentTime })
+        vm.send(.play)
+
+        currentTime += -vm.songTime() + 0.2                    // song time 0.2: after step 0
+        XCTAssertEqual(vm.screenModel().lastJudgement?.feedback, .perfect)
+
+        currentTime += 0.2                                      // song time 0.4: after the extra swipe
+        let ring = vm.screenModel().lastJudgement
+        XCTAssertEqual(ring?.feedback, .miss)
+        XCTAssertEqual(ring?.time ?? .nan, 0.375, accuracy: 1e-9)
+        XCTAssertEqual(vm.screenModel().lastStrumTime ?? .nan, 0.375, accuracy: 1e-9)
+    }
+
     func test_play_startsPlayback() {
         let vm = makeViewModel(events: [])
         vm.send(.play)

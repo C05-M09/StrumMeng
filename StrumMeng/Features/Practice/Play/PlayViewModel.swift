@@ -89,6 +89,8 @@ final class PlayViewModel {
     @ObservationIgnored private var pausedSongTime: TimeInterval?
     /// Session time of the latest swipe in a running session, judged or not (the ring reacts to it).
     @ObservationIgnored private var lastStrumSongTime: TimeInterval?
+    /// Session time of the latest extra swipe, which turns the ring the Miss colour.
+    @ObservationIgnored private var lastExtraStrumSongTime: TimeInterval?
     /// Every swipe of the running session at its session time, for the result and Replay.
     @ObservationIgnored private var sessionStrums: [(id: UUID, time: TimeInterval, direction: StrumDirection)] = []
 
@@ -308,6 +310,7 @@ final class PlayViewModel {
             // arrive after the short pulse would already be over, so it would look undetected.
             // Judging still uses the touch time.
             if anchorTime != nil { lastStrumSongTime = currentSongTime() }
+            if isExtra(strum) { lastExtraStrumSongTime = currentSongTime() }
             record(strum)
             apply(engine.addStrum(strum))
             finishIfDone()
@@ -351,6 +354,10 @@ final class PlayViewModel {
             if judgement.time <= songTime, judgement.time > last?.time ?? -.infinity {
                 last = judgement
             }
+        }
+        // An extra swipe judges no node, so it shows on the ring alone.
+        if let extra = lastExtraStrumSongTime, extra <= songTime, extra > last?.time ?? -.infinity {
+            last = PlayJudgement(feedback: .miss, time: extra)
         }
         return PlayScreenModel(title: pattern.name, bpm: bpm, duration: duration,
                                slotInterval: stepInterval, songTime: songTime, phase: phase,
@@ -409,6 +416,36 @@ final class PlayViewModel {
     private func scheduleClick(forStep step: Int, at time: TimeInterval) {
         guard let metronome, step < totalSteps, step.isMultiple(of: 2) else { return }
         metronome.click(at: time, accent: step >= 0 && step.isMultiple(of: pattern.strokes.count))
+    }
+
+    /// True when a swipe can judge no node: it is outside every node's window, or inside the window of
+    /// a node that is already judged. Decided when the swipe arrives, so the ring turns red at once;
+    /// FeedbackEngine lists the same swipe as extra a little later. Swipes before the next node's
+    /// window (the count-in, or the re-count after a pause) are free.
+    private func isExtra(_ strum: StrumEvent) -> Bool {
+        guard let anchorTime, let firstNode = nextNodeStep(from: resumeStep) else { return false }
+        let time = strum.time - latencyOffset - anchorTime
+        let (perfect, early) = tolerance.windows(stepInterval: stepInterval)
+        guard time >= Double(firstNode) * stepInterval - early else { return false }
+        let lowest = max(0, Int(((time - perfect) / stepInterval).rounded(.down)))
+        let highest = min(totalSteps - 1, Int(((time + early) / stepInterval).rounded(.up)))
+        guard lowest <= highest else { return true }
+        for step in lowest...highest where isNode(step) {
+            let beat = Double(step) * stepInterval
+            if time >= beat - early, time <= beat + perfect {
+                return beatEvents.contains { $0.stepIndex == step }
+            }
+        }
+        return true
+    }
+
+    private func isNode(_ step: Int) -> Bool {
+        Self.direction(for: pattern.strokes[step % pattern.strokes.count]) != nil
+    }
+
+    private func nextNodeStep(from step: Int) -> Int? {
+        guard step < totalSteps else { return nil }
+        return (step..<totalSteps).first(where: isNode)
     }
 
     /// Keeps a swipe for Replay at its session time (its touch time, not when it arrived). A resent
@@ -505,6 +542,7 @@ final class PlayViewModel {
         frozenSongTime = nil
         pausedSongTime = nil
         lastStrumSongTime = nil
+        lastExtraStrumSongTime = nil
     }
 
     /// The direction a step must be strummed in; nil for a rest, which is never judged.

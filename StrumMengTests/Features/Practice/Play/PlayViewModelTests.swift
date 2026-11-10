@@ -399,6 +399,42 @@ final class PlayViewModelTests: XCTestCase {
         XCTAssertEqual(result.strums.last?.time ?? .nan, step, accuracy: 1e-9)
     }
 
+    func test_swipeOnARest_turnsTheRingTheMissColour_atOnce() async throws {
+        let viewModel = try makeViewModel()
+        await startPlaying(viewModel)
+        strum(viewModel, at: time(ofTick: 6))           // step 0: Perfect
+        tick(viewModel, 7)
+        strum(viewModel, at: time(ofTick: 7))           // step 1 is a rest
+        XCTAssertEqual(viewModel.screenModel().lastJudgement?.feedback, .miss)
+        XCTAssertEqual(nodeResult(viewModel, step: 0), .perfect, "the node keeps its own colour")
+    }
+
+    func test_secondSwipeForAJudgedNode_turnsTheRingTheMissColour() async throws {
+        let viewModel = try makeViewModel()
+        await startPlaying(viewModel)
+        strum(viewModel, at: time(ofTick: 6))
+        XCTAssertEqual(viewModel.screenModel().lastJudgement?.feedback, .perfect)
+        strum(viewModel, at: time(ofTick: 6) + 0.03)
+        XCTAssertEqual(viewModel.screenModel().lastJudgement?.feedback, .miss)
+    }
+
+    func test_earlySwipeForAComingNode_doesNotTurnTheRingRed() async throws {
+        let viewModel = try makeViewModel()
+        await startPlaying(viewModel)
+        strum(viewModel, at: time(ofTick: 6))           // step 0: Perfect
+        tick(viewModel, 7)
+        strum(viewModel, at: time(ofTick: 8) - 0.1)     // early for step 2, still open
+        XCTAssertEqual(viewModel.screenModel().lastJudgement?.feedback, .perfect)
+    }
+
+    func test_swipeDuringTheCountIn_doesNotTurnTheRingRed() async throws {
+        let viewModel = try makeViewModel()
+        await viewModel.send(.tapReady)
+        for n in 0...3 { tick(viewModel, n) }
+        strum(viewModel, at: time(ofTick: 3))
+        XCTAssertNil(viewModel.screenModel().lastJudgement)
+    }
+
     func test_strumsBeforeReady_areNotRecorded() async throws {
         let viewModel = try makeViewModel(repetitions: 1)
         strum(viewModel, at: 1)
