@@ -207,8 +207,10 @@ final class PlayViewModel {
         let previous = state
         let next = reduce(previous, event)
         guard next != previous else { return }
-        // Counting in without the only input connected would only collect Misses.
-        if case .countIn = next, requiresController, !isControllerConnected { return }
+        // Counting in without the only input connected would only collect Misses. A session the
+        // iPhone dropped out of waits for it, even when on-screen swipes could carry on.
+        if case .countIn = next, requiresController || previous == .disconnected,
+           !isControllerConnected { return }
         state = next
         if case .countIn = state {
             sessionUsesController = controller != nil && isControllerConnected
@@ -224,6 +226,11 @@ final class PlayViewModel {
             await controller?.setSessionActive(true)
             await clock.resume()
         case (_, .paused):
+            await controller?.setSessionActive(false)
+            await pause()
+        case (_, .disconnected):
+            // From the pause menu the session is already stopped.
+            guard previous != .paused else { break }
             await controller?.setSessionActive(false)
             await pause()
         case (.tapRestart, .ready):
@@ -319,8 +326,8 @@ final class PlayViewModel {
         }
     }
 
-    /// A controller that stops being connected while counting in or playing pauses the session,
-    /// instead of judging the strums it can no longer send as Miss.
+    /// A controller that stops being connected while counting in, playing or paused stops the
+    /// session as `.disconnected`, instead of judging the strums it can no longer send as Miss.
     func handle(_ connection: ControllerConnectionState) async {
         if case .connected = connection {
             // Arrives with every ping; only a real change should notify observers.
@@ -380,7 +387,8 @@ final class PlayViewModel {
         case .idle, .listening, .ready: .ready
         case .countIn(let n): .countIn(n)
         case .playing, .finished: .playing
-        case .paused: .paused
+        // Shown as the pause menu until the disconnect overlay exists.
+        case .paused, .disconnected: .paused
         }
     }
 

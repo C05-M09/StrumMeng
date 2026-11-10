@@ -25,11 +25,41 @@ final class PracticeReducerTests: XCTestCase {
         XCTAssertEqual(reduce(.countIn(1), .countInDone), .playing)
     }
 
-    func test_pauseDisconnectAndBackground_pauseWhilePlayingOrCountingIn() {
-        for event in [PracticeEvent.tapPause, .controllerDisconnected, .appMovedToBackground] {
+    func test_pauseAndBackground_pauseWhilePlayingOrCountingIn() {
+        for event in [PracticeEvent.tapPause, .appMovedToBackground] {
             XCTAssertEqual(reduce(.playing, event), .paused)
             XCTAssertEqual(reduce(.countIn(2), event), .paused)
         }
+    }
+
+    func test_controllerDisconnected_whileCountingInPlayingOrPaused_goesToDisconnected() {
+        for state in [PracticeState.countIn(2), .playing, .paused] {
+            XCTAssertEqual(reduce(state, .controllerDisconnected), .disconnected)
+        }
+    }
+
+    func test_controllerDisconnected_outsideASession_isIgnored() {
+        for state in [PracticeState.idle, .listening, .ready, .disconnected, .finished(result)] {
+            XCTAssertEqual(reduce(state, .controllerDisconnected), state)
+        }
+    }
+
+    func test_resume_fromDisconnected_countsInAgain() {
+        XCTAssertEqual(reduce(.disconnected, .tapResume), .countIn(3))
+    }
+
+    func test_disconnected_ignoresPauseRestartAndBackground() {
+        for event in [PracticeEvent.tapPause, .tapRestart, .appMovedToBackground, .countInDone] {
+            XCTAssertEqual(reduce(.disconnected, event), .disconnected)
+        }
+    }
+
+    func test_disconnectResumeFinish_sequence() {
+        var state = PracticeState.playing
+        for event in [PracticeEvent.controllerDisconnected, .tapResume, .countInDone, .sessionEnded(result)] {
+            state = reduce(state, event)
+        }
+        XCTAssertEqual(state, .finished(result))
     }
 
     func test_resumeAndRestart_fromPaused_countInAgain() {
@@ -46,7 +76,7 @@ final class PracticeReducerTests: XCTestCase {
     }
 
     func test_backToMenu_returnsToIdle() {
-        for state in [PracticeState.listening, .ready, .paused, .finished(result)] {
+        for state in [PracticeState.listening, .ready, .paused, .disconnected, .finished(result)] {
             XCTAssertEqual(reduce(state, .tapBackToMenu), .idle)
         }
     }

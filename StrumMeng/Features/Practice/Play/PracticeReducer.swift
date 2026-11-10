@@ -18,14 +18,19 @@ func reduce(_ state: PracticeState, _ event: PracticeEvent) -> PracticeState {
     case (.countIn, .countInDone):
         return .playing
 
-    case (.countIn, .tapPause), (.countIn, .controllerDisconnected), (.countIn, .appMovedToBackground),
-         (.playing, .tapPause), (.playing, .controllerDisconnected), (.playing, .appMovedToBackground):
+    case (.countIn, .tapPause), (.countIn, .appMovedToBackground),
+         (.playing, .tapPause), (.playing, .appMovedToBackground):
         return .paused
+    // A dropped iPhone gets its own stop, so the screen can say why and wait for it to come back.
+    // It also replaces the pause menu, which would offer a Resume that cannot work yet.
+    case (.countIn, .controllerDisconnected), (.playing, .controllerDisconnected),
+         (.paused, .controllerDisconnected):
+        return .disconnected
     case (.playing, .sessionEnded(let result)):
         return .finished(result)
 
     // Resume re-counts before continuing; Restart starts a fresh session. Both count in first.
-    case (.paused, .tapResume), (.paused, .tapRestart):
+    case (.paused, .tapResume), (.paused, .tapRestart), (.disconnected, .tapResume):
         return .countIn(3)
 
     // Retry from the result goes back to Ready (the recommendation popup belongs to Summary).
@@ -33,7 +38,7 @@ func reduce(_ state: PracticeState, _ event: PracticeEvent) -> PracticeState {
         return .ready
 
     case (.listening, .tapBackToMenu), (.ready, .tapBackToMenu), (.paused, .tapBackToMenu),
-         (.finished, .tapBackToMenu):
+         (.disconnected, .tapBackToMenu), (.finished, .tapBackToMenu):
         return .idle
 
     default:
