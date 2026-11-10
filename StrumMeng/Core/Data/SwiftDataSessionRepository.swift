@@ -7,7 +7,14 @@ import SwiftData
 /// confined to one executor. That keeps non-Sendable SwiftData state out of the rest
 /// of the app without any `@unchecked Sendable`.
 @ModelActor
-actor SwiftDataSessionRepository: SessionRepository {
+actor SwiftDataSessionRepository: SessionRepository, SessionHistoryChecking {
+    /// No pattern filter: a record from any pattern (or a future song) means the user has played.
+    func hasSavedSessions() async throws -> Bool {
+        var descriptor = FetchDescriptor<PracticeSessionRecord>()
+        descriptor.fetchLimit = 1
+        return !(try modelContext.fetch(descriptor)).isEmpty
+    }
+
     func save(_ result: SessionResult) async throws {
         let id = result.id
         var existing = FetchDescriptor<PracticeSessionRecord>(

@@ -80,6 +80,9 @@ struct ContentView: View {
             pairingIntroduction.setActive(active)
         }
         .task { await container.startControllerLink() }
+        // Each pattern starts at the tempo it was last played at. Loaded once here, not on the
+        // list's appear, so it never overwrites a tempo the player is adjusting.
+        .task { await patternListViewModel.loadRememberedBPMs() }
         // Menu music follows the screen on top, and pauses while the app is not active.
         .onChange(of: router.path, initial: true) { _, path in
             container.updateMenuMusic(for: path, isAppActive: scenePhase == .active)

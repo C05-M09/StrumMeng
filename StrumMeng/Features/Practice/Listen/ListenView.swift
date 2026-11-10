@@ -48,6 +48,22 @@ struct ListenView: View {
                     information.transition(.opacity)
                 }
                 if case .paused = viewModel.state { pauseMenu }
+                if case .checkingHistory = viewModel.state {
+                    AppColors.brownInk.opacity(FirstPlayInstructionsLayout.scrimOpacity)
+                    ProgressView("Getting ready…").tint(AppColors.cream)
+                        .foregroundStyle(AppColors.cream)
+                }
+                if case .instructions = viewModel.state {
+                    FirstPlayInstructionsView { viewModel.send(.instructionsNext) }
+                }
+                if case let .historyFailed(_, message) = viewModel.state {
+                    AppColors.brownInk.opacity(FirstPlayInstructionsLayout.scrimOpacity)
+                    VStack(spacing: 24) {
+                        Text(message).font(AppTypography.dmMono(size: 24))
+                        Button("Try again") { viewModel.send(.retryHistory) }
+                        Button("Back to patterns") { viewModel.send(.back) }
+                    }.foregroundStyle(AppColors.cream)
+                }
                 if case let .failed(message) = viewModel.state {
                     AppColors.brownInk.opacity(0.8)
                     VStack(spacing: 24) {
@@ -217,6 +233,10 @@ struct ListenView: View {
 }
 #Preview("03 · Listening — Ready enabled", traits: .landscapeLeft) {
     ListenPreviewFactory.make(events: [.next, .progress(step: 3, completed: true)], elapsed: 1.125)
+}
+#Preview("04 · First Play instructions", traits: .landscapeLeft) {
+    ListenPreviewFactory.make(events: [.next, .progress(step: 2, completed: true), .ready,
+                                       .historyChecked(hasRecords: false)])
 }
 #Preview("04 · Pause", traits: .landscapeLeft) {
     ListenPreviewFactory.make(events: [.next, .progress(step: 3, completed: false), .pause])

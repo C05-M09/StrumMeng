@@ -2,7 +2,10 @@ import Foundation
 
 /// Stands in when storage could not start, so Summary still works. Nothing is saved; the practice
 /// list already shows its records error in that case.
-struct UnavailableSessionRepository: SessionRepository {
+struct UnavailableSessionRepository: SessionRepository, SessionHistoryChecking {
+    private enum HistoryError: Error { case unavailable }
+    func hasSavedSessions() async throws -> Bool { throw HistoryError.unavailable }
+
     func save(_ result: SessionResult) async throws {}
 
     func practiceRecords(forPattern patternID: String) async throws -> [SessionResult] { [] }

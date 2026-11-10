@@ -5,6 +5,7 @@ final class AppContainer {
 
     private let router: AppRouter
     private let repository: SessionRepository?
+    private let sessionHistory: (any SessionHistoryChecking)?
     private let settings: any SettingsStore
     private let pairingIntroductionStore: any PairingIntroductionStore
     /// One menu music and button click player for the whole app, so the music keeps its place
@@ -54,12 +55,13 @@ final class AppContainer {
             let modelContainer = try ModelContainerFactory.make(
                 inMemory: inMemory
             )
-            repository = SwiftDataSessionRepository(
-                modelContainer: modelContainer
-            )
+            let sessions = SwiftDataSessionRepository(modelContainer: modelContainer)
+            repository = sessions
+            sessionHistory = sessions
         } catch {
             // Show a records error when storage cannot be initialized.
             repository = nil
+            sessionHistory = nil
         }
     }
 
@@ -96,6 +98,7 @@ final class AppContainer {
             pattern: pattern,
             bpm: bpm,
             player: SynthListenPlayer(sound: guitarSound),
+            history: sessionHistory ?? UnavailableSessionRepository(),
             onReady: { [weak router] in router?.push(.play(patternID: pattern.id, bpm: bpm)) },
             onBack: { [weak router] in router?.popTo(.practiceList) }
         )
@@ -154,12 +157,19 @@ final class AppContainer {
             patternListViewModel?.send(.setBPM(bpm))
             router.popTo(.practiceList)
             router.push(.listen(patternID: result.patternID, bpm: bpm))
+            reloadRecords()
         case .backToMain:
             router.popTo(.practiceList)
+            reloadRecords()
         case .replay:
             // Shown inside SummaryView.
             break
         }
+    }
+
+    /// Summary waits for the save before navigating, so the new session is already stored here.
+    private func reloadRecords() {
+        Task { await patternListViewModel?.reloadRecords() }
     }
 
     func makePatternListViewModel() -> PatternListViewModel {
@@ -171,6 +181,10 @@ final class AppContainer {
         let viewModel = PatternListViewModel(
             recordsViewModels: records,
             recordsFallbackState: repository == nil ? .failed : .empty,
+            lastPlayedBPM: { [repository] patternID in
+                guard let repository else { return nil }
+                return try? await repository.lastPracticeBPM(forPattern: patternID)
+            },
             onListenRequested: { [weak router] patternID, bpm in
                 router?.push(.listen(patternID: patternID, bpm: bpm))
             },

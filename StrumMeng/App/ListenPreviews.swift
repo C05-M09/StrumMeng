@@ -6,7 +6,7 @@ enum ListenPreviewFactory {
     static func make(events: [ListenEvent], elapsed: TimeInterval = 0) -> ListenView {
         AppFontRegistrar.registerFonts()
         let model = ListenViewModel(pattern: PatternCatalog.all[1], bpm: 80,
-                                    player: ListenPreviewPlayer(elapsed: elapsed), onReady: {}, onBack: {})
+                                    player: ListenPreviewPlayer(elapsed: elapsed), history: ListenPreviewHistory(), onReady: {}, onBack: {})
         for event in events { model.send(event) }
         model.refreshProgress()
         return ListenView(viewModel: model)
@@ -21,6 +21,10 @@ private final class ListenPreviewPlayer: ListenPatternPlayer {
     func pause() {}
     func resume() {}
     func stop() {}
+}
+
+private struct ListenPreviewHistory: SessionHistoryChecking {
+    func hasSavedSessions() async throws -> Bool { false }
 }
 
 #endif
