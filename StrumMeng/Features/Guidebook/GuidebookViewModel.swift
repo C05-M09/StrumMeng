@@ -17,9 +17,11 @@ final class GuidebookViewModel {
     private(set) var currentPageIndex: Int = 0
     private(set) var bpm: Int = GuidebookTempoConfig.defaultBPM
     private(set) var isPlayingAudio: Bool = false
+    private(set) var currentStep: Int? = nil
 
     @ObservationIgnored private let player: (any ListenPatternPlayer)?
     @ObservationIgnored private let onBackRequested: () -> Void
+    @ObservationIgnored private var progressTask: Task<Void, Never>?
 
     init(
         pages: [GuidebookPage] = GuidebookCatalog.pages,
@@ -106,15 +108,23 @@ final class GuidebookViewModel {
 
     func startSound() {
         guard let player else { return }
+        progressTask?.cancel()
         do {
             try player.start(pattern: GuidebookTempoConfig.pattern, bpm: bpm)
             isPlayingAudio = true
+            currentStep = 0
+            observeProgress()
         } catch {
             isPlayingAudio = false
+            currentStep = nil
+            progressTask = nil
         }
     }
 
     func stopSound() {
+        progressTask?.cancel()
+        progressTask = nil
+        currentStep = nil
         guard isPlayingAudio else { return }
         player?.stop()
         isPlayingAudio = false
@@ -123,6 +133,34 @@ final class GuidebookViewModel {
     private func restartSound() {
         guard isPlayingAudio else { return }
         startSound()
+    }
+
+    func refreshProgress() {
+        guard isPlayingAudio, let player else {
+            currentStep = nil
+            return
+        }
+        let pattern = GuidebookTempoConfig.pattern
+        guard !pattern.strokes.isEmpty else { return }
+        let loopDuration = Double(pattern.beatsPerPattern) * 60.0 / Double(bpm)
+        let stepDuration = loopDuration / Double(pattern.strokes.count)
+        guard stepDuration > 0 else { return }
+        let step = Int(player.elapsed / stepDuration)
+        currentStep = step % pattern.strokes.count
+    }
+
+    private func observeProgress() {
+        progressTask?.cancel()
+        progressTask = Task { [weak self] in
+            while !Task.isCancelled {
+                self?.refreshProgress()
+                do {
+                    try await Task.sleep(for: .milliseconds(16))
+                } catch {
+                    return
+                }
+            }
+        }
     }
 
     // MARK: - Dismiss

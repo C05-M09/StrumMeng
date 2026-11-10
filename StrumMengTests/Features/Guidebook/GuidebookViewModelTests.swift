@@ -40,11 +40,13 @@ final class GuidebookViewModelTests: XCTestCase {
     }
 
     private func makeSUT(
+        pages: [GuidebookPage] = GuidebookCatalog.pages,
         player: MockListenPlayer? = nil,
         onBack: @escaping () -> Void = {}
     ) -> (sut: GuidebookViewModel, player: MockListenPlayer) {
         let activePlayer = player ?? MockListenPlayer()
         let sut = GuidebookViewModel(
+            pages: pages,
             player: activePlayer,
             onBackRequested: onBack
         )
@@ -56,13 +58,14 @@ final class GuidebookViewModelTests: XCTestCase {
     func test_init_loadsCatalogPagesAndDefaultState() {
         let (sut, _) = makeSUT()
 
-        XCTAssertEqual(sut.pages.count, 3)
+        XCTAssertEqual(sut.pages.count, GuidebookCatalog.pages.count)
         XCTAssertEqual(sut.currentPageIndex, 0)
         XCTAssertEqual(sut.currentPage.id, "counting-beats")
         XCTAssertEqual(sut.bpm, 60)
         XCTAssertFalse(sut.canDecreaseBPM, "BPM 60 adalah nilai minimum")
         XCTAssertTrue(sut.canIncreaseBPM)
         XCTAssertFalse(sut.isPlayingAudio)
+        XCTAssertNil(sut.currentStep)
         XCTAssertTrue(sut.hasNextPage)
         XCTAssertTrue(sut.hasPreviousPage)
     }
@@ -78,39 +81,34 @@ final class GuidebookViewModelTests: XCTestCase {
         XCTAssertEqual(sut.currentPage.id, "practice-tempo")
         XCTAssertTrue(sut.currentPage.isInteractiveTempo)
 
-        // Page 1 -> Page 2
-        sut.nextPage()
-        XCTAssertEqual(sut.currentPageIndex, 2)
-        XCTAssertEqual(sut.currentPage.id, "how-to-strum")
-
         // Next at last page loops back to page 0
         sut.nextPage()
         XCTAssertEqual(sut.currentPageIndex, 0)
         XCTAssertEqual(sut.currentPage.id, "counting-beats")
 
-        // Previous at first page loops back to page 2
-        sut.previousPage()
-        XCTAssertEqual(sut.currentPageIndex, 2)
-        XCTAssertEqual(sut.currentPage.id, "how-to-strum")
-
-        // Page 2 -> Page 1
+        // Previous at first page loops back to last page (index 1)
         sut.previousPage()
         XCTAssertEqual(sut.currentPageIndex, 1)
+        XCTAssertEqual(sut.currentPage.id, "practice-tempo")
+
+        // Page 1 -> Page 0
+        sut.previousPage()
+        XCTAssertEqual(sut.currentPageIndex, 0)
     }
 
     func test_setPage_withValidAndInvalidIndices() {
         let (sut, _) = makeSUT()
 
-        sut.setPage(index: 2)
-        XCTAssertEqual(sut.currentPageIndex, 2)
+        sut.setPage(index: 1)
+        XCTAssertEqual(sut.currentPageIndex, 1)
 
         // Invalid negative index
         sut.setPage(index: -1)
-        XCTAssertEqual(sut.currentPageIndex, 2, "Indeks negatif harus diabaikan")
+        XCTAssertEqual(sut.currentPageIndex, 1, "Indeks negatif harus diabaikan")
 
         // Invalid out of bounds index
         sut.setPage(index: 99)
-        XCTAssertEqual(sut.currentPageIndex, 2, "Indeks melebihi batas harus diabaikan")
+        XCTAssertEqual(sut.currentPageIndex, 1, "Indeks melebihi batas harus diabaikan")
     }
 
     func test_setPage_stopsAudioWhenSwitchingPage() {
@@ -184,6 +182,7 @@ final class GuidebookViewModelTests: XCTestCase {
         // Toggle on
         sut.toggleSoundPreview()
         XCTAssertTrue(sut.isPlayingAudio)
+        XCTAssertEqual(sut.currentStep, 0)
         XCTAssertEqual(player.startCount, 1)
         XCTAssertEqual(player.lastPattern?.id, "guidebook-tempo")
         XCTAssertEqual(player.lastBPM, 60)
@@ -191,7 +190,38 @@ final class GuidebookViewModelTests: XCTestCase {
         // Toggle off
         sut.toggleSoundPreview()
         XCTAssertFalse(sut.isPlayingAudio)
+        XCTAssertNil(sut.currentStep)
         XCTAssertEqual(player.stopCount, 1)
+    }
+
+    func test_progressTracking_updatesCurrentStepBasedOnElapsedAndBPM() {
+        let (sut, player) = makeSUT()
+        sut.startSound()
+        XCTAssertEqual(sut.currentStep, 0)
+
+        // At 60 BPM (beatsPerPattern = 4, strokes = 8):
+        // loopDuration = 4 * 60 / 60 = 4.0s
+        // stepDuration = 4.0 / 8 = 0.5s per step
+        player.elapsed = 0.6
+        sut.refreshProgress()
+        XCTAssertEqual(sut.currentStep, 1)
+
+        player.elapsed = 1.1
+        sut.refreshProgress()
+        XCTAssertEqual(sut.currentStep, 2)
+
+        player.elapsed = 3.6
+        sut.refreshProgress()
+        XCTAssertEqual(sut.currentStep, 7)
+
+        // Loops back to step 0
+        player.elapsed = 4.1
+        sut.refreshProgress()
+        XCTAssertEqual(sut.currentStep, 0)
+
+        // Stop clears currentStep
+        sut.stopSound()
+        XCTAssertNil(sut.currentStep)
     }
 
     func test_audioPlayback_failureSetsIsPlayingToFalse() {
@@ -200,6 +230,7 @@ final class GuidebookViewModelTests: XCTestCase {
 
         sut.startSound()
         XCTAssertFalse(sut.isPlayingAudio)
+        XCTAssertNil(sut.currentStep)
     }
 
     // MARK: - Dismiss
