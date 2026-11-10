@@ -534,9 +534,11 @@ Next routes to the existing Play/count-in with the same pattern and BPM. No reco
 or permanent onboarding flag is written here: abandoning a first session means the
 instructions will appear again while history is empty. History failures offer retry
 and Back instead of treating a storage error as an empty history.
-FirstPlayInstructionsLayout.artworkAssetName is nil until designer artwork arrives.
-Set it to the imageset name to replace the temporary content with one full-modal
-asset; the normal/pressed Next button remains separately interactive at bottom-right.
+FirstPlayInstructionsLayout lives alongside FirstPlayInstructionsView in the same
+Swift file so its values can be adjusted while viewing the Canvas. It uses the
+designer’s 2_Guidance artwork. The normal/pressed
+Next button is independently interactive and anchored to the artwork’s bottom-right,
+with insets accounting for its transparent margins.
 The history task is cancelled on leaving Listen and ignores results after cancellation.
 
 ### US10: first-launch pairing invitation
