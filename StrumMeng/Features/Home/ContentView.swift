@@ -118,13 +118,28 @@ private struct ListenRoute: View {
 /// Same idea for the Play screen, so a redraw cannot reset a running session.
 private struct PlayRoute: View {
     @State private var viewModel: PlayViewModel
+    private let container: AppContainer
 
     init(pattern: StrumPattern, bpm: Int, container: AppContainer) {
-        _viewModel = State(initialValue: container.makePlayViewModel(pattern: pattern, bpm: bpm))
+        self.container = container
+        // Navigation to Summary is deferred until PracticePlaySessionView finishes the banner + Garage close animation.
+        _viewModel = State(
+            initialValue: container.makePlayViewModel(
+                pattern: pattern,
+                bpm: bpm,
+                onFinished: { _ in }
+            )
+        )
     }
 
     var body: some View {
-        PracticePlaySessionView(viewModel: viewModel, startImmediately: true)
+        PracticePlaySessionView(
+            viewModel: viewModel,
+            startImmediately: true,
+            onTransitionComplete: { result in
+                container.sessionFinished(result)
+            }
+        )
     }
 }
 

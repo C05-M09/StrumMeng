@@ -104,7 +104,11 @@ final class AppContainer {
         )
     }
 
-    func makePlayViewModel(pattern: StrumPattern, bpm: Int) -> PlayViewModel {
+    func makePlayViewModel(
+        pattern: StrumPattern,
+        bpm: Int,
+        onFinished: ((SessionResult) -> Void)? = nil
+    ) -> PlayViewModel {
         // Swipes on the iPad screen keep working next to the iPhone, so the iPhone is optional.
         let touch = TouchStrumInputService()
         let link = sharedControllerLink()
@@ -124,7 +128,7 @@ final class AppContainer {
                 let delay = time - HostClock.now()
                 if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
             },
-            onFinished: { [weak self] result in self?.sessionFinished(result) },
+            onFinished: onFinished ?? { [weak self] result in self?.sessionFinished(result) },
             onExit: { [weak router] in router?.popTo(.practiceList) }
         )
     }

@@ -12,6 +12,7 @@ struct SummaryView: View {
     var onNavigate: ((SummaryDestination) -> Void)?
     @State private var activeReplayResult: SessionResult?
     @State private var isShowingFeedbackOverlay: Bool
+    @State private var isGarageOpen: Bool = false
 
     init(
         viewModel: SummaryViewModel,
@@ -86,6 +87,14 @@ struct SummaryView: View {
                     .transition(.opacity)
                     .zIndex(50)
                 }
+
+                // 6. Garage Shutter Opening Upwards on Appear
+                Image("Garage")
+                    .resizable()
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .offset(y: isGarageOpen ? -proxy.size.height : 0)
+                    .allowsHitTesting(!isGarageOpen)
+                    .zIndex(200)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .animation(.easeInOut(duration: 0.35), value: activeReplayResult != nil)
@@ -94,6 +103,11 @@ struct SummaryView: View {
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
         .toolbar(.hidden, for: .navigationBar)
+        .onAppear {
+            withAnimation(.spring(response: 0.58, dampingFraction: 0.86).delay(0.10)) {
+                isGarageOpen = true
+            }
+        }
         .task {
             await viewModel.onAppear()
         }
@@ -233,9 +247,9 @@ struct SummaryView: View {
         let accuracyPercent = Int((result.accuracy * 100).rounded())
 
         let headlineText: String = {
-            if result.accuracy >= 0.86 {
+            if result.accuracy >= 0.85 {
                 return "PURRFECT!"
-            } else if result.accuracy >= 0.66 {
+            } else if result.accuracy >= 0.65 {
                 return "NICE!!"
             } else {
                 return "YOU GOOD?"
@@ -243,9 +257,9 @@ struct SummaryView: View {
         }()
         
         let charaImage: String = {
-            if result.accuracy >= 0.86 {
+            if result.accuracy >= 0.85 {
                 return "cat_purfect"
-            } else if result.accuracy >= 0.66 {
+            } else if result.accuracy >= 0.65 {
                 return "cat_oke"
             } else {
                 return "cat_you good"
