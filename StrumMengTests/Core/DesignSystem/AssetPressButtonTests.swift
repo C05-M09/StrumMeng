@@ -23,7 +23,22 @@ final class AssetPressButtonTests: XCTestCase {
     }
 
     func test_standardStyle_onlyShrinks_likeBefore() {
-        XCTAssertEqual(AssetPressStyle.standard, AssetPressStyle(scale: 0.94, sink: 0, brightness: 0))
+        XCTAssertEqual(AssetPressStyle.standard,
+                       AssetPressStyle(scale: 0.94, sink: 0, brightness: 0, minimumPress: .zero))
+        XCTAssertEqual(AssetPressStyle.standard.releaseDelay(afterPressedFor: .milliseconds(10)), .zero)
+    }
+
+    func test_quickTap_staysPressedUntilTheMinimumPress() {
+        let style = AssetPressStyle.raisedKey
+        XCTAssertEqual(style.releaseDelay(afterPressedFor: .milliseconds(20)),
+                       style.minimumPress - .milliseconds(20))
+        XCTAssertEqual(style.releaseDelay(afterPressedFor: .zero), style.minimumPress)
+    }
+
+    func test_longPress_releasesAtOnce() {
+        let style = AssetPressStyle.raisedKey
+        XCTAssertEqual(style.releaseDelay(afterPressedFor: style.minimumPress), .zero)
+        XCTAssertEqual(style.releaseDelay(afterPressedFor: .seconds(1)), .zero)
     }
 
     func test_raisedKeyStyle_sinksAndDarkens() {

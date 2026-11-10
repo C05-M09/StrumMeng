@@ -17,6 +17,9 @@ struct AssetPressButton: View {
     let action: () -> Void
 
     @State private var isPressed: Bool
+    @State private var pressedAt: ContinuousClock.Instant?
+    /// Lifts the button after a tap shorter than the style's minimum press; cancelled by a new press.
+    @State private var release: Task<Void, Never>?
 
     init(normalAsset: String, pressedAsset: String, size: CGSize, accessibilityLabel: String,
          isLatched: Bool = false, isPressed: Bool = false, style: AssetPressStyle = .standard,
@@ -64,14 +67,37 @@ struct AssetPressButton: View {
         .gesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { value in
-                    isPressed = Self.isInside(value.location, size: size)
+                    let inside = Self.isInside(value.location, size: size)
+                    if inside, !isPressed {
+                        release?.cancel()
+                        pressedAt = .now
+                    }
+                    isPressed = inside
                 }
                 .onEnded { value in
-                    let releasedInside = Self.isInside(value.location, size: size)
-                    isPressed = false
-                    if releasedInside { action() }
+                    guard Self.isInside(value.location, size: size) else {
+                        isPressed = false
+                        return
+                    }
+                    // The action fires at once; only the artwork waits, so a tap still shows its click.
+                    action()
+                    let elapsed = pressedAt.map { $0.duration(to: .now) } ?? style.minimumPress
+                    let delay = style.releaseDelay(afterPressedFor: elapsed)
+                    guard delay > .zero else {
+                        isPressed = false
+                        return
+                    }
+                    release = Task {
+                        try? await Task.sleep(for: delay)
+                        guard !Task.isCancelled else { return }
+                        isPressed = false
+                    }
                 }
         )
+        .onDisappear {
+            release?.cancel()
+            release = nil
+        }
         .accessibilityElement()
         .accessibilityAddTraits(.isButton)
         .accessibilityLabel(accessibilityLabel)
