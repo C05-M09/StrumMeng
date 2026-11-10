@@ -171,17 +171,31 @@ struct BeatEvent: Codable, Sendable, Equatable {
     let result: BeatResult
 }
 
+/// Every swipe of a session, kept for Replay (decision 24).
+struct RecordedStrum: Codable, Sendable, Equatable {
+    let time: TimeInterval          // session time: seconds after step 0
+    let direction: StrumDirection
+    let isExtra: Bool               // judged no node (decision 23)
+}
+
 struct SessionResult: Codable, Sendable, Equatable {
     let id: UUID
     let patternID: String
     let bpm: Int
     let duration: TimeInterval
     let beats: [BeatEvent]
+    let strums: [RecordedStrum]     // empty for records saved before decision 24
 
     var perfectCount: Int { beats.filter { $0.result == .perfect }.count }
     var tooEarlyCount: Int { beats.filter { $0.result == .tooEarly }.count }
-    var missCount: Int { beats.filter { $0.result == .miss }.count }
-    var accuracy: Double { beats.isEmpty ? 0 : Double(perfectCount) / Double(beats.count) }
+    var extraStrumCount: Int { strums.filter(\.isExtra).count }
+    // An extra strum counts as a Miss (decision 23).
+    var missCount: Int { beats.filter { $0.result == .miss }.count + extraStrumCount }
+    // Too Early earns half a point; extra strums raise the divider (decision 23).
+    var accuracy: Double {
+        let scored = beats.count + extraStrumCount
+        return scored == 0 ? 0 : (Double(perfectCount) + 0.5 * Double(tooEarlyCount)) / Double(scored)
+    }
     var offTempoCount: Int { tooEarlyCount + missCount }
 }
 
@@ -232,7 +246,8 @@ Every type above has a mock \(MockControllerLink emits scripted strums: on\-time
 - The clock's BeatTick carries no direction, so the view model pairs each tick with the pattern's<br>Stroke as a BeatTarget \(index, expectedTime, direction\) before handing it to the judge\.
 - ToleranceConfig \(perfectWindowMs, earlyWindowMs\) lives in one place so it is easy to tune\. Windows<br>are capped to a fraction of the beat interval so they never overlap at high BPM\. Actual values come<br>from on\-device testing \(§9\)\.
 - FeedbackEngine consumes beatStream and strums and emits each BeatEvent as soon as that beat's window<br>closes, not at the end of the session\. This is what makes colours appear in real time\.
-- SessionResultBuilder collects events and produces a SessionResult on finish\(\)\. A session ended by<br>Restart or Back to Menu produces nothing\.
+- Extra strums \(decision 23\): a strum that judges no node \(a swipe on a rest or in a gap, or a second<br>swipe for the same node\) is listed by FeedbackEngine as extra\. Strums before the first node's window<br>\(the count\-in, and the re\-count after a pause\), strums in the 2\-second break after the last node, and<br>resent copies are never extra\.
+- SessionResultBuilder collects events and produces a SessionResult on finish\(\)\. A session ended by<br>Restart or Back to Menu produces nothing\. Accuracy is \(Perfect \+ 0\.5 × Too Early\) / \(nodes \+ extra<br>strums\), and every extra strum adds a Miss: 60 nodes with 10 extra swipes are scored out of 70\.
 
 #### 3\.2\.3 Controller link and strum input
 
@@ -282,7 +297,7 @@ stores and a fake ControllerLink so the entire handoff can be tested without Wi-
 
 #### 3\.3\.1 Summary
 
-Shows pattern, BPM, duration, accuracy \(%\), counts of Perfect, Too Early and Miss, and an "off tempo N<br>times" message \(Too Early plus Miss\)\. No stars in Practice\. Buttons: Replay, Retry, Back to Main\.
+Shows pattern, BPM, duration, accuracy \(%\), counts of Perfect, Too Early and Miss \(Miss includes extra<br>strums, decision 23\), and an "off tempo N times" message \(Too Early plus Miss\)\. No stars in Practice\. Buttons: Replay, Retry, Back to Main\.
 
 SummaryState: \.showing\(SessionResult\), \.showingRecommendation\(RecommendedBPM\), \.navigating\(destination\)\.<br>The session is saved exactly once, when the summary first appears, so re\-appearing never creates a duplicate\.
 
@@ -292,7 +307,7 @@ Flow: when the session ends, Play is replaced by Summary \(Back never returns to
 
 Replay plays the previous session again, visually and audibly, from the stored \[BeatEvent\]\. It takes<br>no controller input and does no new judging\. The colour sequence must match the original session exactly\.
 
-Audio is reconstructed, not recorded: the metronome is re\-scheduled on every quarter note, and the<br>player's own strums are re\-played as guitar strums at their stored times \(ReplayCue, scheduled on the<br>host clock through GuitarSound and MetronomeSound\)\. BeatEvent does not store a strum's direction, so a<br>strum takes the direction of the note it was judged against; a Miss with no strum makes no sound\.<br>There is no microphone recording to play back\.
+Audio is reconstructed, not recorded: the metronome is re\-scheduled on every quarter note, and every<br>swipe the player made is re\-played as a guitar strum at its recorded time and in its own direction,<br>including wrong\-direction and extra ones \(SessionResult\.strums, decision 24; ReplayCue, scheduled on the<br>host clock through GuitarSound and MetronomeSound\)\. Records saved before decision 24 have no strums:<br>they replay only the judged strums, at the node's time plus offset and in the node's direction\. There<br>is no microphone recording to play back\.
 
 Seek \(decision 22\): the progress bar can be tapped or dragged to jump to any point\. Seek is a ReplayEvent<br>that moves playback without changing the ReplayState; the time maths is pure \(ReplayTimeline\), and sounds<br>are rescheduled from the new position\. Seeking never re\-judges: nodes simply show their stored colours up<br>to the new position\. Overshooting the end while dragging does not end the replay; letting go at the end<br>does\. There is no speed control: dragging the bar covers jumping to a moment\.
 
@@ -335,6 +350,7 @@ final class PracticeSessionRecord {
     var missCount: Int
     var accuracy: Double
     var beatsData: Data                    // [BeatEvent] encoded as JSON
+    var strumsData: Data?                  // [RecordedStrum] as JSON; schema V2, nil for V1 records
 }
 
 protocol SessionRepository: Sendable {
@@ -346,7 +362,7 @@ protocol SessionRepository: Sendable {
 
 - Beats are stored as one JSON blob per session rather than one @Model row per beat\. It is much<br>simpler for Replay and there is no need to query individual beats\.
 - The ModelContainer is created in App/ and injected into the repository, never into a View\.
-- A VersionedSchema is declared from the first version so later migrations are cheap\.
+- A VersionedSchema is declared from the first version so later migrations are cheap\. SchemaV2 adds<br>the optional strumsData \(decision 24\); SessionMigrationPlan moves V1 stores to V2 with a lightweight<br>stage, and V1 stays frozen\. Old records keep the accuracy they were saved with\.
 - Domain code only sees SessionResult, never PracticeSessionRecord\. A small mapper translates between them\.
 - All access runs on a single, consistent actor context \(@MainActor or a ModelActor\)\. The in\-memory<br>configuration \(isStoredInMemoryOnly: true\) is used in tests and previews\.
 - Records live on the iPad only\. The iPhone controller stores nothing but its own controller settings\.
@@ -449,7 +465,7 @@ Tests must pass before a PR is merged\. Dependencies \(controller link, clock, r
 | --- | --- |
 | reduce functions \(all state machines\) | Unit tests for every transition, including illegal ones being ignored and pause then resume then finish |
 | TimingJudge | On\-time, early, no onset, late onset \(Miss\), double onset, positive and negative latency offset |
-| SessionResult | Accuracy, counts, empty beat list \(no divide\-by\-zero\) |
+| SessionResult | Accuracy \(half a point for Too Early, extra strums as Miss\), counts, empty beat list \(no divide\-by\-zero\) |
 | RecommendationPolicy | Boundaries 50, 51, 65, 66, 85, 86, and BPM at the min/max clamp |
 | SessionRepository | Save, fetch, ordering by accuracy, against an in\-memory ModelContainer |
 | ControllerLink | Host\-clock conversion, duplicate packets, ordering, reconnects, and state changes |
@@ -507,6 +523,8 @@ Accepted risk: users with colour\-vision deficiency may find it hard to tell res
 | 20 | Does the iPhone make sound? | Only outside a session, so swiping there feels like a guitar\. From the count\-in on, the sound comes from the iPad alone and the iPhone cuts anything still ringing\. The metronome stays on the iPad\. |
 | 21 | What do the Option volume sliders control? | Music sets the menu background music \(SettingsStore\.soundVolume, which first meant the metronome volume\); Sound Effects sets the button click\. The music pauses from Listen on, so the metronome and guitar are heard clearly\. Changes the meaning of a shared contract value: needs team agreement\. |
 | 22 | Can the player jump around in Replay? | Yes: the progress bar can be tapped or dragged to any point\. Colours are never re\-judged\. No speed control: dragging the bar is enough\. |
+| 23 | How is accuracy scored? | Team decision \(2026\-11\-10\): Perfect = 1 point, Too Early = half a point, Miss = 0\. A strum that judges no node \(a swipe on a rest, or a second swipe for one node\) is an extra strum and counts as a Miss, raising the divider: accuracy = \(Perfect \+ 0\.5 × Too Early\) / \(nodes \+ extra strums\)\. Count\-in strums and the break after the last node are free\. |
+| 24 | What does Replay play? | Every swipe of the session at its recorded time and direction, including wrong and extra ones, so the player hears exactly what they played\. Stored as SessionResult\.strums \(schema V2\)\. |
 
 ## 11\. Suggested implementation order
 
