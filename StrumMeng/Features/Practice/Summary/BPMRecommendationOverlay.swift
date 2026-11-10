@@ -230,6 +230,8 @@ private struct OverlayScaleButtonStyle: ButtonStyle {
     )
 }
 
+#if DEBUG
+// PracticePlayDemoView exists in DEBUG builds only.
 #Preview("Overlay on Viewplay (Exact Mockup Match)", traits: .landscapeLeft) {
     ZStack {
         // The real PracticePlayView underneath
@@ -242,3 +244,4 @@ private struct OverlayScaleButtonStyle: ButtonStyle {
         )
     }
 }
+#endif

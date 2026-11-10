@@ -4,6 +4,8 @@ import XCTest
 final class TimingJudgeTests: XCTestCase {
     private let step80 = AudioBeatClock.stepInterval(bpm: 80)     // 0.375 s, windows not capped
     private let down = BeatTarget(index: 4, expectedTime: 10.0, direction: .down)
+    /// The Perfect window, so these tests follow when the tolerance is tuned.
+    private let perfect = ToleranceConfig.standard.perfectWindowMs / 1000
 
     private func judge(_ strums: [StrumEvent], target: BeatTarget? = nil,
                        offset: TimeInterval = 0) -> TimingJudgement {
@@ -47,7 +49,7 @@ final class TimingJudgeTests: XCTestCase {
     }
 
     func test_lateStrum_isJudgedAsMiss() {
-        XCTAssertEqual(judge([PracticeFixtures.strum(at: 10.06)]).event.result, .miss)
+        XCTAssertEqual(judge([PracticeFixtures.strum(at: 10 + perfect + 0.01)]).event.result, .miss)
     }
 
     func test_doubleStrum_earlyThenPerfect_countsAsPerfect() {
@@ -122,6 +124,6 @@ final class TimingJudgeTests: XCTestCase {
 
     func test_windowEnd_isBeatPlusPerfectWindowPlusOffset() {
         let end = TimingJudge.windowEnd(of: down, latencyOffset: 0.1, stepInterval: step80, config: .standard)
-        XCTAssertEqual(end, 10.15, accuracy: 1e-9)
+        XCTAssertEqual(end, 10 + perfect + 0.1, accuracy: 1e-9)
     }
 }

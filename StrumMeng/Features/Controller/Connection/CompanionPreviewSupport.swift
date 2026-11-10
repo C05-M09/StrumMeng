@@ -1,7 +1,7 @@
-#if DEBUG
 import Foundation
 
 /// Stands in for the link and the saved codes in previews, which only show the state they are given.
+/// Not DEBUG-only: #Preview blocks are compiled in Release builds too.
 extension CompanionViewModel {
     static func preview(state: CompanionState) -> CompanionViewModel {
         CompanionViewModel(client: PreviewControllerClient(), pairCodes: PreviewPairCodeStore(), state: state)
@@ -21,4 +21,3 @@ private final class PreviewPairCodeStore: PairCodeStore {
     var enteredPairCode: PairCode? { nil }
     func setEnteredPairCode(_ code: PairCode?) {}
 }
-#endif

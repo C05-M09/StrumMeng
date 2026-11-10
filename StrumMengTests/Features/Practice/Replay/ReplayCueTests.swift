@@ -4,13 +4,41 @@ import XCTest
 final class ReplayCueTests: XCTestCase {
     private let step = 0.375                                        // eighth note at 80 BPM
 
-    private func result(_ events: [BeatEvent]) -> SessionResult {
+    private func result(_ events: [BeatEvent], strums: [RecordedStrum] = []) -> SessionResult {
         SessionResultBuilder.build(id: UUID(), patternID: "subdivision", bpm: 80,
-                                   beatEvents: events, createdAt: Date(timeIntervalSince1970: 0))
+                                   beatEvents: events, strums: strums, createdAt: Date(timeIntervalSince1970: 0))
     }
 
-    private func cues(_ events: [BeatEvent], totalSteps: Int = 16) -> [ReplayCue] {
-        ReplayCue.cues(for: result(events), pattern: PatternCatalog.all[1], stepInterval: step, totalSteps: totalSteps)
+    private func cues(_ events: [BeatEvent], strums: [RecordedStrum] = [], totalSteps: Int = 16) -> [ReplayCue] {
+        ReplayCue.cues(for: result(events, strums: strums), pattern: PatternCatalog.all[1], stepInterval: step,
+                       totalSteps: totalSteps)
+    }
+
+    private func strumCues(_ cues: [ReplayCue]) -> [ReplayCue] {
+        cues.filter { if case .strum = $0.sound { true } else { false } }
+    }
+
+    func test_everyRecordedSwipe_replays_inItsOwnDirection_includingWrongAndExtraOnes() {
+        let strums = [
+            RecordedStrum(time: 0.02, direction: .down, isExtra: false),     // Perfect
+            RecordedStrum(time: 0.2, direction: .down, isExtra: true),       // extra, between nodes
+            RecordedStrum(time: step - 0.01, direction: .down, isExtra: false) // wrong direction on an up node
+        ]
+        let events = [BeatEvent(stepIndex: 0, result: .perfect, offsetMs: 20),
+                      BeatEvent(stepIndex: 1, result: .miss, offsetMs: -10)]
+
+        XCTAssertEqual(strumCues(cues(events, strums: strums)), [
+            ReplayCue(time: 0.02, sound: .strum(.down)),
+            ReplayCue(time: 0.2, sound: .strum(.down)),
+            ReplayCue(time: step - 0.01, sound: .strum(.down))
+        ])
+    }
+
+    func test_recordedSwipes_replaceTheJudgedStrums_soNothingSoundsTwice() {
+        let strums = [RecordedStrum(time: 0.02, direction: .down, isExtra: false)]
+        let events = [BeatEvent(stepIndex: 0, result: .perfect, offsetMs: 20)]
+
+        XCTAssertEqual(strumCues(cues(events, strums: strums)).count, 1)
     }
 
     func test_metronome_clicksEveryQuarterNote_accentingEachBar() {
@@ -21,7 +49,7 @@ final class ReplayCueTests: XCTestCase {
             .map { ReplayCue.Sound.click(accent: $0) })
     }
 
-    func test_playerStrums_replayAtTheirRecordedTime_inTheNotesDirection() {
+    func test_oldRecordWithoutSwipes_replaysTheJudgedStrums_inTheNotesDirection() {
         let strums = cues([
             BeatEvent(stepIndex: 0, result: .perfect, offsetMs: 20),
             BeatEvent(stepIndex: 1, result: .tooEarly, offsetMs: -90),

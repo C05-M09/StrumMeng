@@ -295,6 +295,17 @@ final class ReplayViewModel {
             }
         }
 
+        // Every recorded swipe pulses the ring, and an extra one turns it the Miss colour, as in Play.
+        // Old records without swipes keep the pulses from their judged strums above.
+        for strum in result.strums where strum.time <= time {
+            if strum.time > (lastStrumTime ?? -.infinity) {
+                lastStrumTime = strum.time
+            }
+            if strum.isExtra, strum.time > (lastJudgement?.time ?? -.infinity) {
+                lastJudgement = PlayJudgement(feedback: .miss, time: strum.time)
+            }
+        }
+
         // Tentukan fase tampilan UI berdasarkan status state machine
         let phase: PlayScreenPhase = {
             switch state {

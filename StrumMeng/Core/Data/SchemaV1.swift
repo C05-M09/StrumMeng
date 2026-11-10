@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-/// The first persisted schema.
+/// The first persisted schema. Frozen: kept only so old stores can be migrated (SessionMigrationPlan).
 ///
 /// When `PracticeSessionRecord` changes, leave this enum untouched, add a `SchemaV2`
 /// with the new shape, and add a stage to `SessionMigrationPlan`.

@@ -2,7 +2,9 @@ import XCTest
 @testable import StrumMeng
 
 final class FeedbackEngineTests: XCTestCase {
-    private let step = AudioBeatClock.stepInterval(bpm: 80)    // 0.375 s
+    private let step = AudioBeatClock.stepInterval(bpm: 80)    // 0.375 s, windows not capped
+    /// The Perfect window, so these tests follow when the tolerance is tuned.
+    private let perfect = ToleranceConfig.standard.perfectWindowMs / 1000
 
     private func makeEngine(offset: TimeInterval = 0) -> FeedbackEngine {
         FeedbackEngine(config: .standard, latencyOffset: offset, stepInterval: step)
@@ -30,8 +32,8 @@ final class FeedbackEngineTests: XCTestCase {
         var engine = makeEngine()
         _ = engine.addStrum(PracticeFixtures.strum(at: 9.9))
         XCTAssertTrue(engine.addBeat(beat(0, at: 10)).isEmpty)
-        XCTAssertTrue(engine.close(upTo: 10.04).isEmpty)
-        XCTAssertEqual(engine.close(upTo: 10.05).map(\.result), [.tooEarly])
+        XCTAssertTrue(engine.close(upTo: 10 + perfect - 0.01).isEmpty)
+        XCTAssertEqual(engine.close(upTo: 10 + perfect).map(\.result), [.tooEarly])
     }
 
     func test_tooEarlyThenPerfect_inOneWindow_endsAsPerfect() {
@@ -58,15 +60,15 @@ final class FeedbackEngineTests: XCTestCase {
     func test_noStrum_isMissWhenTheWindowCloses() {
         var engine = makeEngine()
         _ = engine.addBeat(beat(0, at: 10))
-        XCTAssertEqual(engine.nextDeadline ?? 0, 10.05, accuracy: 1e-9)
-        XCTAssertEqual(engine.close(upTo: 10.05).map(\.result), [.miss])
+        XCTAssertEqual(engine.nextDeadline ?? 0, 10 + perfect, accuracy: 1e-9)
+        XCTAssertEqual(engine.close(upTo: 10 + perfect).map(\.result), [.miss])
         XCTAssertNil(engine.nextDeadline)
     }
 
     func test_lateStrum_closesTheBeatAsMiss() {
         var engine = makeEngine()
         _ = engine.addBeat(beat(0, at: 10))
-        XCTAssertEqual(engine.addStrum(PracticeFixtures.strum(at: 10.08)).map(\.result), [.miss])
+        XCTAssertEqual(engine.addStrum(PracticeFixtures.strum(at: 10 + perfect + 0.01)).map(\.result), [.miss])
     }
 
     func test_oneStrum_satisfiesOnlyOneBeat() {
@@ -101,6 +103,81 @@ final class FeedbackEngineTests: XCTestCase {
         var engine = makeEngine(offset: 0.1)
         _ = engine.addBeat(beat(0, at: 10))
         XCTAssertEqual(engine.addStrum(PracticeFixtures.strum(at: 10.1)).map(\.result), [.perfect])
+    }
+
+    // MARK: Extra strums
+
+    func test_strumUsedByAStep_isNotExtra() {
+        var engine = makeEngine()
+        _ = engine.addBeat(beat(0, at: 10))
+        _ = engine.addStrum(PracticeFixtures.strum(at: 10.0))
+        _ = engine.close(upTo: 11)
+        XCTAssertEqual(engine.extraStrumIDs, [])
+    }
+
+    func test_strumOnARestBetweenSteps_isExtra() {
+        var engine = makeEngine()
+        _ = engine.addBeat(beat(0, at: 10))
+        _ = engine.addStrum(PracticeFixtures.strum(at: 10.0))
+        // Step 1 is a rest: a swipe there matches no step.
+        let onTheRest = PracticeFixtures.strum(at: 10 + step)
+        _ = engine.addStrum(onTheRest)
+        _ = engine.addBeat(beat(2, at: 10 + 2 * step))
+        _ = engine.addStrum(PracticeFixtures.strum(at: 10 + 2 * step))
+        XCTAssertEqual(engine.extraStrumIDs, [onTheRest.id])
+    }
+
+    func test_secondStrumForTheSameStep_isExtra() {
+        var engine = makeEngine()
+        let early = PracticeFixtures.strum(at: 9.9)
+        _ = engine.addStrum(early)
+        _ = engine.addBeat(beat(0, at: 10))
+        XCTAssertEqual(engine.addStrum(PracticeFixtures.strum(at: 10.01)).map(\.result), [.perfect])
+        XCTAssertEqual(engine.extraStrumIDs, [early.id], "the Too Early swipe was replaced by the Perfect one")
+    }
+
+    func test_rightStrumAfterAWrongOne_isExtra() {
+        var engine = makeEngine()
+        _ = engine.addBeat(beat(0, at: 10))
+        XCTAssertEqual(engine.addStrum(PracticeFixtures.strum(at: 9.97, .up)).map(\.result), [.miss])
+        let right = PracticeFixtures.strum(at: 10.0, .down)
+        _ = engine.addStrum(right)
+        _ = engine.addBeat(beat(1, at: 10 + step))
+        _ = engine.close(upTo: 11)
+        XCTAssertEqual(engine.extraStrumIDs, [right.id])
+    }
+
+    func test_strumsBeforeTheFirstStepsWindow_areNotExtra() {
+        var engine = makeEngine()
+        // Swipes during the count-in, long before the first step.
+        _ = engine.addStrum(PracticeFixtures.strum(at: 9.0))
+        _ = engine.addStrum(PracticeFixtures.strum(at: 9.5))
+        _ = engine.addBeat(beat(0, at: 10))
+        _ = engine.close(upTo: 11)
+        XCTAssertEqual(engine.extraStrumIDs, [])
+    }
+
+    func test_strumsDuringTheRecountAfterAPause_areNotExtra() {
+        var engine = makeEngine()
+        _ = engine.addBeat(beat(0, at: 10))
+        _ = engine.addStrum(PracticeFixtures.strum(at: 10.0))
+        _ = engine.discardOpenBeats()
+        // Swipes during the 3-2-1 before the session continues at step 2.
+        _ = engine.addStrum(PracticeFixtures.strum(at: 20.0))
+        _ = engine.addBeat(beat(2, at: 21))
+        _ = engine.close(upTo: 22)
+        XCTAssertEqual(engine.extraStrumIDs, [])
+    }
+
+    func test_resentCopyOfAStrum_isNeverExtra() {
+        var engine = makeEngine()
+        let strum = PracticeFixtures.strum(at: 10.0)
+        _ = engine.addBeat(beat(0, at: 10))
+        _ = engine.addStrum(strum)
+        _ = engine.addStrum(strum)
+        _ = engine.addBeat(beat(1, at: 10 + step))
+        _ = engine.close(upTo: 11)
+        XCTAssertEqual(engine.extraStrumIDs, [])
     }
 
     func test_discardOpenBeats_returnsTheUnjudgedBeats() {

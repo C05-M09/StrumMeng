@@ -14,7 +14,8 @@ final class SessionRepositoryTests: XCTestCase {
         bpm: Int = 80,
         accuracy: Double = 0.9,
         createdAt: Date = Date(timeIntervalSince1970: 1_000),
-        beatEvents: [BeatEvent] = []
+        beatEvents: [BeatEvent] = [],
+        strums: [RecordedStrum] = []
     ) -> SessionResult {
         SessionResult(
             id: id,
@@ -26,7 +27,8 @@ final class SessionRepositoryTests: XCTestCase {
             tooEarlyCount: 1,
             missCount: 1,
             createdAt: createdAt,
-            beatEvents: beatEvents
+            beatEvents: beatEvents,
+            strums: strums
         )
     }
 
@@ -39,6 +41,9 @@ final class SessionRepositoryTests: XCTestCase {
         let saved = makeResult(beatEvents: [
             BeatEvent(stepIndex: 0, result: .perfect, offsetMs: 8),
             BeatEvent(stepIndex: 1, result: .miss, offsetMs: nil)
+        ], strums: [
+            RecordedStrum(time: 0.008, direction: .down, isExtra: false),
+            RecordedStrum(time: 0.2, direction: .up, isExtra: true)
         ])
 
         try await repository.save(saved)
