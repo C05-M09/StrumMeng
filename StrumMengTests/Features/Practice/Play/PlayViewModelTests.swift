@@ -5,6 +5,8 @@ import XCTest
 final class PlayViewModelTests: XCTestCase {
     private let start: TimeInterval = 100
     private let step = AudioBeatClock.stepInterval(bpm: 80)    // 0.375 s
+    /// The Perfect window, so these tests follow when the tolerance is tuned.
+    private let perfect = ToleranceConfig.standard.perfectWindowMs / 1000
     private var currentTime: TimeInterval = 0
     private let clock = MockBeatClock()
     private var finished: [SessionResult] = []
@@ -13,6 +15,7 @@ final class PlayViewModelTests: XCTestCase {
     /// Syncopation, "D - D U - U D U": step 0 judged, step 1 a rest.
     private func makeViewModel(patternID: String = "syncopation",
                                repetitions: Int = 10,
+                               finishBreak: TimeInterval = 0,
                                leadInSteps: Int = 0,
                                latencyOffset: TimeInterval = 0,
                                strumArrivalGrace: TimeInterval = 0,
@@ -25,7 +28,7 @@ final class PlayViewModelTests: XCTestCase {
             pattern: pattern, bpm: 80, clock: clock, input: MockStrumInputService(), touchInput: touchInput,
             controller: controller, requiresController: requiresController,
             guitar: sound, metronome: sound, latencyOffset: latencyOffset, strumArrivalGrace: strumArrivalGrace,
-            leadInSteps: leadInSteps, repetitions: repetitions,
+            leadInSteps: leadInSteps, repetitions: repetitions, finishBreak: finishBreak,
             now: { [unowned self] in self.currentTime },
             waitUntil: { _ in try? await Task.sleep(for: .seconds(3600)) },
             makeID: { UUID(uuidString: "00000000-0000-0000-0000-000000000001") ?? UUID() },
@@ -106,7 +109,7 @@ final class PlayViewModelTests: XCTestCase {
         // Tick 8 (6 + 2): step 0 arrives in hit ring, songTime is 0, node is judged
         tick(viewModel, 8)
         XCTAssertEqual(viewModel.screenModel().songTime, 0, accuracy: 1e-9)
-        currentTime = time(ofTick: 8) + 0.06
+        currentTime = time(ofTick: 8) + perfect + 0.01
         viewModel.closeWindows(upTo: currentTime)
         XCTAssertEqual(nodeResult(viewModel, step: 0), .miss)
     }
@@ -144,7 +147,7 @@ final class PlayViewModelTests: XCTestCase {
         strum(viewModel, at: time(ofTick: 8) - 0.1)
         tick(viewModel, 8)
         XCTAssertNil(nodeResult(viewModel, step: 2))
-        currentTime = time(ofTick: 8) + 0.06
+        currentTime = time(ofTick: 8) + perfect + 0.01
         viewModel.closeWindows(upTo: currentTime)
         XCTAssertEqual(nodeResult(viewModel, step: 2), .tooEarly)
     }
@@ -152,7 +155,7 @@ final class PlayViewModelTests: XCTestCase {
     func test_noStrum_turnsTheNodeMiss() async throws {
         let viewModel = try makeViewModel()
         await startPlaying(viewModel)
-        currentTime = time(ofTick: 6) + 0.06
+        currentTime = time(ofTick: 6) + perfect + 0.01
         viewModel.closeWindows(upTo: currentTime)
         XCTAssertEqual(nodeResult(viewModel, step: 0), .miss)
     }
@@ -355,6 +358,93 @@ final class PlayViewModelTests: XCTestCase {
         XCTAssertEqual(finished, [result])
     }
 
+    func test_finishedSession_waitsForTheBreak_beforeOpeningSummary() async throws {
+        let viewModel = try makeViewModel(repetitions: 1, finishBreak: 2)
+        await startPlaying(viewModel)
+        for n in 7...14 { tick(viewModel, n) }
+
+        guard case .finished = viewModel.state else { return XCTFail("expected finished") }
+        XCTAssertTrue(viewModel.isAnimating, "the lane keeps moving during the break")
+        XCTAssertTrue(finished.isEmpty, "Summary opens only after the break")
+    }
+
+    func test_leavingDuringTheBreak_neverReportsAResult() async throws {
+        let viewModel = try makeViewModel(repetitions: 1, finishBreak: 2)
+        await startPlaying(viewModel)
+        for n in 7...14 { tick(viewModel, n) }
+
+        await viewModel.onDisappear()
+        XCTAssertFalse(viewModel.isAnimating)
+        XCTAssertTrue(finished.isEmpty)
+    }
+
+    func test_swipeOnARest_isAnExtraStrum_countedAsMissInTheResult() async throws {
+        // Syncopation: down, rest, down, up, rest, up, down, up (6 nodes).
+        let viewModel = try makeViewModel(repetitions: 1)
+        await startPlaying(viewModel)
+        strum(viewModel, at: time(ofTick: 6))           // step 0: Perfect
+        tick(viewModel, 7)
+        strum(viewModel, at: time(ofTick: 7), .up)      // step 1 is a rest
+        for n in 8...14 { tick(viewModel, n) }
+
+        guard case .finished(let result) = viewModel.state else {
+            return XCTFail("expected finished, got \(viewModel.state)")
+        }
+        XCTAssertEqual(result.perfectCount, 1)
+        XCTAssertEqual(result.missCount, 5 + 1, "5 missed nodes and the swipe on the rest")
+        XCTAssertEqual(result.accuracy, 1.0 / 7.0, accuracy: 1e-9)
+        XCTAssertEqual(result.strums.map(\.isExtra), [false, true])
+        XCTAssertEqual(result.strums.map(\.direction), [.down, .up])
+        XCTAssertEqual(result.strums.first?.time ?? .nan, 0, accuracy: 1e-9)
+        XCTAssertEqual(result.strums.last?.time ?? .nan, step, accuracy: 1e-9)
+    }
+
+    func test_swipeOnARest_turnsTheRingTheMissColour_atOnce() async throws {
+        let viewModel = try makeViewModel()
+        await startPlaying(viewModel)
+        strum(viewModel, at: time(ofTick: 6))           // step 0: Perfect
+        tick(viewModel, 7)
+        strum(viewModel, at: time(ofTick: 7))           // step 1 is a rest
+        XCTAssertEqual(viewModel.screenModel().lastJudgement?.feedback, .miss)
+        XCTAssertEqual(nodeResult(viewModel, step: 0), .perfect, "the node keeps its own colour")
+    }
+
+    func test_secondSwipeForAJudgedNode_turnsTheRingTheMissColour() async throws {
+        let viewModel = try makeViewModel()
+        await startPlaying(viewModel)
+        strum(viewModel, at: time(ofTick: 6))
+        XCTAssertEqual(viewModel.screenModel().lastJudgement?.feedback, .perfect)
+        strum(viewModel, at: time(ofTick: 6) + 0.03)
+        XCTAssertEqual(viewModel.screenModel().lastJudgement?.feedback, .miss)
+    }
+
+    func test_earlySwipeForAComingNode_doesNotTurnTheRingRed() async throws {
+        let viewModel = try makeViewModel()
+        await startPlaying(viewModel)
+        strum(viewModel, at: time(ofTick: 6))           // step 0: Perfect
+        tick(viewModel, 7)
+        strum(viewModel, at: time(ofTick: 8) - 0.1)     // early for step 2, still open
+        XCTAssertEqual(viewModel.screenModel().lastJudgement?.feedback, .perfect)
+    }
+
+    func test_swipeDuringTheCountIn_doesNotTurnTheRingRed() async throws {
+        let viewModel = try makeViewModel()
+        await viewModel.send(.tapReady)
+        for n in 0...3 { tick(viewModel, n) }
+        strum(viewModel, at: time(ofTick: 3))
+        XCTAssertNil(viewModel.screenModel().lastJudgement)
+    }
+
+    func test_strumsBeforeReady_areNotRecorded() async throws {
+        let viewModel = try makeViewModel(repetitions: 1)
+        strum(viewModel, at: 1)
+        await startPlaying(viewModel)
+        for n in 7...14 { tick(viewModel, n) }
+
+        guard case .finished(let result) = viewModel.state else { return XCTFail("expected finished") }
+        XCTAssertEqual(result.strums, [])
+    }
+
     func test_sameJudgingLogic_worksForEveryPattern() async throws {
         for pattern in PatternCatalog.all {
             finished = []
@@ -495,8 +585,8 @@ final class PlayViewModelTests: XCTestCase {
     func test_strumTouchedInTime_butArrivingAfterTheWindow_isPerfectWithAGrace() async throws {
         let viewModel = try makeViewModel(strumArrivalGrace: 0.15)
         await startPlaying(viewModel)
-        // The window has ended (beat + 50 ms) but the iPhone strum is still on its way.
-        currentTime = time(ofTick: 6) + 0.07
+        // The window has ended (beat + Perfect window) but the iPhone strum is still on its way.
+        currentTime = time(ofTick: 6) + perfect + 0.02
         viewModel.closeWindows(upTo: currentTime)
         XCTAssertNil(nodeResult(viewModel, step: 0))
         // It arrives, carrying the touch time inside the Perfect window.
@@ -507,7 +597,7 @@ final class PlayViewModelTests: XCTestCase {
     func test_withoutAGrace_aStrumArrivingAfterTheWindowIsTooLate() async throws {
         let viewModel = try makeViewModel()
         await startPlaying(viewModel)
-        currentTime = time(ofTick: 6) + 0.07
+        currentTime = time(ofTick: 6) + perfect + 0.02
         viewModel.closeWindows(upTo: currentTime)
         viewModel.handle(PracticeFixtures.strum(at: time(ofTick: 6) + 0.02, .down))
         XCTAssertEqual(nodeResult(viewModel, step: 0), .miss)
@@ -516,7 +606,7 @@ final class PlayViewModelTests: XCTestCase {
     func test_withAGrace_noStrumIsStillAMissOnceTheGraceHasPassed() async throws {
         let viewModel = try makeViewModel(strumArrivalGrace: 0.15)
         await startPlaying(viewModel)
-        currentTime = time(ofTick: 6) + 0.05 + 0.15
+        currentTime = time(ofTick: 6) + perfect + 0.15
         viewModel.closeWindows(upTo: currentTime)
         XCTAssertEqual(nodeResult(viewModel, step: 0), .miss)
     }
@@ -524,8 +614,8 @@ final class PlayViewModelTests: XCTestCase {
     func test_withAGrace_aLateTouchIsStillAMiss() async throws {
         let viewModel = try makeViewModel(strumArrivalGrace: 0.15)
         await startPlaying(viewModel)
-        viewModel.handle(PracticeFixtures.strum(at: time(ofTick: 6) + 0.08, .down))
-        currentTime = time(ofTick: 6) + 0.25
+        viewModel.handle(PracticeFixtures.strum(at: time(ofTick: 6) + perfect + 0.03, .down))
+        currentTime = time(ofTick: 6) + perfect + 0.2
         viewModel.closeWindows(upTo: currentTime)
         XCTAssertEqual(nodeResult(viewModel, step: 0), .miss)
     }

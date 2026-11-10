@@ -8,6 +8,10 @@ import Foundation
 ///   direction anywhere in its window), or
 /// - when its window closes (Too Early or Miss).
 /// Events always come out in step order, and a strum is used for at most one step.
+///
+/// A strum that ends up used by no step (a swipe on a rest, or a second swipe for the same step) is
+/// listed in `extraStrumIDs`; the session counts it as a Miss. Strums before the first step's window
+/// (the count-in, also the re-count after a pause) are not extra.
 struct FeedbackEngine {
     let config: ToleranceConfig
     let latencyOffset: TimeInterval
@@ -17,6 +21,10 @@ struct FeedbackEngine {
     private var strums: [StrumEvent] = []
     /// Every strum id ever added, so a resent copy is ignored even after the original was used.
     private var seenStrumIDs: Set<UUID> = []
+    /// Strums that were dropped without deciding any step, in the order they were dropped.
+    private(set) var extraStrumIDs: [UUID] = []
+    /// Whether a step has been added since the start or the last pause; strums before it are never extra.
+    private var hasStarted = false
 
     init(config: ToleranceConfig, latencyOffset: TimeInterval, stepInterval: TimeInterval) {
         self.config = config
@@ -33,8 +41,10 @@ struct FeedbackEngine {
         if openBeats.isEmpty {
             // Strums before this window starts cannot match this step or any later one.
             let (_, early) = config.windows(stepInterval: stepInterval)
-            strums.removeAll { $0.time - latencyOffset < beat.expectedTime - early }
+            let windowStart = beat.expectedTime - early + latencyOffset
+            drop(countingAsExtra: hasStarted) { $0.time < windowStart }
         }
+        hasStarted = true
         openBeats.append(beat)
         events += finalizeDecidedBeat()
         return events
@@ -63,6 +73,8 @@ struct FeedbackEngine {
         let dropped = openBeats
         openBeats = []
         strums = []
+        // The re-count after a pause is a count-in again.
+        hasStarted = false
         return dropped
     }
 
@@ -85,8 +97,16 @@ struct FeedbackEngine {
         }
         // Windows never overlap, so a strum before this window's end cannot serve a later step.
         let end = windowEnd(beat)
-        strums.removeAll { $0.time <= end }
+        drop(countingAsExtra: true) { $0.time <= end }
         return judgement.event
+    }
+
+    /// Removes the strums matching `shouldDrop`, listing them as extra when asked.
+    private mutating func drop(countingAsExtra: Bool, where shouldDrop: (StrumEvent) -> Bool) {
+        if countingAsExtra {
+            extraStrumIDs += strums.filter(shouldDrop).map(\.id)
+        }
+        strums.removeAll(where: shouldDrop)
     }
 
     private func windowEnd(_ beat: BeatTarget) -> TimeInterval {

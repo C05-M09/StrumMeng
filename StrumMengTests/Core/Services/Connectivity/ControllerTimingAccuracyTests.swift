@@ -76,7 +76,8 @@ final class ControllerTimingAccuracyTests: XCTestCase {
     func test_lateTouch_isMiss_whateverTheDelay() throws {
         syncClocks(uplink: 0.004, downlink: 0.004)
         iPhone.receive(.startSession, arrivedAt: 20)
-        XCTAssertEqual(try judge(touchOffset: 0.080, delay: 0.010).result, .miss)
+        let perfect = ToleranceConfig.standard.perfectWindowMs / 1000
+        XCTAssertEqual(try judge(touchOffset: perfect + 0.03, delay: 0.010).result, .miss)
     }
 
     /// The one error clock sync cannot remove: when the way there is slower than the way back,

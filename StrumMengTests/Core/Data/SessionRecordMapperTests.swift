@@ -2,7 +2,7 @@ import XCTest
 @testable import StrumMeng
 
 final class SessionRecordMapperTests: XCTestCase {
-    private func makeResult(beatEvents: [BeatEvent]) -> SessionResult {
+    private func makeResult(beatEvents: [BeatEvent], strums: [RecordedStrum] = []) -> SessionResult {
         SessionResult(
             id: UUID(),
             patternID: "foundation",
@@ -13,7 +13,8 @@ final class SessionRecordMapperTests: XCTestCase {
             tooEarlyCount: 1,
             missCount: 1,
             createdAt: Date(timeIntervalSince1970: 1_000),
-            beatEvents: beatEvents
+            beatEvents: beatEvents,
+            strums: strums
         )
     }
 
@@ -38,6 +39,40 @@ final class SessionRecordMapperTests: XCTestCase {
         let restored = try SessionRecordMapper.makeResult(from: record)
 
         XCTAssertEqual(restored.beatEvents, [])
+    }
+
+    func test_roundTrip_keepsEveryStrumIncludingExtraOnes() throws {
+        let strums = [
+            RecordedStrum(time: -0.4, direction: .down, isExtra: false),
+            RecordedStrum(time: 0.01, direction: .down, isExtra: false),
+            RecordedStrum(time: 0.375, direction: .up, isExtra: true)
+        ]
+        let original = makeResult(beatEvents: [BeatEvent(stepIndex: 0, result: .perfect, offsetMs: 10)],
+                                  strums: strums)
+
+        let record = try SessionRecordMapper.makeRecord(from: original)
+        let restored = try SessionRecordMapper.makeResult(from: record)
+
+        XCTAssertEqual(restored.strums, strums)
+        XCTAssertEqual(restored.extraStrumCount, 1)
+    }
+
+    func test_recordSavedBeforeStrumsWereRecorded_hasNoStrums() throws {
+        let record = PracticeSessionRecord(
+            id: UUID(),
+            patternID: "foundation",
+            songID: nil,
+            bpm: 80,
+            accuracy: 0.5,
+            perfectCount: 1,
+            tooEarlyCount: 0,
+            missCount: 1,
+            createdAt: Date(timeIntervalSince1970: 0),
+            beatEventsData: Data("[]".utf8),
+            strumsData: nil
+        )
+
+        XCTAssertEqual(try SessionRecordMapper.makeResult(from: record).strums, [])
     }
 
     func test_makeResult_withCorruptData_throwsDecodingFailed() {

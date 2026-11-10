@@ -13,7 +13,7 @@ import SwiftData
 /// schema and migration plan as production instead of a hand-rolled copy.
 enum ModelContainerFactory {
     static func make(inMemory: Bool = false) throws -> ModelContainer {
-        let schema = Schema(versionedSchema: SchemaV1.self)
+        let schema = Schema(versionedSchema: SchemaV2.self)
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: inMemory)
         return try ModelContainer(
             for: schema,
