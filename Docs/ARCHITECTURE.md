@@ -525,8 +525,6 @@ This document is the design reference\. CLAUDE\.md at the repository root is the
 
 
 ### US3: first Play instructions after Ready
-
-
 After a full Listen loop, Ready stops the example and checks whether any saved
 session exists. SwiftDataSessionRepository implements the additive read-only
 SessionHistoryChecking capability; SessionRepository's shared contract is unchanged.
@@ -540,6 +538,8 @@ FirstPlayInstructionsLayout.artworkAssetName is nil until designer artwork arriv
 Set it to the imageset name to replace the temporary content with one full-modal
 asset; the normal/pressed Next button remains separately interactive at bottom-right.
 The history task is cancelled on leaving Listen and ignores results after cancellation.
+
+### US10: first-launch pairing invitation
 On the iPad host, Home waits 1.5 seconds on the first launch, then presents Meng
 using the shared ListenInformationEntrance animation and Listen illustration assets.
 The welcome remains visible until Next is tapped; taps outside the button do not
