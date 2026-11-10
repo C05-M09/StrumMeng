@@ -105,6 +105,69 @@ final class FeedbackEngineTests: XCTestCase {
         XCTAssertEqual(engine.addStrum(PracticeFixtures.strum(at: 10.1)).map(\.result), [.perfect])
     }
 
+    // MARK: Extra strums
+
+    func test_strumUsedByAStep_isNotExtra() {
+        var engine = makeEngine()
+        _ = engine.addBeat(beat(0, at: 10))
+        _ = engine.addStrum(PracticeFixtures.strum(at: 10.0))
+        _ = engine.close(upTo: 11)
+        XCTAssertEqual(engine.extraStrumIDs, [])
+    }
+
+    func test_strumOnARestBetweenSteps_isExtra() {
+        var engine = makeEngine()
+        _ = engine.addBeat(beat(0, at: 10))
+        _ = engine.addStrum(PracticeFixtures.strum(at: 10.0))
+        // Step 1 is a rest: a swipe there matches no step.
+        let onTheRest = PracticeFixtures.strum(at: 10 + step)
+        _ = engine.addStrum(onTheRest)
+        _ = engine.addBeat(beat(2, at: 10 + 2 * step))
+        _ = engine.addStrum(PracticeFixtures.strum(at: 10 + 2 * step))
+        XCTAssertEqual(engine.extraStrumIDs, [onTheRest.id])
+    }
+
+    func test_secondStrumForTheSameStep_isExtra() {
+        var engine = makeEngine()
+        let early = PracticeFixtures.strum(at: 9.9)
+        _ = engine.addStrum(early)
+        _ = engine.addBeat(beat(0, at: 10))
+        XCTAssertEqual(engine.addStrum(PracticeFixtures.strum(at: 10.01)).map(\.result), [.perfect])
+        XCTAssertEqual(engine.extraStrumIDs, [early.id], "the Too Early swipe was replaced by the Perfect one")
+    }
+
+    func test_rightStrumAfterAWrongOne_isExtra() {
+        var engine = makeEngine()
+        _ = engine.addBeat(beat(0, at: 10))
+        XCTAssertEqual(engine.addStrum(PracticeFixtures.strum(at: 9.97, .up)).map(\.result), [.miss])
+        let right = PracticeFixtures.strum(at: 10.0, .down)
+        _ = engine.addStrum(right)
+        _ = engine.addBeat(beat(1, at: 10 + step))
+        _ = engine.close(upTo: 11)
+        XCTAssertEqual(engine.extraStrumIDs, [right.id])
+    }
+
+    func test_strumsBeforeTheFirstStepsWindow_areNotExtra() {
+        var engine = makeEngine()
+        // Swipes during the count-in, long before the first step.
+        _ = engine.addStrum(PracticeFixtures.strum(at: 9.0))
+        _ = engine.addStrum(PracticeFixtures.strum(at: 9.5))
+        _ = engine.addBeat(beat(0, at: 10))
+        _ = engine.close(upTo: 11)
+        XCTAssertEqual(engine.extraStrumIDs, [])
+    }
+
+    func test_resentCopyOfAStrum_isNeverExtra() {
+        var engine = makeEngine()
+        let strum = PracticeFixtures.strum(at: 10.0)
+        _ = engine.addBeat(beat(0, at: 10))
+        _ = engine.addStrum(strum)
+        _ = engine.addStrum(strum)
+        _ = engine.addBeat(beat(1, at: 10 + step))
+        _ = engine.close(upTo: 11)
+        XCTAssertEqual(engine.extraStrumIDs, [])
+    }
+
     func test_discardOpenBeats_returnsTheUnjudgedBeats() {
         var engine = makeEngine()
         _ = engine.addBeat(beat(3, at: 10))
