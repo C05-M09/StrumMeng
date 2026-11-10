@@ -33,9 +33,9 @@ struct SummaryFeedbackOverlay: View {
     }
 
     private var headlineText: String {
-        if result.accuracy >= 0.86 {
+        if result.accuracy >= 0.85 {
             return "PURRFECT!"
-        } else if result.accuracy >= 0.66 {
+        } else if result.accuracy >= 0.65 {
             return "NICE!!"
         } else {
             return "YOU GOOD?"
@@ -43,9 +43,9 @@ struct SummaryFeedbackOverlay: View {
     }
 
     private var charaImage: String {
-        if result.accuracy >= 0.86 {
+        if result.accuracy >= 0.85 {
             return "cat_purfect"
-        } else if result.accuracy >= 0.66 {
+        } else if result.accuracy >= 0.65 {
             return "cat_oke"
         } else {
             return "cat_you good"
@@ -94,13 +94,13 @@ struct SummaryFeedbackOverlay: View {
 
     // MARK: - Entrance Animation
     private func triggerEntranceAnimation() {
-        withAnimation(.spring(response: 0.45, dampingFraction: 0.75)) {
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.75).delay(0.35)) {
             mascotEntered = true
         }
-        withAnimation(.spring(response: 0.40, dampingFraction: 0.70).delay(0.12)) {
+        withAnimation(.spring(response: 0.40, dampingFraction: 0.70).delay(0.47)) {
             bannerEntered = true
         }
-        withAnimation(.spring(response: 0.38, dampingFraction: 0.75).delay(0.24)) {
+        withAnimation(.spring(response: 0.38, dampingFraction: 0.75).delay(0.59)) {
             feedbackEntered = true
         }
         // Step 4: Tombol NEXT muncul setelah 3 detik

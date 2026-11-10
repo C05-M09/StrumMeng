@@ -50,6 +50,9 @@ struct GuidebookView: View {
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
         .toolbar(.hidden, for: .navigationBar)
+        .onDisappear {
+            viewModel.stopSound()
+        }
     }
 
     private var content: some View {

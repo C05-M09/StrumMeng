@@ -23,14 +23,14 @@ enum GuidebookCatalog {
             body: "Tap your foot, count out loud, and practice steady tempo at your preferred BPM.",
             backgroundAsset: "Guidebook_2",
             isInteractiveTempo: true
-        ),
-        GuidebookPage(
-            id: "how-to-strum",
-            title: "How to Strum",
-            body: "Tips for holding your pick or controller and strumming smoothly.",
-            backgroundAsset: "Guidebook_3",
-            isInteractiveTempo: false
         )
+//        GuidebookPage(
+//            id: "how-to-strum",
+//            title: "How to Strum",
+//            body: "Tips for holding your pick or controller and strumming smoothly.",
+//            backgroundAsset: "Guidebook_3",
+//            isInteractiveTempo: false
+//        )
     ]
 }
 

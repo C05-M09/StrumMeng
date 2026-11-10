@@ -16,12 +16,8 @@ struct GuidebookTempoControlView: View {
     var body: some View {
         
         VStack(alignment: .leading, spacing: 14) {
-            // 8-beat strum diagram asset: 1 & 2 & 3 & 4 & with [↓] [↑] arrows
-            Image("Guidebook_Tempo")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 530)
-                .frame(maxWidth: .infinity, alignment: .center)
+            // 8-beat strum diagram asset with active playback highlight
+            tempoDiagram
                 
             Spacer()
             
@@ -91,6 +87,48 @@ struct GuidebookTempoControlView: View {
         .frame(width: 540, height: 190)
 //        .background(AppColors.brownPrimary.opacity(0.75))
         Spacer()
+    }
+
+    private var tempoDiagram: some View {
+        let diagramWidth: CGFloat = 530
+        let svgWidth: CGFloat = 551.87
+        let svgHeight: CGFloat = 109.26
+        let scale = diagramWidth / svgWidth
+        let diagramHeight = svgHeight * scale
+
+        return ZStack(alignment: .topLeading) {
+            // Highlight backing card positioned BEHIND Image("Guidebook_Tempo")
+            if viewModel.isPlayingAudio, let currentStep = viewModel.currentStep {
+                let boxWidth: CGFloat = 56.8 * scale
+                let boxHeight: CGFloat = 73.16 * scale
+                let boxY: CGFloat = 32.09 * scale
+                let boxX: CGFloat = (4.0 + CGFloat(currentStep) * 69.647) * scale
+                let cornerRadius: CGFloat = 8.64 * scale
+                let padding: CGFloat = 5
+
+                ZStack(alignment: .bottom) {
+                    // Solid golden-yellow backing card framing the box from behind
+                    RoundedRectangle(cornerRadius: cornerRadius + padding)
+                        .fill(AppColors.recordOutline)
+
+                }
+                .frame(width: boxWidth + (padding * 2), height: boxHeight + (padding * 2))
+                .shadow(color: AppColors.recordOutline.opacity(0.85), radius: 8, x: 0, y: 0)
+                .shadow(color: AppColors.brownInk.opacity(0.2), radius: 2, y: 2)
+                .scaleEffect(1.04)
+                .offset(x: boxX - padding, y: boxY - padding)
+                .animation(.spring(response: 0.22, dampingFraction: 0.72), value: currentStep)
+            }
+
+            // Foreground tempo diagram asset
+            Image("Guidebook_Tempo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: diagramWidth, height: diagramHeight)
+                .allowsHitTesting(false)
+        }
+        .frame(width: diagramWidth, height: diagramHeight)
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 }
 

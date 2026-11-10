@@ -29,14 +29,24 @@ struct ReplayCue: Equatable {
             return cues.sorted { $0.time < $1.time }
         }
         for event in result.beatEvents {
-            guard let offsetMs = event.offsetMs, !pattern.strokes.isEmpty else { continue }
+            guard !pattern.strokes.isEmpty else { continue }
+            let stroke = pattern.strokes[event.stepIndex % pattern.strokes.count]
             let direction: StrumDirection
-            switch pattern.strokes[event.stepIndex % pattern.strokes.count] {
-            case .down: direction = .down
-            case .up: direction = .up
-            case .rest: continue
+            if event.result == .miss {
+                // Wrong strum: opposite direction of the pattern stroke (or down on rest)
+                switch stroke {
+                case .down: direction = .up
+                case .up: direction = .down
+                case .rest: direction = .down
+                }
+            } else {
+                switch stroke {
+                case .down: direction = .down
+                case .up: direction = .up
+                case .rest: continue
+                }
             }
-            let time = Double(event.stepIndex) * stepInterval + offsetMs / 1000
+            let time = Double(event.stepIndex) * stepInterval + (event.offsetMs ?? 0) / 1000
             cues.append(ReplayCue(time: time, sound: .strum(direction)))
         }
         return cues.sorted { $0.time < $1.time }
