@@ -378,6 +378,37 @@ final class PlayViewModelTests: XCTestCase {
         XCTAssertTrue(finished.isEmpty)
     }
 
+    func test_swipeOnARest_isAnExtraStrum_countedAsMissInTheResult() async throws {
+        // Syncopation: down, rest, down, up, rest, up, down, up (6 nodes).
+        let viewModel = try makeViewModel(repetitions: 1)
+        await startPlaying(viewModel)
+        strum(viewModel, at: time(ofTick: 6))           // step 0: Perfect
+        tick(viewModel, 7)
+        strum(viewModel, at: time(ofTick: 7), .up)      // step 1 is a rest
+        for n in 8...14 { tick(viewModel, n) }
+
+        guard case .finished(let result) = viewModel.state else {
+            return XCTFail("expected finished, got \(viewModel.state)")
+        }
+        XCTAssertEqual(result.perfectCount, 1)
+        XCTAssertEqual(result.missCount, 5 + 1, "5 missed nodes and the swipe on the rest")
+        XCTAssertEqual(result.accuracy, 1.0 / 7.0, accuracy: 1e-9)
+        XCTAssertEqual(result.strums.map(\.isExtra), [false, true])
+        XCTAssertEqual(result.strums.map(\.direction), [.down, .up])
+        XCTAssertEqual(result.strums.first?.time ?? .nan, 0, accuracy: 1e-9)
+        XCTAssertEqual(result.strums.last?.time ?? .nan, step, accuracy: 1e-9)
+    }
+
+    func test_strumsBeforeReady_areNotRecorded() async throws {
+        let viewModel = try makeViewModel(repetitions: 1)
+        strum(viewModel, at: 1)
+        await startPlaying(viewModel)
+        for n in 7...14 { tick(viewModel, n) }
+
+        guard case .finished(let result) = viewModel.state else { return XCTFail("expected finished") }
+        XCTAssertEqual(result.strums, [])
+    }
+
     func test_sameJudgingLogic_worksForEveryPattern() async throws {
         for pattern in PatternCatalog.all {
             finished = []

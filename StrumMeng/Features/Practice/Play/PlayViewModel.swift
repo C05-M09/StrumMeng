@@ -89,6 +89,8 @@ final class PlayViewModel {
     @ObservationIgnored private var pausedSongTime: TimeInterval?
     /// Session time of the latest swipe in a running session, judged or not (the ring reacts to it).
     @ObservationIgnored private var lastStrumSongTime: TimeInterval?
+    /// Every swipe of the running session at its session time, for the result and Replay.
+    @ObservationIgnored private var sessionStrums: [(id: UUID, time: TimeInterval, direction: StrumDirection)] = []
 
     @ObservationIgnored private var tickTask: Task<Void, Never>?
     @ObservationIgnored private var strumTask: Task<Void, Never>?
@@ -306,6 +308,7 @@ final class PlayViewModel {
             // arrive after the short pulse would already be over, so it would look undetected.
             // Judging still uses the touch time.
             if anchorTime != nil { lastStrumSongTime = currentSongTime() }
+            record(strum)
             apply(engine.addStrum(strum))
             finishIfDone()
         default:
@@ -408,6 +411,13 @@ final class PlayViewModel {
         metronome.click(at: time, accent: step >= 0 && step.isMultiple(of: pattern.strokes.count))
     }
 
+    /// Keeps a swipe for Replay at its session time (its touch time, not when it arrived). A resent
+    /// copy is kept once; a swipe before the count-in has a session time is skipped.
+    private func record(_ strum: StrumEvent) {
+        guard let anchorTime, !sessionStrums.contains(where: { $0.id == strum.id }) else { return }
+        sessionStrums.append((strum.id, strum.time - anchorTime, strum.direction))
+    }
+
     private func apply(_ events: [BeatEvent]) {
         guard !events.isEmpty else { return }
         let songTime = currentSongTime()
@@ -434,8 +444,13 @@ final class PlayViewModel {
         guard state == .playing, nextStep >= totalSteps, engine.openBeats.isEmpty else { return }
         windowTask?.cancel()
         metronome?.cancelClicks()
+        let extra = Set(engine.extraStrumIDs)
+        let strums = sessionStrums.map {
+            RecordedStrum(time: $0.time, direction: $0.direction, isExtra: extra.contains($0.id))
+        }
         let result = SessionResultBuilder.build(id: makeID(), patternID: pattern.id, bpm: bpm,
-                                                beatEvents: beatEvents, createdAt: currentDate())
+                                                beatEvents: beatEvents, strums: strums,
+                                                createdAt: currentDate())
         // .finished from here on: strums in the break are ignored, not judged.
         state = reduce(state, .sessionEnded(result))
         Task { [clock, controller] in
@@ -479,6 +494,7 @@ final class PlayViewModel {
         windowTask?.cancel()
         engine = FeedbackEngine(config: tolerance, latencyOffset: latencyOffset, stepInterval: stepInterval)
         beatEvents = []
+        sessionStrums = []
         judgedAt = [:]
         countInFirstIndex = nil
         countInStartTime = nil

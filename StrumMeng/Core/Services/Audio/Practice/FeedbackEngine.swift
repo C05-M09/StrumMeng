@@ -11,7 +11,7 @@ import Foundation
 ///
 /// A strum that ends up used by no step (a swipe on a rest, or a second swipe for the same step) is
 /// listed in `extraStrumIDs`; the session counts it as a Miss. Strums before the first step's window
-/// (the count-in) are not extra.
+/// (the count-in, also the re-count after a pause) are not extra.
 struct FeedbackEngine {
     let config: ToleranceConfig
     let latencyOffset: TimeInterval
@@ -23,7 +23,7 @@ struct FeedbackEngine {
     private var seenStrumIDs: Set<UUID> = []
     /// Strums that were dropped without deciding any step, in the order they were dropped.
     private(set) var extraStrumIDs: [UUID] = []
-    /// Whether any step has been added yet; strums before the first step are never extra.
+    /// Whether a step has been added since the start or the last pause; strums before it are never extra.
     private var hasStarted = false
 
     init(config: ToleranceConfig, latencyOffset: TimeInterval, stepInterval: TimeInterval) {
@@ -73,6 +73,8 @@ struct FeedbackEngine {
         let dropped = openBeats
         openBeats = []
         strums = []
+        // The re-count after a pause is a count-in again.
+        hasStarted = false
         return dropped
     }
 

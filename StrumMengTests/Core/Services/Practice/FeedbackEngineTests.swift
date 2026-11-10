@@ -157,6 +157,18 @@ final class FeedbackEngineTests: XCTestCase {
         XCTAssertEqual(engine.extraStrumIDs, [])
     }
 
+    func test_strumsDuringTheRecountAfterAPause_areNotExtra() {
+        var engine = makeEngine()
+        _ = engine.addBeat(beat(0, at: 10))
+        _ = engine.addStrum(PracticeFixtures.strum(at: 10.0))
+        _ = engine.discardOpenBeats()
+        // Swipes during the 3-2-1 before the session continues at step 2.
+        _ = engine.addStrum(PracticeFixtures.strum(at: 20.0))
+        _ = engine.addBeat(beat(2, at: 21))
+        _ = engine.close(upTo: 22)
+        XCTAssertEqual(engine.extraStrumIDs, [])
+    }
+
     func test_resentCopyOfAStrum_isNeverExtra() {
         var engine = makeEngine()
         let strum = PracticeFixtures.strum(at: 10.0)
