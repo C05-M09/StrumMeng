@@ -2,7 +2,7 @@ import Foundation
 
 /// The metronome click from the prototype: a short sine blip that dies away in a few ms.
 nonisolated enum ClickSound {
-    static let duration = 0.035
+    static let duration = 0.06
     static let accentFrequency = 1760.0
     static let beatFrequency = 1175.0
 
