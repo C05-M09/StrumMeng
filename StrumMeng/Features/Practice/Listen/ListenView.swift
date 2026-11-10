@@ -157,7 +157,7 @@ struct ListenView: View {
                 VStack(spacing: 2) {
                     Text("Read and listen to the pattern,")
                     Text("then strum along when you’re ready.")
-                    Text("\(Text("No chords needed,").foregroundStyle(AppColors.redAccent)) just the rhythm.")
+                    Text("Just focus on the rhythm.")
                 }
                     .font(AppTypography.dmMono(size: 28)).multilineTextAlignment(.center)
                     .foregroundStyle(AppColors.brownInk)
