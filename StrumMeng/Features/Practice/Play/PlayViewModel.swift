@@ -387,8 +387,8 @@ final class PlayViewModel {
         case .idle, .listening, .ready: .ready
         case .countIn(let n): .countIn(n)
         case .playing, .finished: .playing
-        // Shown as the pause menu until the disconnect overlay exists.
-        case .paused, .disconnected: .paused
+        case .paused: .paused
+        case .disconnected: .disconnected(isReconnected: isControllerConnected)
         }
     }
 

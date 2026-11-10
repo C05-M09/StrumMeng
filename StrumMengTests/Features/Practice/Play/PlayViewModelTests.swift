@@ -672,6 +672,18 @@ final class PlayViewModelTests: XCTestCase {
         XCTAssertEqual(controller.sessionActiveCalls, [true, false])
     }
 
+    func test_disconnectedScreen_showsWhenTheIPhoneIsBack() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try await makeConnectedViewModel(controller)
+        await startPlaying(viewModel)
+        await viewModel.handle(.reconnecting)
+        XCTAssertEqual(viewModel.screenModel().phase, .disconnected(isReconnected: false))
+        await viewModel.handle(.connected(latencyMs: 6))
+        XCTAssertEqual(viewModel.screenModel().phase, .disconnected(isReconnected: true))
+        await viewModel.handle(.reconnecting)
+        XCTAssertEqual(viewModel.screenModel().phase, .disconnected(isReconnected: false))
+    }
+
     func test_backToMenu_whileDisconnected_leavesTheSession() async throws {
         let controller = MockControllerLink()
         let viewModel = try await makeConnectedViewModel(controller)

@@ -2,7 +2,8 @@ import SwiftUI
 
 /// Practice-Play screen, edge to edge. The Play_BG artwork provides the header box, the red board and
 /// the lane; on top of it the code draws the pause button, title, BPM, the moving lane contents,
-/// session time and progress. READY?, the count-in and the pause modal draw over a veil.
+/// session time and progress. READY?, the count-in, the pause modal and the iPhone-disconnected
+/// notice draw over a veil.
 ///
 /// Only the parts that move (lane, time, progress, count-in number) are redrawn every frame; the
 /// artwork, title, BPM and buttons are drawn once and only change with the phase. That keeps each
@@ -166,6 +167,10 @@ struct PracticePlayView: View {
                     .transition(.scale(scale: 0.9).combined(with: .opacity))
             }
             .transition(.opacity)
+        case .disconnected(let isReconnected):
+            ControllerDisconnectedOverlay(unit: layout.unit, isReconnected: isReconnected,
+                                          onResume: onResume, onBackToMenu: onBackToMenu)
+                .transition(.opacity)
         case .playing:
             EmptyView()
         }
