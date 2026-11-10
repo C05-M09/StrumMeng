@@ -156,7 +156,7 @@ struct BPMRecommendationOverlay: View {
                 .foregroundStyle(AppColor.ink)
                 .multilineTextAlignment(.center)
                 .lineSpacing(4)
-                .frame(width: 580)
+                .frame(width: 560)
                 .offset(x: 35, y: -5)
         }
         .position(x: 880, y: 460)
@@ -206,7 +206,7 @@ struct BPMRecommendationOverlay: View {
     private var speechText: String {
         let countText = offTempoCount == 1 ? "1 time" : "\(offTempoCount) times"
         if offTempoCount > 0 {
-            return "You lost the tempo \(countText) last time. Try starting at \(recommendation.targetBPM) BPM, or challenge yourself at your previous BPM?"
+            return "You lost the tempo \(countText) last time. Try starting at \(recommendation.targetBPM) BPM, or keep practicing at your previous BPM?"
         } else {
             return "All on tempo! Ready to level up to \(recommendation.targetBPM) BPM, or keep practicing at your previous BPM?"
         }

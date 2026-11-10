@@ -17,8 +17,8 @@ enum ListenLayout {
     static let titleLineSpacing: CGFloat = -20
     static let informationBannerSize = CGSize(width: 1500, height: 616)
     static let informationBannerCenter = CGPoint(x: 688, y: 516)
-    static let informationCharacterSize = CGSize(width: 960, height: 1020)
-    static let informationCharacterCenter = CGPoint(x: 450, y: 620)
+    static let informationCharacterSize = CGSize(width: 920, height: 1000)
+    static let informationCharacterCenter = CGPoint(x: 450, y: 567)
     static let informationBubbleSize = CGSize(width: 850, height: 320)
     static let informationBubbleCenter = CGPoint(x: 895, y: 680)
     static let informationTextCenter = CGPoint(x: 925, y: 675)
@@ -162,8 +162,7 @@ struct ListenView: View {
                 .modifier(informationEntrance(.banner))
                 .allowsHitTesting(false)
             Image("Retry_Character").resizable().scaledToFit()
-                .frame(width: ListenLayout.informationCharacterSize.width,
-                       height: ListenLayout.informationCharacterSize.height)
+                .frame(width: ListenLayout.informationCharacterSize.width)
                 .position(ListenLayout.informationCharacterCenter)
                 .modifier(informationEntrance(.mascot))
             ZStack {

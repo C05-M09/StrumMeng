@@ -2,9 +2,9 @@ import Foundation
 
 /// A sound in a replay, at its session time (seconds after step 0).
 ///
-/// Replay sounds like Play did: the metronome on every quarter note and the player's own strums at
-/// their recorded times. A strum's direction is not stored, so it takes the direction of the note it
-/// was judged against; a Miss with no recorded strum makes no sound.
+/// Replay sounds like Play did: the metronome on every quarter note and the player's strums at
+/// their recorded times. If a beat was judged as a Miss (wrong strum or missed beat), it plays
+/// with the wrong strum direction so the player can audibly hear their mistake during replay.
 struct ReplayCue: Equatable {
     enum Sound: Equatable {
         case strum(StrumDirection)
@@ -23,14 +23,24 @@ struct ReplayCue: Equatable {
             cues.append(ReplayCue(time: Double(step) * stepInterval, sound: .click(accent: accent)))
         }
         for event in result.beatEvents {
-            guard let offsetMs = event.offsetMs, !pattern.strokes.isEmpty else { continue }
+            guard !pattern.strokes.isEmpty else { continue }
+            let stroke = pattern.strokes[event.stepIndex % pattern.strokes.count]
             let direction: StrumDirection
-            switch pattern.strokes[event.stepIndex % pattern.strokes.count] {
-            case .down: direction = .down
-            case .up: direction = .up
-            case .rest: continue
+            if event.result == .miss {
+                // Wrong strum: opposite direction of the pattern stroke (or down on rest)
+                switch stroke {
+                case .down: direction = .up
+                case .up: direction = .down
+                case .rest: direction = .down
+                }
+            } else {
+                switch stroke {
+                case .down: direction = .down
+                case .up: direction = .up
+                case .rest: continue
+                }
             }
-            let time = Double(event.stepIndex) * stepInterval + offsetMs / 1000
+            let time = Double(event.stepIndex) * stepInterval + (event.offsetMs ?? 0) / 1000
             cues.append(ReplayCue(time: time, sound: .strum(direction)))
         }
         return cues.sorted { $0.time < $1.time }

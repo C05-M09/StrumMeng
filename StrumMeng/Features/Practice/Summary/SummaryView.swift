@@ -290,7 +290,7 @@ struct SummaryView: View {
             /// TO DO: Bisa diubah pakai condition
             Text(
                 offTempoCount > 0
-                ? "BUT YOU OFF TEMPO \(offTempoCount) TIMES. wiadiawdwijdwa awidjawd widjaw wa daw aw adw daw fdwa wdaa aw wawd wad."
+                ? "BUT YOU OFF TEMPO \(offTempoCount) TIMES. wiadiawdwijdwa awidjawd widjaw wa daw aw adw daw fdwa."
                 : "ALL ON TEMPO! PERFECT RHYTHM."
             )
             .font(AppTypography.dmMono(size: 30))
