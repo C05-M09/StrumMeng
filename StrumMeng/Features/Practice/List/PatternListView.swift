@@ -107,7 +107,8 @@ struct PatternListView: View {
                         onDecreaseBPM: { viewModel.send(.decreaseBPM) },
                         onIncreaseBPM: { viewModel.send(.increaseBPM) },
                         recordsViewModel: viewModel.recordsViewModels[selectedPatternID],
-                        recordsFallbackState: viewModel.recordsFallbackState
+                        recordsFallbackState: viewModel.recordsFallbackState,
+                        recordsRefreshID: viewModel.recordsRefreshID
                     )
                     .id(selectedPatternID)
                     .transition(

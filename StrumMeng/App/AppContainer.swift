@@ -157,12 +157,19 @@ final class AppContainer {
             patternListViewModel?.send(.setBPM(bpm))
             router.popTo(.practiceList)
             router.push(.listen(patternID: result.patternID, bpm: bpm))
+            reloadRecords()
         case .backToMain:
             router.popTo(.practiceList)
+            reloadRecords()
         case .replay:
             // Shown inside SummaryView.
             break
         }
+    }
+
+    /// Summary waits for the save before navigating, so the new session is already stored here.
+    private func reloadRecords() {
+        Task { await patternListViewModel?.reloadRecords() }
     }
 
     func makePatternListViewModel() -> PatternListViewModel {
@@ -174,6 +181,10 @@ final class AppContainer {
         let viewModel = PatternListViewModel(
             recordsViewModels: records,
             recordsFallbackState: repository == nil ? .failed : .empty,
+            lastPlayedBPM: { [repository] patternID in
+                guard let repository else { return nil }
+                return try? await repository.lastPracticeBPM(forPattern: patternID)
+            },
             onListenRequested: { [weak router] patternID, bpm in
                 router?.push(.listen(patternID: patternID, bpm: bpm))
             },
