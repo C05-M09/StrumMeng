@@ -15,7 +15,7 @@ struct DeviceSetupView: View {
                 title
                 BackButton { viewModel.send(.tapBack) }
                     .position(BackButton.referenceCenter)
-                lane.position(x: size.width / 2, y: 520)
+                lane.position(x: size.width / 2, y: 540)
                 ChunkyButton(title: "Done", fontSize: 44, width: 294, height: 96, hasDropShadow: true) {
                     viewModel.send(.tapDone)
                 }
@@ -41,7 +41,7 @@ struct DeviceSetupView: View {
                      foregroundColor: AppColors.white, outlineColor: AppColors.brownInk,
                      outlineWidth: 6, shadowColor: AppColors.brownInk, shadowOffset: .zero,
                      alignment: .center)
-            .position(x: AppLayout.referenceSize.width / 2, y: 120)
+            .position(x: AppLayout.referenceSize.width / 2, y: 100)
     }
 
     @ViewBuilder
@@ -54,9 +54,12 @@ struct DeviceSetupView: View {
                 steps
             }
         case let .connected(latencyMs):
-            VStack(spacing: AppSpacing.l) {
-                heading("Connected", color: AppColor.perfect, size: 92)
-                detail("iPhone is ready to strum (\(Int(latencyMs.rounded())) ms)")
+            VStack(spacing: AppSpacing.xl) {
+                VStack(spacing: AppSpacing.xs) {
+                    heading("Connected", color: AppColor.perfect, size: 92)
+                    detail("iPhone is ready to strum")
+                }
+                detail("Device latency: \(Int(latencyMs.rounded())) ms")
             }
         case .reconnecting:
             VStack(spacing: AppSpacing.l) {
