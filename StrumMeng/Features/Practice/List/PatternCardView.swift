@@ -7,7 +7,8 @@ struct PatternCardView: View {
     let onIncreaseBPM: () -> Void
     var recordsViewModel: RecordsViewModel? = nil
     var recordsFallbackState: RecordsViewState = .empty
-
+    var recordsRefreshID: Int = 0
+    
     var body: some View {
         ZStack {
             Image(cardAssetName)
@@ -65,6 +66,7 @@ struct PatternCardView: View {
             Group {
                 if let recordsViewModel {
                     RecordsView(viewModel: recordsViewModel)
+                        .id(recordsRefreshID)
                 } else {
                     RecordsContentView(state: recordsFallbackState)
                 }
