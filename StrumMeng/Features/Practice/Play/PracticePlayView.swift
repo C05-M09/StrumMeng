@@ -126,7 +126,7 @@ struct PracticePlayView: View {
         }
     }
 
-    // MARK: Veil (READY?, count-in, pause)
+    // MARK: Veil (READY?, count-in, pause, iPhone disconnected)
 
     @ViewBuilder
     private func veil(_ layout: PlayScreenLayout, _ model: PlayScreenModel) -> some View {
@@ -168,9 +168,13 @@ struct PracticePlayView: View {
             }
             .transition(.opacity)
         case .disconnected(let isReconnected):
-            ControllerDisconnectedOverlay(unit: layout.unit, isReconnected: isReconnected,
-                                          onResume: onResume, onBackToMenu: onBackToMenu)
-                .transition(.opacity)
+            ZStack {
+                AppColors.brownInk.opacity(0.65)
+                ControllerDisconnectedOverlay(unit: layout.unit, isReconnected: isReconnected,
+                                              onResume: onResume, onBackToMenu: onBackToMenu)
+                    .transition(.scale(scale: 0.9).combined(with: .opacity))
+            }
+            .transition(.opacity)
         case .playing:
             EmptyView()
         }

@@ -138,12 +138,12 @@ struct PracticePlayDemoView: View {
                                                        songTime: 5, paused: true))
 }
 
-#Preview("iPhone disconnected", traits: .landscapeLeft) {
+#Preview("Paused - reconnecting", traits: .landscapeLeft) {
     PracticePlayView(model: PracticePlayDemoView.model(songTime: 5,
                                                        disconnected: .disconnected(isReconnected: false)))
 }
 
-#Preview("iPhone reconnected", traits: .landscapeLeft) {
+#Preview("Paused - iPhone back", traits: .landscapeLeft) {
     PracticePlayView(model: PracticePlayDemoView.model(songTime: 5,
                                                        disconnected: .disconnected(isReconnected: true)))
 }
