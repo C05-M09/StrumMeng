@@ -29,6 +29,7 @@ struct ListenView: View {
     @State private var viewModel: ListenViewModel
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.playSoundEffect) private var playSoundEffect
     @State private var informationVisible = false
     
     init(viewModel: ListenViewModel) {
@@ -189,6 +190,7 @@ struct ListenView: View {
                 .position(ListenLayout.informationNextCenter)
                 .modifier(informationEntrance(.buttons))
         }
+        .onAppear { playSoundEffect(.popUp) }
     }
     
     private func informationEntrance(_ stage: ListenInformationEntrance.Stage) -> ListenInformationEntrance {

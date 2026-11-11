@@ -21,6 +21,8 @@ final class CompanionViewModel {
     @ObservationIgnored private let connectTimeout: Duration
     @ObservationIgnored private let makeGuitar: () -> (any GuitarSound)?
     @ObservationIgnored private var guitar: (any GuitarSound)?
+    @ObservationIgnored private let makeSounds: () -> (any MenuSoundService)?
+    @ObservationIgnored private var sounds: (any MenuSoundService)?
     /// While the iPad has a session playing the sound comes from the iPad, so this iPhone stays silent.
     @ObservationIgnored private var isSessionActive = false
     @ObservationIgnored private var tracker = SwipeTracker()
@@ -33,13 +35,15 @@ final class CompanionViewModel {
     ///     the iPad may simply not be open yet, and Cancel is there if it never comes.
     ///   - makeGuitar: called once on appear, not here: this view model can be made again on a
     ///     redraw, and each real guitar starts its own audio engine.
+    ///   - makeSounds: the button click, made on appear for the same reason.
     init(
         client: any ControllerClient,
         pairCodes: any PairCodeStore,
         state: CompanionState = .enteringCode(""),
         now: @escaping () -> TimeInterval = HostClock.now,
         connectTimeout: Duration = .seconds(10),
-        makeGuitar: @escaping () -> (any GuitarSound)? = { nil }
+        makeGuitar: @escaping () -> (any GuitarSound)? = { nil },
+        makeSounds: @escaping () -> (any MenuSoundService)? = { nil }
     ) {
         self.client = client
         self.pairCodes = pairCodes
@@ -47,6 +51,7 @@ final class CompanionViewModel {
         self.now = now
         self.connectTimeout = connectTimeout
         self.makeGuitar = makeGuitar
+        self.makeSounds = makeSounds
     }
 
     /// Follows the link and goes back to the iPad it was last paired with.
@@ -65,6 +70,9 @@ final class CompanionViewModel {
         if guitar == nil, let made = makeGuitar() {
             guitar = made
             Task { await made.prepare() }
+        }
+        if sounds == nil {
+            sounds = makeSounds()
         }
         if let saved = pairCodes.enteredPairCode {
             send(.resumePairing(saved.value))
@@ -132,6 +140,13 @@ final class CompanionViewModel {
 
     func endSwipe() {
         tracker.reset()
+    }
+
+    /// The keys and Unpair click like the iPad's buttons, but not while the iPad has a session
+    /// playing: then the iPhone stays silent (ARCHITECTURE.md decision 20).
+    func playSoundEffect(_ effect: SoundEffect) {
+        guard !isSessionActive else { return }
+        sounds?.play(effect)
     }
 
     private func sessionChanged(_ active: Bool) {

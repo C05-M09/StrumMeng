@@ -25,30 +25,23 @@ final class HomeViewModel {
     let guidance: HomeGuidanceViewModel?
     private(set) var presentedOverlay: HomeOverlay?
 
-    private let sounds: any MenuSoundService
     private let onPracticeRequested: () -> Void
 
-    init(sounds: any MenuSoundService, guidance: HomeGuidanceViewModel? = nil,
-         onPracticeRequested: @escaping () -> Void) {
+    init(guidance: HomeGuidanceViewModel? = nil, onPracticeRequested: @escaping () -> Void) {
         self.guidance = guidance
-        self.sounds = sounds
         self.onPracticeRequested = onPracticeRequested
     }
 
     func send(_ event: HomeEvent) {
         switch event {
+        // The buttons click on their own (ButtonPressSound), so no sound is played here.
         case .tapPractice:
-            sounds.playButtonSound()
             onPracticeRequested()
         case .tapOption:
-            sounds.playButtonSound()
             presentedOverlay = .option
         case .tapGuidebook:
-            sounds.playButtonSound()
             presentedOverlay = .guidebook
         case .dismissOverlay:
-            // Sent by the Back button of Option and of Guidebook, so both click here.
-            sounds.playButtonSound()
             presentedOverlay = nil
         case .tapShowtime:
             break   // Showtime is not connected yet: no navigation, no message.

@@ -16,15 +16,9 @@ final class HomeViewModelTests: XCTestCase {
     }
 
     private func makeSUT() -> (sut: HomeViewModel, recorder: CallbackRecorder) {
-        let (sut, recorder, _) = makeSUTWithSounds()
-        return (sut, recorder)
-    }
-
-    private func makeSUTWithSounds() -> (sut: HomeViewModel, recorder: CallbackRecorder, sounds: MockMenuSoundService) {
         let recorder = CallbackRecorder()
-        let sounds = MockMenuSoundService()
-        let sut = HomeViewModel(sounds: sounds, onPracticeRequested: { recorder.practiceCount += 1 })
-        return (sut, recorder, sounds)
+        let sut = HomeViewModel(onPracticeRequested: { recorder.practiceCount += 1 })
+        return (sut, recorder)
     }
 
     // MARK: - Initial state
@@ -146,55 +140,6 @@ final class HomeViewModelTests: XCTestCase {
 
         XCTAssertEqual(recorder.practiceCount, 0, "Showtime tidak boleh navigasi")
         XCTAssertNil(sut.presentedOverlay, "Showtime tidak boleh membuka overlay")
-    }
-
-    func test_tapShowtime_playsNoButtonSound() {
-        let (sut, _, sounds) = makeSUTWithSounds()
-
-        sut.send(.tapShowtime)
-
-        XCTAssertEqual(sounds.buttonSoundCount, 0, "Showtime has no action, so no click either")
-    }
-
-    // MARK: - Button sound
-
-    func test_init_playsNoButtonSound() {
-        let (_, _, sounds) = makeSUTWithSounds()
-
-        XCTAssertEqual(sounds.buttonSoundCount, 0)
-    }
-
-    func test_tapPractice_playsTheButtonSound() {
-        let (sut, _, sounds) = makeSUTWithSounds()
-
-        sut.send(.tapPractice)
-
-        XCTAssertEqual(sounds.buttonSoundCount, 1)
-    }
-
-    func test_tapOption_playsTheButtonSound() {
-        let (sut, _, sounds) = makeSUTWithSounds()
-
-        sut.send(.tapOption)
-
-        XCTAssertEqual(sounds.buttonSoundCount, 1)
-    }
-
-    func test_tapGuidebook_playsTheButtonSound() {
-        let (sut, _, sounds) = makeSUTWithSounds()
-
-        sut.send(.tapGuidebook)
-
-        XCTAssertEqual(sounds.buttonSoundCount, 1)
-    }
-
-    func test_dismissOverlay_playsTheButtonSound() {
-        let (sut, _, sounds) = makeSUTWithSounds()
-        sut.send(.tapOption)
-
-        sut.send(.dismissOverlay)
-
-        XCTAssertEqual(sounds.buttonSoundCount, 2, "one for opening, one for Back")
     }
 
     func test_tapShowtime_whileOverlayShown_keepsOverlay() {

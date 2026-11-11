@@ -70,6 +70,8 @@ struct HomeView: View {
             menuButton(HomeLayout.showtime, "Showtime", hint: "Not available yet") {
                 viewModel.send(.tapShowtime)
             }
+            // Showtime has no action yet, so it does not click either.
+            .environment(\.playSoundEffect, .silent)
 
             menuButton(HomeLayout.option, "Option") {
                 viewModel.send(.tapOption)
@@ -145,11 +147,10 @@ struct HomeView: View {
 }
 
 #Preview {
-    let sounds = AVMenuSoundService()
-    let home = HomeViewModel(sounds: sounds, onPracticeRequested: {})
+    let home = HomeViewModel(onPracticeRequested: {})
     let option = OptionViewModel(
         settings: UserDefaultsSettingsStore(),
-        sounds: sounds,
+        sounds: AVMenuSoundService(),
         onBackRequested: { [weak home] in home?.send(.dismissOverlay) }
     )
     let guidebook = GuidebookViewModel(

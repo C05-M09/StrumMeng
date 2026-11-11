@@ -22,7 +22,7 @@ struct CompanionPairingView: View {
 
             ZStack {
                 Image("Companion_Pair_BG").resizable()
-                title.position(x: size.width / 2, y: 76.8)
+                title.position(x: size.width / 2, y: 90)
                 lines(prompt, font: AppTypography.bungee(size: 22), spacing: -7.4)
                     .position(x: size.width / 2, y: 252)
                 PairCodeSlotsView(code: typedCode, slotSize: CGSize(width: 46.8, height: 62.2),

@@ -5,6 +5,7 @@ import SwiftUI
 struct PracticePlaySessionView: View {
     @State private var viewModel: PlayViewModel
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.playSoundEffect) private var playSoundEffect
     private let startImmediately: Bool
     private let onTransitionComplete: ((SessionResult) -> Void)?
 
@@ -81,6 +82,7 @@ struct PracticePlaySessionView: View {
 
     private func startEndSessionTransition(result: SessionResult) {
         completedResult = result
+        playSoundEffect(.popUp)
         withAnimation(.easeOut(duration: 0.2)) {
             isShowingBanner = true
         }
@@ -90,6 +92,7 @@ struct PracticePlaySessionView: View {
             try? await Task.sleep(for: .seconds(3.0))
 
             // 2. Garage shutter slams down from the top
+            playSoundEffect(.garage)
             withAnimation(.spring(response: 0.50, dampingFraction: 0.86)) {
                 isGarageClosed = true
             }

@@ -12,8 +12,8 @@ final class MenuMusicPolicyTests: XCTestCase {
         XCTAssertTrue(MenuMusicPolicy.playsMusic(on: .practiceList, isAppActive: true))
     }
 
-    func test_deviceSetup_playsMusic() {
-        XCTAssertTrue(MenuMusicPolicy.playsMusic(on: .deviceSetup, isAppActive: true))
+    func test_deviceSetup_pausesMusic() {
+        XCTAssertFalse(MenuMusicPolicy.playsMusic(on: .deviceSetup, isAppActive: true))
     }
 
     func test_listen_pausesMusic() {

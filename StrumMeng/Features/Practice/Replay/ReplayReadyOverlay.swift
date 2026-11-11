@@ -20,6 +20,7 @@ struct ReplayReadyOverlay: View {
     @State private var mascotEntered: Bool = false
     @State private var bubbleEntered: Bool = false
     @State private var buttonEntered: Bool = false
+    @Environment(\.playSoundEffect) private var playSoundEffect
 
     init(onStart: @escaping () -> Void = {}) {
         self.onStart = onStart
@@ -55,6 +56,7 @@ struct ReplayReadyOverlay: View {
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
         .onAppear {
+            playSoundEffect(.popUp)
             triggerEntranceAnimation()
         }
     }
