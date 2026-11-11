@@ -51,7 +51,8 @@ struct PracticePlayDemoView: View {
                       pattern: [BeatNodeView.Arrow?] = [.down, .up, .down, .up, .down, .up, .down, .up],
                       songTime: TimeInterval,
                       ready: Bool = false,
-                      paused: Bool = false) -> PlayScreenModel {
+                      paused: Bool = false,
+                      disconnected: PlayScreenPhase? = nil) -> PlayScreenModel {
         let slot = PlayTimeline.slotInterval(bpm: bpm)
         var nodes = PlayTimeline.makeNodes(pattern: pattern, slotInterval: slot, duration: duration)
         var last: PlayJudgement?
@@ -72,7 +73,9 @@ struct PracticePlayDemoView: View {
         }
 
         let phase: PlayScreenPhase
-        if ready {
+        if let disconnected {
+            phase = disconnected
+        } else if ready {
             phase = .ready
         } else if paused {
             phase = .paused
@@ -133,5 +136,15 @@ struct PracticePlayDemoView: View {
     PracticePlayView(model: PracticePlayDemoView.model(title: "Syncopation Strum",
                                                        pattern: [.down, nil, .down, .up, nil, .up, .down, .up],
                                                        songTime: 5, paused: true))
+}
+
+#Preview("Paused - reconnecting", traits: .landscapeLeft) {
+    PracticePlayView(model: PracticePlayDemoView.model(songTime: 5,
+                                                       disconnected: .disconnected(isReconnected: false)))
+}
+
+#Preview("Paused - iPhone back", traits: .landscapeLeft) {
+    PracticePlayView(model: PracticePlayDemoView.model(songTime: 5,
+                                                       disconnected: .disconnected(isReconnected: true)))
 }
 #endif

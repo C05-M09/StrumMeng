@@ -6,4 +6,5 @@ enum PlayScreenPhase: Equatable {
     case countIn(Int)     // 3, 2, 1
     case playing
     case paused           // "Are you sure want to end the session?"
+    case disconnected(isReconnected: Bool)  // the iPhone dropped; Resume once it is back
 }

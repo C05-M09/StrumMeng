@@ -500,22 +500,22 @@ final class PlayViewModelTests: XCTestCase {
         XCTAssertEqual(controller.sessionActiveCalls, [true])
     }
 
-    func test_controllerDisconnectingWhilePlaying_pausesTheSession() async throws {
+    func test_controllerDisconnectingWhilePlaying_stopsTheSessionAsDisconnected() async throws {
         let controller = MockControllerLink()
         let viewModel = try await makeConnectedViewModel(controller)
         await startPlaying(viewModel)
         await viewModel.handle(.reconnecting)
-        XCTAssertEqual(viewModel.state, .paused)
+        XCTAssertEqual(viewModel.state, .disconnected)
         XCTAssertEqual(clock.pauseCount, 1)
         XCTAssertEqual(controller.sessionActiveCalls, [true, false])
     }
 
-    func test_controllerDisconnectingDuringTheCountIn_pausesTheSession() async throws {
+    func test_controllerDisconnectingDuringTheCountIn_stopsTheSessionAsDisconnected() async throws {
         let controller = MockControllerLink()
         let viewModel = try await makeConnectedViewModel(controller)
         await viewModel.send(.tapReady)
         await viewModel.handle(.reconnecting)
-        XCTAssertEqual(viewModel.state, .paused)
+        XCTAssertEqual(viewModel.state, .disconnected)
     }
 
     func test_controllerDisconnectingWhilePlaying_doesNotJudgeMisses() async throws {
@@ -543,7 +543,7 @@ final class PlayViewModelTests: XCTestCase {
         await startPlaying(viewModel)
         await viewModel.handle(.reconnecting)
         await viewModel.send(.tapResume)
-        XCTAssertEqual(viewModel.state, .paused)
+        XCTAssertEqual(viewModel.state, .disconnected)
         await viewModel.handle(.connected(latencyMs: 8))
         await viewModel.send(.tapResume)
         XCTAssertEqual(viewModel.state, .countIn(3))
@@ -639,13 +639,59 @@ final class PlayViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.state, .playing)
     }
 
-    func test_optionalController_sessionStartedWithTheIPhone_pausesWhenItDrops() async throws {
+    func test_optionalController_sessionStartedWithTheIPhone_stopsAsDisconnectedWhenItDrops() async throws {
         let controller = MockControllerLink()
         let viewModel = try makeViewModel(controller: controller, requiresController: false)
         await viewModel.handle(.connected(latencyMs: 5))
         await startPlaying(viewModel)
         await viewModel.handle(.reconnecting)
-        XCTAssertEqual(viewModel.state, .paused)
+        XCTAssertEqual(viewModel.state, .disconnected)
+    }
+
+    func test_optionalController_resumeAfterTheIPhoneDropped_waitsForItToReconnect() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try makeViewModel(controller: controller, requiresController: false)
+        await viewModel.handle(.connected(latencyMs: 5))
+        await startPlaying(viewModel)
+        await viewModel.handle(.reconnecting)
+        await viewModel.send(.tapResume)
+        XCTAssertEqual(viewModel.state, .disconnected)
+        await viewModel.handle(.connected(latencyMs: 5))
+        await viewModel.send(.tapResume)
+        XCTAssertEqual(viewModel.state, .countIn(3))
+    }
+
+    func test_controllerDisconnectingWhilePaused_showsDisconnectedWithoutPausingTwice() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try await makeConnectedViewModel(controller)
+        await startPlaying(viewModel)
+        await viewModel.send(.tapPause)
+        await viewModel.handle(.reconnecting)
+        XCTAssertEqual(viewModel.state, .disconnected)
+        XCTAssertEqual(clock.pauseCount, 1)
+        XCTAssertEqual(controller.sessionActiveCalls, [true, false])
+    }
+
+    func test_disconnectedScreen_showsWhenTheIPhoneIsBack() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try await makeConnectedViewModel(controller)
+        await startPlaying(viewModel)
+        await viewModel.handle(.reconnecting)
+        XCTAssertEqual(viewModel.screenModel().phase, .disconnected(isReconnected: false))
+        await viewModel.handle(.connected(latencyMs: 6))
+        XCTAssertEqual(viewModel.screenModel().phase, .disconnected(isReconnected: true))
+        await viewModel.handle(.reconnecting)
+        XCTAssertEqual(viewModel.screenModel().phase, .disconnected(isReconnected: false))
+    }
+
+    func test_backToMenu_whileDisconnected_leavesTheSession() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try await makeConnectedViewModel(controller)
+        await startPlaying(viewModel)
+        await viewModel.handle(.reconnecting)
+        await viewModel.send(.tapBackToMenu)
+        XCTAssertEqual(viewModel.state, .idle)
+        XCTAssertEqual(exitCount, 1)
     }
     // MARK: Sound
 
