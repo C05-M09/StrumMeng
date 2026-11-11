@@ -14,6 +14,7 @@ struct GuidebookView: View {
 
     @State private var dragOffset: CGFloat = 0
     @State private var isShuffling: Bool = false
+    @Environment(\.playSoundEffect) private var playSoundEffect
     @State private var shufflingCardIndex: Int? = nil
     @State private var shuffleOffset: CGFloat = 0
     @State private var shuffleRotation: Double = 0
@@ -160,6 +161,7 @@ struct GuidebookView: View {
     private func shuffleToBack(direction: CGFloat) {
         guard !isShuffling else { return }
         isShuffling = true
+        playSoundEffect(.guidebookPage)
 
         let activeIndex = viewModel.currentPageIndex
         shufflingCardIndex = activeIndex
@@ -195,6 +197,7 @@ struct GuidebookView: View {
     private func pullFromBackToFront(direction: CGFloat) {
         guard !isShuffling else { return }
         isShuffling = true
+        playSoundEffect(.guidebookPage)
 
         let prevIndex = (viewModel.currentPageIndex - 1 + viewModel.pages.count) % viewModel.pages.count
         shufflingCardIndex = prevIndex

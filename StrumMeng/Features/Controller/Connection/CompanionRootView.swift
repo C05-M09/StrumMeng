@@ -17,6 +17,10 @@ struct CompanionRootView: View {
                 CompanionPairingView(viewModel: viewModel)
             }
         }
+        // The keypad and Unpair click through the shared buttons; the view model decides when.
+        .environment(\.playSoundEffect, SoundEffectAction { [viewModel] effect in
+            viewModel.playSoundEffect(effect)
+        })
         .statusBarHidden()
         .persistentSystemOverlays(.hidden)
         .onAppear { viewModel.appear() }

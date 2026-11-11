@@ -79,6 +79,8 @@ struct ContentView: View {
         .onChange(of: canPresentPairingIntroduction, initial: true) { _, active in
             pairingIntroduction.setActive(active)
         }
+        // Every iPad screen below plays its UI sounds through this (clicks, garage, pop-ups...).
+        .environment(\.playSoundEffect, container.soundEffectAction)
         .task { await container.startControllerLink() }
         // Each pattern starts at the tempo it was last played at. Loaded once here, not on the
         // list's appear, so it never overwrites a tempo the player is adjusting.

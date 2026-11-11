@@ -13,6 +13,7 @@ struct SummaryView: View {
     @State private var activeReplayResult: SessionResult?
     @State private var isShowingFeedbackOverlay: Bool
     @State private var isGarageOpen: Bool = false
+    @Environment(\.playSoundEffect) private var playSoundEffect
 
     init(
         viewModel: SummaryViewModel,
@@ -104,6 +105,8 @@ struct SummaryView: View {
         .persistentSystemOverlays(.hidden)
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
+            // Started with the shutter, which waits 0.1 s; the sound's own run-up covers that.
+            playSoundEffect(.garage)
             withAnimation(.spring(response: 0.58, dampingFraction: 0.86).delay(0.10)) {
                 isGarageOpen = true
             }
@@ -334,6 +337,7 @@ private struct ScaleOnlyButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
             .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
+            .clicksWhenPressed(configuration.isPressed)
     }
 }
 

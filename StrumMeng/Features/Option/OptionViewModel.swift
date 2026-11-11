@@ -42,11 +42,9 @@ final class OptionViewModel {
             sounds.setEffectsVolume(state.sfxVolume)
 
         case .tapSetUpDevice:
-            sounds.playButtonSound()
             onSetUpDeviceRequested()
 
         case .tapBack:
-            // No click here: closing the overlay plays it (HomeViewModel's dismissOverlay).
             onBackRequested()
         }
     }

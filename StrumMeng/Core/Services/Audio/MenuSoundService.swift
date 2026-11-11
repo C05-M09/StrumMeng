@@ -1,7 +1,7 @@
 import Foundation
 
-/// The menu background music and the button click. View models depend on this protocol;
-/// `AppContainer` is the one place that wires in the real player.
+/// The menu background music and the UI sound effects. View models and `SoundEffectAction` depend
+/// on this protocol; `AppContainer` is the one place that wires in the real player.
 ///
 /// Volumes are 0...1. The Option sliders set them through the Option view model, and
 /// `AppContainer` sets the saved values at launch, so the service never reads SettingsStore itself.
@@ -14,8 +14,8 @@ protocol MenuSoundService: AnyObject {
     /// Pauses the background music, keeping its position for the next `startMusic()`.
     func pauseMusic()
 
-    /// Plays the button click once. A new tap restarts it, so fast taps each get a click.
-    func playButtonSound()
+    /// Plays a sound effect once. Fast repeats each get their own sound (the wheel ticks overlap).
+    func play(_ effect: SoundEffect)
 
     /// Values outside 0...1 are clamped.
     func setMusicVolume(_ volume: Double)
