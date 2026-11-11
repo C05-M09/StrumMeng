@@ -213,25 +213,21 @@ struct PracticeTransitionBanner: View {
     }
 }
 
-// MARK: - Rotating Comic Burst Rays (Purrfect Tier)
+// MARK: - Rotating Comic Sunburst (Purrfect Tier)
 private struct ComicBurstRays: View {
     @State private var angle: Double = 0
 
     var body: some View {
-        ZStack {
-            ForEach(0..<6, id: \.self) { index in
-                Rectangle()
-                    .fill(AppColors.yellowAccent.opacity(0.28))
-                    .frame(width: 52, height: 2400)
-                    .rotationEffect(.degrees(Double(index) * 30))
+        Image("Effect_Sunburst")
+            .resizable()
+            .scaledToFit()
+            .frame(width: 1750, height: 1750)
+            .rotationEffect(.degrees(angle))
+            .onAppear {
+                withAnimation(.linear(duration: 14).repeatForever(autoreverses: false)) {
+                    angle = 360
+                }
             }
-        }
-        .rotationEffect(.degrees(angle))
-        .onAppear {
-            withAnimation(.linear(duration: 14).repeatForever(autoreverses: false)) {
-                angle = 360
-            }
-        }
     }
 }
 
