@@ -224,8 +224,11 @@ final class AppContainer {
         let guidanceStore = homeGuidanceStore
         return DeviceSetupViewModel(
             link: sharedControllerLink(),
-            onClose: { [weak router] in router?.pop() },
-            onPairedDone: { guidanceStore.scheduleAfterPairing() }
+            onClose: { [weak router] in
+                // Back also hands off to the Home tour, even without a paired device.
+                guidanceStore.scheduleAfterSetup()
+                router?.pop()
+            }
         )
     }
 

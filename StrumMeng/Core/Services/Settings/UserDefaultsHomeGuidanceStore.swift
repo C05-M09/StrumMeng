@@ -10,7 +10,7 @@ final class UserDefaultsHomeGuidanceStore: HomeGuidanceStore {
     var isPending: Bool { defaults.bool(forKey: Self.pendingKey) }
     var hasCompleted: Bool { defaults.bool(forKey: Self.completedKey) }
 
-    func scheduleAfterPairing() {
+    func scheduleAfterSetup() {
         guard !hasCompleted else { return }
         defaults.set(true, forKey: Self.pendingKey)
     }
