@@ -185,18 +185,20 @@ struct BPMRecommendationOverlay: View {
             }
             .buttonStyle(OverlayScaleButtonStyle())
 
-            Button {
-                onKeepPrevious()
-            } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 22, weight: .bold))
-                    Text("KEEP PREVIOUS BPM")
-                        .font(AppTypography.bungee(size: 38))
+            if recommendation.targetBPM != recommendation.currentBPM {
+                Button {
+                    onKeepPrevious()
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 22, weight: .bold))
+                        Text("KEEP PREVIOUS BPM")
+                            .font(AppTypography.bungee(size: 38))
+                    }
+                    .foregroundStyle(Color.white)
                 }
-                .foregroundStyle(Color.white)
+                .buttonStyle(OverlayScaleButtonStyle())
             }
-            .buttonStyle(OverlayScaleButtonStyle())
         }
         .frame(width: 580, alignment: .leading)
         .position(x: 960, y: 670)
@@ -205,10 +207,34 @@ struct BPMRecommendationOverlay: View {
     // MARK: - Helpers
     private var speechText: String {
         let countText = offTempoCount == 1 ? "1 time" : "\(offTempoCount) times"
-        if offTempoCount > 0 {
-            return "You lost the tempo \(countText) last time. Try starting at \(recommendation.targetBPM) BPM, or keep practicing at your previous BPM?"
+        let currentBPM = recommendation.currentBPM
+        let targetBPM = recommendation.targetBPM
+        let delta = recommendation.delta
+
+        if targetBPM > currentBPM {
+            if offTempoCount == 0 {
+                return "All on tempo! Ready to level up to \(targetBPM) BPM, or retry at \(currentBPM) BPM?"
+            } else {
+                return "Sharp run! Just \(countText) off tempo. Push up to \(targetBPM) BPM, or stay at \(currentBPM) BPM?"
+            }
+        } else if targetBPM < currentBPM {
+            if delta == -10 {
+                return "Off tempo \(countText) last time. Ease back to \(targetBPM) BPM, or retry at \(currentBPM) BPM?"
+            } else {
+                return "You lost the beat \(countText). Slow down to \(targetBPM) BPM to nail it, or keep \(currentBPM) BPM?"
+            }
+        } else if delta > 0 {
+            if offTempoCount == 0 {
+                return "You aced max speed at \(currentBPM) BPM! Ready to run it back at \(currentBPM) BPM?"
+            } else {
+                return "Great run at max \(currentBPM) BPM! Just \(countText) off tempo. Retry \(currentBPM) BPM for 100%?"
+            }
+        } else if delta < 0 {
+            return "Off tempo \(countText) at \(currentBPM) BPM. Take it steady and give \(currentBPM) BPM another shot!"
+        } else if offTempoCount > 0 {
+            return "Nice pace! You slipped \(countText). Let's lock in \(currentBPM) BPM before speeding up!"
         } else {
-            return "All on tempo! Ready to level up to \(recommendation.targetBPM) BPM, or keep practicing at your previous BPM?"
+            return "Solid rhythm! Let's lock in \(currentBPM) BPM once more before speeding up!"
         }
     }
 }
@@ -223,14 +249,121 @@ private struct OverlayScaleButtonStyle: ButtonStyle {
 }
 
 // MARK: - Previews
+#if DEBUG
+private struct BPMOverlayScenario: Identifiable {
+    let id: String
+    let label: String
+    let recommendation: RecommendedBPM
+    let offTempoCount: Int
+
+    static let all: [BPMOverlayScenario] = [
+        BPMOverlayScenario(
+            id: "up-clean",
+            label: "Speed Up (+10, 0 slip)",
+            recommendation: RecommendedBPM(currentBPM: 80, targetBPM: 90, accuracy: 1.0, delta: 10),
+            offTempoCount: 0
+        ),
+        BPMOverlayScenario(
+            id: "up-slip",
+            label: "Speed Up (+10, minor slip)",
+            recommendation: RecommendedBPM(currentBPM: 80, targetBPM: 90, accuracy: 0.90, delta: 10),
+            offTempoCount: 1
+        ),
+        BPMOverlayScenario(
+            id: "max-clean",
+            label: "Max 120 BPM (0 slip)",
+            recommendation: RecommendedBPM(currentBPM: 120, targetBPM: 120, accuracy: 1.0, delta: 10),
+            offTempoCount: 0
+        ),
+        BPMOverlayScenario(
+            id: "max-slip",
+            label: "Max 120 BPM (minor slip)",
+            recommendation: RecommendedBPM(currentBPM: 120, targetBPM: 120, accuracy: 0.90, delta: 10),
+            offTempoCount: 2
+        ),
+        BPMOverlayScenario(
+            id: "stay-slip",
+            label: "Stay Same (66-85%)",
+            recommendation: RecommendedBPM(currentBPM: 80, targetBPM: 80, accuracy: 0.75, delta: 0),
+            offTempoCount: 4
+        ),
+        BPMOverlayScenario(
+            id: "stay-clean",
+            label: "Stay Same (0 slip)",
+            recommendation: RecommendedBPM(currentBPM: 80, targetBPM: 80, accuracy: 0.85, delta: 0),
+            offTempoCount: 0
+        ),
+        BPMOverlayScenario(
+            id: "down-10",
+            label: "Slow Down (-10 BPM)",
+            recommendation: RecommendedBPM(currentBPM: 90, targetBPM: 80, accuracy: 0.58, delta: -10),
+            offTempoCount: 6
+        ),
+        BPMOverlayScenario(
+            id: "down-20",
+            label: "Slow Down (-20 BPM)",
+            recommendation: RecommendedBPM(currentBPM: 90, targetBPM: 70, accuracy: 0.42, delta: -20),
+            offTempoCount: 9
+        ),
+        BPMOverlayScenario(
+            id: "min-60",
+            label: "Min 60 BPM (clamped)",
+            recommendation: RecommendedBPM(currentBPM: 60, targetBPM: 60, accuracy: 0.40, delta: -20),
+            offTempoCount: 9
+        )
+    ]
+}
+
+private struct BPMOverlayScenarioBrowserPreview: View {
+    @State private var index: Int = 0
+
+    private var scenario: BPMOverlayScenario {
+        BPMOverlayScenario.all[index]
+    }
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            PracticePlayDemoView()
+
+            BPMRecommendationOverlay(
+                recommendation: scenario.recommendation,
+                offTempoCount: scenario.offTempoCount
+            )
+            .id(scenario.id)
+
+            HStack(spacing: 10) {
+                Button("◀") {
+                    index = (index - 1 + BPMOverlayScenario.all.count) % BPMOverlayScenario.all.count
+                }
+                .buttonStyle(.borderedProminent)
+
+                Text("\(index + 1)/\(BPMOverlayScenario.all.count): \(scenario.label)")
+                    .font(.caption.bold())
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.ultraThinMaterial, in: Capsule())
+
+                Button("▶") {
+                    index = (index + 1) % BPMOverlayScenario.all.count
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .padding(.top, 14)
+        }
+    }
+}
+
+#Preview("All BPM Scenarios", traits: .landscapeLeft) {
+    BPMOverlayScenarioBrowserPreview()
+}
+
 #Preview("Overlay Standalone", traits: .landscapeLeft) {
     BPMRecommendationOverlay(
-        recommendation: RecommendedBPM(currentBPM: 70, targetBPM: 50, accuracy: 0.45, delta: -20),
+        recommendation: RecommendedBPM(currentBPM: 80, targetBPM: 60, accuracy: 0.45, delta: -20),
         offTempoCount: 7
     )
 }
 
-#if DEBUG
 // PracticePlayDemoView exists in DEBUG builds only.
 #Preview("Overlay on Viewplay (Exact Mockup Match)", traits: .landscapeLeft) {
     ZStack {
@@ -239,7 +372,7 @@ private struct OverlayScaleButtonStyle: ButtonStyle {
 
         // The recommendation overlay on top
         BPMRecommendationOverlay(
-            recommendation: RecommendedBPM(currentBPM: 70, targetBPM: 50, accuracy: 0.45, delta: -20),
+            recommendation: RecommendedBPM(currentBPM: 80, targetBPM: 60, accuracy: 0.45, delta: -20),
             offTempoCount: 7
         )
     }

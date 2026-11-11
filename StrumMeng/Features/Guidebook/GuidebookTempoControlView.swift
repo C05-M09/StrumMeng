@@ -12,6 +12,7 @@ import SwiftUI
 /// and the audio preview toggle button.
 struct GuidebookTempoControlView: View {
     @Bindable var viewModel: GuidebookViewModel
+    @State private var popScale: CGFloat = 1.05
 
     var body: some View {
         
@@ -110,14 +111,12 @@ struct GuidebookTempoControlView: View {
                     // Solid golden-yellow backing card framing the box from behind
                     RoundedRectangle(cornerRadius: cornerRadius + padding)
                         .fill(AppColors.recordOutline)
-
                 }
                 .frame(width: boxWidth + (padding * 2), height: boxHeight + (padding * 2))
                 .shadow(color: AppColors.recordOutline.opacity(0.85), radius: 8, x: 0, y: 0)
                 .shadow(color: AppColors.brownInk.opacity(0.2), radius: 2, y: 2)
-                .scaleEffect(1.04)
+                .scaleEffect(popScale)
                 .offset(x: boxX - padding, y: boxY - padding)
-                .animation(.spring(response: 0.22, dampingFraction: 0.72), value: currentStep)
             }
 
             // Foreground tempo diagram asset
@@ -129,6 +128,13 @@ struct GuidebookTempoControlView: View {
         }
         .frame(width: diagramWidth, height: diagramHeight)
         .frame(maxWidth: .infinity, alignment: .center)
+        .onChange(of: viewModel.currentStep) { _, newStep in
+            guard newStep != nil else { return }
+            popScale = 0.80
+            withAnimation(.spring(response: 0.08, dampingFraction: 0.58)) {
+                popScale = 1.05
+            }
+        }
     }
 }
 
