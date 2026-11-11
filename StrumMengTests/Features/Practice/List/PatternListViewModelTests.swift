@@ -27,11 +27,11 @@ final class PatternListViewModelTests: XCTestCase {
             onBackRequested: {}
         )
 
-        viewModel.send(.selectPattern(id: "dynamic"))
+        viewModel.send(.selectPattern(id: "driving"))
         viewModel.send(.increaseBPM)
         viewModel.send(.tapPlay)
 
-        XCTAssertEqual(routedPatternID, "dynamic")
+        XCTAssertEqual(routedPatternID, "driving")
         XCTAssertEqual(routedBPM, 85)
     }
 

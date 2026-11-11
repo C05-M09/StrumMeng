@@ -87,8 +87,8 @@ struct PatternCardView: View {
             "Practice_Syncopation Strum"
         case "upbeat":
             "Practice_Upbeat Strum"
-        case "dynamic":
-            "Practice_Dynamic Strum"
+        case "driving":
+            "Practice_driving pop strum"
         default:
             "Practice_Foundation Strum"
         }
