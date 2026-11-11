@@ -73,7 +73,7 @@ struct StrumPattern: Identifiable, Codable, Sendable, Equatable {
 ```
 
 - PatternCatalog\.all holds the five confirmed patterns in suggested order: Foundation Strum,
-  Subdivision Strum, Syncopation Strum, The Upbeat Strum, and Dynamic Strum\.
+  Subdivision Strum, Syncopation Strum, The Upbeat Strum, and Driving Pop Strum\.
 - Patterns are stored as stable ids in session records, never as copies, so renaming a pattern updates old records\.
 - PatternListViewModel owns the selected pattern and selectedBPM\. On this list, BPM changes in steps
   of 5 and is clamped to 60…120\. Selecting another pattern resets BPM to that pattern's default\.

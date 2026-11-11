@@ -12,7 +12,7 @@ final class PatternCatalogTests: XCTestCase {
                 "Subdivision Strum",
                 "Syncopation Strum",
                 "The Upbeat Strum",
-                "Dynamic Strum",
+                "Driving Pop Strum",
             ]
         )
     }

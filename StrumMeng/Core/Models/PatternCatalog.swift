@@ -39,9 +39,9 @@ enum PatternCatalog {
             defaultBPM: 80
         ),
         StrumPattern(
-            id: "dynamic",
-            name: "Dynamic Strum",
-            strokes: [.down, .rest, .down, .rest, .down, .rest, .down, .rest],
+            id: "driving",
+            name: "Driving Pop Strum",
+            strokes: [.down, .rest, .down, .up, .down, .rest, .down, .rest],
             beatLabels: ["1", "&", "2", "&", "3", "&", "4", "&"],
             beatsPerPattern: 4,
             suggestedOrder: 5,
@@ -58,5 +58,5 @@ enum PatternCatalog {
     static var subdivision: StrumPattern { all[1] }
     static var syncopation: StrumPattern { all[2] }
     static var theUpbeat: StrumPattern { all[3] }
-    static var dynamic: StrumPattern { all[4] }
+    static var driving: StrumPattern { all[4] }
 }

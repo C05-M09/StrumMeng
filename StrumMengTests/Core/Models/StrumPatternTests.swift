@@ -46,7 +46,7 @@ final class StrumPatternTests: XCTestCase {
     func test_patternCatalog_usesStableIDs() {
         XCTAssertEqual(
             PatternCatalog.all.map(\.id),
-            ["foundation", "subdivision", "syncopation", "upbeat", "dynamic"]
+            ["foundation", "subdivision", "syncopation", "upbeat", "driving"]
         )
     }
 
