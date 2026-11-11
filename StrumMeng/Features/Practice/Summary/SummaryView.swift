@@ -177,7 +177,6 @@ struct SummaryView: View {
             Text(patternName.uppercased())
                 .font(AppTypography.bungee(size: 40))
                 .foregroundStyle(AppColors.white)
-                .lineSpacing(4)
         }
         .frame(width: 320, height: 180, alignment: .bottomLeading)
         .position(x:1136, y: 420)
@@ -203,7 +202,7 @@ struct SummaryView: View {
             }
         }
         .frame(width: 325)
-        .position(x: 1136, y: 590)
+        .position(x: 1136, y: 580)
         
         // 3. Tombol REPLAY & RETRY (di bawah area teal)
         // 💡 Atur posisi y untuk menaikkan/menurunkan kedua tombol ini
@@ -243,28 +242,8 @@ struct SummaryView: View {
     @ViewBuilder
     private var leftColumnElements: some View {
         let result = viewModel.result
-        let offTempoCount = result.tooEarlyCount + result.missCount
+        let feedback = SummaryFeedbackContent(result: result)
         let accuracyPercent = Int((result.accuracy * 100).rounded())
-
-        let headlineText: String = {
-            if result.accuracy >= 0.85 {
-                return "PURRFECT!"
-            } else if result.accuracy >= 0.65 {
-                return "NICE!!"
-            } else {
-                return "YOU GOOD?"
-            }
-        }()
-        
-        let charaImage: String = {
-            if result.accuracy >= 0.85 {
-                return "cat_purfect"
-            } else if result.accuracy >= 0.65 {
-                return "cat_oke"
-            } else {
-                return "cat_you good"
-            }
-        }()
         
         // 1. Tombol "BACK TO MAIN" (di area bawah kiri)
         // 💡 Atur x dan y untuk posisikan tombol back
@@ -281,37 +260,31 @@ struct SummaryView: View {
 
         //Ekspresi Maskotnya
         VStack(alignment: .leading) {
-            Image(charaImage)
+            Image(feedback.characterImageName)
                 .resizable()
                 .scaledToFit()
                 .frame(width: 400)
                 .position(x: 190, y: 820)
         }
         
-        // 2. Header Banner Kiri ("AWESOME" & Panah >>>)
-        // 💡 Atur posisi y untuk sejajar di banner cokelat atas
+        // 2. Header Banner Kiri ("PURRFECT!", "NICE!!", "YOU GOOD?")
+        // Disamakan posisinya dengan SummaryFeedbackOverlay agar tidak bergeser saat overlay ditutup
         VStack(alignment: .leading) {
-            Text(headlineText)
+            Text(feedback.headline)
                 .font(AppTypography.bungee(size: 55))
                 .foregroundStyle(AppColors.white)
-                .lineSpacing(4)
-                .padding(.bottom, 50)
         }
-        .frame(width: 730, height: 260, alignment: .topLeading)
-        .position(x: 760, y: 775)
-    
-        VStack(alignment: .leading){
-            /// TO DO: Bisa diubah pakai condition
-            Text(
-                offTempoCount > 0
-                ? "BUT YOU OFF TEMPO \(offTempoCount) TIMES. wiadiawdwijdwa awidjawd widjaw wa daw aw adw daw fdwa."
-                : "ALL ON TEMPO! PERFECT RHYTHM."
-            )
-            .font(AppTypography.dmMono(size: 30))
+        .frame(width: 400, height: 100, alignment: .leading)
+        .position(x: 595, y: 680)
+
+        Text(feedback.message)
+            .font(AppTypography.dmMono(size: 28))
+            .fontWeight(.bold)
             .foregroundStyle(AppColors.brownInk)
-        }
-        .frame(width: 480, height: 160, alignment: .topLeading)
-        .position(x: 640, y: 860)
+            .lineSpacing(4)
+            .minimumScaleFactor(0.85)
+            .frame(width: 480, height: 190, alignment: .leading)
+            .position(x: 640, y: 860)
 
         // 4. Accuracy Pill Capsule (di tengah area teal)
         HStack(alignment: .firstTextBaseline, spacing: 16) {
@@ -321,12 +294,13 @@ struct SummaryView: View {
 
             Spacer()
             
+            
             Text("\(accuracyPercent)%")
-                .font(AppTypography.bungee(size: 70))
+                .font(AppTypography.bungee(size: 69))
                 .foregroundStyle(AppColors.brownInk)
         }
-        .frame(width: 400, height: 160, alignment: .topLeading)
-        .position(x: 475, y: 435)
+        .frame(width: 410, height: 160, alignment: .topLeading)
+        .position(x: 475, y: 440)
 
         // 4. Statistik 3 Kolom (PERFECT, TOO EARLY, MISS)
         HStack(spacing: 0) {
@@ -400,7 +374,7 @@ private struct PreviewSessionRepository: SessionRepository {
         patternID: "syncopation",
         songID: nil,
         bpm: 100,
-        accuracy: 0.9,
+        accuracy: 1,
         perfectCount: 15,
         tooEarlyCount: 1,
         missCount: 0,
