@@ -3,7 +3,7 @@ import XCTest
 
 @MainActor
 final class HomeGuidanceTests: XCTestCase {
-    func test_homeWithoutSuccessfulPairingShowsNoGuidance() {
+    func test_homeBeforeSetupClosesShowsNoGuidance() {
         let model = HomeGuidanceViewModel(store: GuidanceStore())
         model.send(.homeAppeared)
         XCTAssertEqual(model.state, .dormant)
@@ -13,7 +13,7 @@ final class HomeGuidanceTests: XCTestCase {
 
     func test_optionThenGuidebookAdvanceOnTapsAndPersistCompletion() {
         let store = GuidanceStore()
-        store.scheduleAfterPairing()
+        store.scheduleAfterSetup()
         let model = HomeGuidanceViewModel(store: store)
         model.send(.homeAppeared)
         XCTAssertEqual(model.state, .option)
@@ -31,7 +31,7 @@ final class HomeGuidanceTests: XCTestCase {
 
     func test_unfinishedTourStartsAgainOnNextLaunch() {
         let store = GuidanceStore()
-        store.scheduleAfterPairing()
+        store.scheduleAfterSetup()
         let first = HomeGuidanceViewModel(store: store)
         first.send(.homeAppeared)
         first.send(.advance)
@@ -42,7 +42,7 @@ final class HomeGuidanceTests: XCTestCase {
 
     func test_repeatedHomeAppearanceKeepsTheCurrentTip() {
         let store = GuidanceStore()
-        store.scheduleAfterPairing()
+        store.scheduleAfterSetup()
         let model = HomeGuidanceViewModel(store: store)
         model.send(.homeAppeared)
         model.send(.advance)
@@ -55,7 +55,7 @@ final class HomeGuidanceTests: XCTestCase {
         let guidance = HomeGuidanceViewModel(store: store)
         let setup = DeviceSetupViewModel(link: MockControllerLink(), state: .connected(latencyMs: 5),
             onClose: { guidance.send(.homeAppeared) },
-            onPairedDone: { store.scheduleAfterPairing() })
+            onPairedDone: { store.scheduleAfterSetup() })
         setup.send(.tapDone)
         XCTAssertEqual(guidance.state, .option)
     }
@@ -63,7 +63,7 @@ final class HomeGuidanceTests: XCTestCase {
     func test_backAndUnconnectedDoneDoNotScheduleGuidance() {
         let store = GuidanceStore()
         let setup = DeviceSetupViewModel(link: MockControllerLink(), onClose: {},
-            onPairedDone: { store.scheduleAfterPairing() })
+            onPairedDone: { store.scheduleAfterSetup() })
         setup.send(.tapDone)
         setup.send(.tapBack)
         XCTAssertFalse(store.isPending)
@@ -79,11 +79,11 @@ final class HomeGuidanceTests: XCTestCase {
         let first = UserDefaultsHomeGuidanceStore(defaults: defaults)
         XCTAssertFalse(first.isPending)
         XCTAssertFalse(first.hasCompleted)
-        first.scheduleAfterPairing()
+        first.scheduleAfterSetup()
         let reopened = UserDefaultsHomeGuidanceStore(defaults: defaults)
         XCTAssertTrue(reopened.isPending)
         reopened.complete()
-        first.scheduleAfterPairing()
+        first.scheduleAfterSetup()
         XCTAssertFalse(first.isPending)
         XCTAssertTrue(first.hasCompleted)
         let model = HomeGuidanceViewModel(store: first)
@@ -102,6 +102,6 @@ final class HomeGuidanceTests: XCTestCase {
 private final class GuidanceStore: HomeGuidanceStore {
     private(set) var isPending = false
     private(set) var hasCompleted = false
-    func scheduleAfterPairing() { if !hasCompleted { isPending = true } }
+    func scheduleAfterSetup() { if !hasCompleted { isPending = true } }
     func complete() { hasCompleted = true; isPending = false }
 }

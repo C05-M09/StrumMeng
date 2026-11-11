@@ -592,3 +592,10 @@ not claim that pairing succeeded. This separate protocol leaves SettingsStore an
 PairCodeStore contracts intact. Future launches retain Option → Set Up Device.
 The iPhone's existing companion entry flow is unchanged. Preview containers disable
 the invitation so Canvas cannot mutate the persisted first-launch flag.
+
+
+### US7: Home guidance after device setup
+Closing Set Up Device through Back or connected Done schedules the once-only Home
+guidance before the router returns. Pairing success is not required: Option appears
+first, then Guidebook. Unconnected Done keeps setup open without scheduling the tour.
+HomeGuidanceStore persists the pending handoff and ignores scheduling after completion.

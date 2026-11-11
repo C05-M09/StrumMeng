@@ -59,16 +59,49 @@ final class FirstLaunchFlowTests: XCTestCase {
         XCTAssertTrue(router.path.isEmpty)
     }
 
-    func test_backFromUnfinishedSetupDoesNotStartGuidance() throws {
+    func test_backFromUnfinishedFirstLaunchSetupStartsGuidance() throws {
         let router = AppRouter()
         let tour = TourStore()
+        let container = makeContainer(router: router, invitation: InvitationStore(), tour: tour)
+        let intro = container.makePairingIntroductionViewModel()
+        defer { intro.setActive(false) }
+        intro.setActive(true)
+        intro.send(.delayElapsed)
+        intro.send(.continueToSetup)
+        XCTAssertEqual(router.path, [.deviceSetup])
+        XCTAssertFalse(tour.isPending)
+        container.makeDeviceSetupViewModel().send(.tapBack)
+        let guidance = try XCTUnwrap(container.makeHomeViewModel().guidance)
+        guidance.send(.homeAppeared)
+        XCTAssertTrue(router.path.isEmpty)
+        XCTAssertEqual(guidance.state, .option)
+        XCTAssertTrue(tour.isPending)
+        guidance.send(.advance)
+        XCTAssertEqual(guidance.state, .guidebook)
+        guidance.send(.advance)
+        XCTAssertTrue(tour.hasCompleted)
+    }
+
+    func test_backFromSetupDoesNotRepeatCompletedGuidance() throws {
+        let router = AppRouter()
+        let tour = TourStore()
+        tour.complete()
         let container = makeContainer(router: router, invitation: InvitationStore(), tour: tour)
         router.push(.deviceSetup)
         container.makeDeviceSetupViewModel().send(.tapBack)
         let guidance = try XCTUnwrap(container.makeHomeViewModel().guidance)
         guidance.send(.homeAppeared)
-        XCTAssertTrue(router.path.isEmpty)
         XCTAssertEqual(guidance.state, .dormant)
+        XCTAssertFalse(tour.isPending)
+    }
+
+    func test_unconnectedDoneKeepsSetupOpenWithoutStartingGuidance() throws {
+        let router = AppRouter()
+        let tour = TourStore()
+        let container = makeContainer(router: router, invitation: InvitationStore(), tour: tour)
+        router.push(.deviceSetup)
+        container.makeDeviceSetupViewModel().send(.tapDone)
+        XCTAssertEqual(router.path, [.deviceSetup])
         XCTAssertFalse(tour.isPending)
     }
 
@@ -90,6 +123,6 @@ private final class InvitationStore: PairingIntroductionStore {
 private final class TourStore: HomeGuidanceStore {
     private(set) var isPending = false
     private(set) var hasCompleted = false
-    func scheduleAfterPairing() { if !hasCompleted { isPending = true } }
+    func scheduleAfterSetup() { if !hasCompleted { isPending = true } }
     func complete() { hasCompleted = true; isPending = false }
 }
