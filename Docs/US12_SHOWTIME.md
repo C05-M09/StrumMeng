@@ -74,8 +74,8 @@ unchanged. Calibration remains zero, matching Practice, until SettingsStore expo
   the paused place, and is not cut when the last node passes. The file plays untouched, as in
   the list preview (an earlier +8 dB boost under a limiter squashed the plucks and sounded
   doubled). Its level follows the device's volume buttons only, not Option.
-- Chart tempos follow the recordings (beat-grid fit: 80, 120, 100, 110, 100 BPM; Twinkle's
-  chart moved from 100 to 80). Bar 1 is at 0 s in four files and at 2.38 s in Riverside, after
+- Chart tempos follow the recordings (beat-grid fit: 100, 120, 100, 110, 100 BPM; Twinkle is
+  the 100 BPM re-recording of PR #62, which fits its 12-bar chart). Bar 1 is at 0 s in four files and at 2.38 s in Riverside, after
   its pickups. Riverside's recording runs about 64 bars against a 16-bar chart.
 - The song-list preview loops at full level; like the gameplay recording, the device volume
   buttons set it, not Option.

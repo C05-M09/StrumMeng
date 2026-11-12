@@ -7,8 +7,8 @@ nonisolated struct SongBackingTrackInfo: Sendable, Equatable {
     /// Seconds into the file where bar 1 starts: the first node lands here.
     let firstBeat: TimeInterval
 
-    /// The bundled recordings, measured with a beat-grid fit of each file (2026-11-12: 80, 120,
-    /// 100, 110 and 100 BPM). Four start on bar 1 at the top of the file; Riverside opens with
+    /// The bundled recordings, measured with a beat-grid fit of each file (2026-11-12: 100, 120,
+    /// 100, 110 and 100 BPM; Twinkle is the re-recorded file of PR #62). Four start on bar 1 at the top of the file; Riverside opens with
     /// silence and three sixteenth pickups (from 1.93 s) into bar 1 at 2.38 s.
     static let all: [String: SongBackingTrackInfo] = [
         "twinkle-twinkle": .init(resource: "1_foundation_twinkle_twinkle", firstBeat: 0),

@@ -41,7 +41,7 @@ final class SongBackingTrackInfoTests: XCTestCase {
 
     @MainActor func test_everySongsChart_runsAtItsRecordingsTempo() {
         // Beat-grid fit of the bundled files; the nodes must move at the song's own tempo.
-        let measured = ["twinkle-twinkle": 80, "jingle-bells": 120, "abc-song": 100,
+        let measured = ["twinkle-twinkle": 100, "jingle-bells": 120, "abc-song": 100,
                         "row-row-row-your-boat": 110, "down-by-the-riverside": 100]
         for song in DefaultSongCatalog.all {
             XCTAssertEqual(song.bpm, measured[song.id], song.id)
