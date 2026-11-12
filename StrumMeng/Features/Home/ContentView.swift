@@ -71,6 +71,7 @@ struct ContentView: View {
 
                     case .deviceSetup:
                         DeviceSetupRoute(container: container)
+
                     }
                 }
         }
@@ -185,7 +186,11 @@ private struct SummaryRoute: View {
 private struct SongListRoute: View {
     @State private var viewModel: SongListViewModel
     init(container: AppContainer) { _viewModel = State(initialValue: container.makeSongListViewModel()) }
-    var body: some View { SongListView(viewModel: viewModel) }
+    var body: some View {
+        ShowtimeSongSelectView(viewModel: viewModel)
+            .navigationBarBackButtonHidden()
+            .toolbar(.hidden, for: .navigationBar)
+    }
 }
 
 private struct ShowtimeRoute: View {

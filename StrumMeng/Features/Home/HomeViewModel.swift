@@ -1,14 +1,7 @@
-//
-//  HomeViewModel.swift
-//  StrumMeng
-//
-//  Created by rasyel on 29/10/26.
-//
-
 import Foundation
 import Observation
 
-/// The overlays that can sit on top of Home. Only one at a time.
+/// Which full-screen card is covering Home. Nil means none (Home is clear).
 enum HomeOverlay: Equatable {
     case option
     case guidebook
@@ -24,11 +17,12 @@ final class HomeViewModel {
     let guidance: HomeGuidanceViewModel?
     private(set) var presentedOverlay: HomeOverlay?
 
-    private let onShowtimeRequested: () -> Void
     private let onPracticeRequested: () -> Void
+    private let onShowtimeRequested: () -> Void
 
     init(guidance: HomeGuidanceViewModel? = nil,
-         onPracticeRequested: @escaping () -> Void, onShowtimeRequested: @escaping () -> Void = {}) {
+         onPracticeRequested: @escaping () -> Void,
+         onShowtimeRequested: @escaping () -> Void = {}) {
         self.guidance = guidance
         self.onPracticeRequested = onPracticeRequested
         self.onShowtimeRequested = onShowtimeRequested
@@ -36,17 +30,16 @@ final class HomeViewModel {
 
     func send(_ event: HomeEvent) {
         switch event {
-        // The buttons click on their own (ButtonPressSound), so no sound is played here.
         case .tapPractice:
             onPracticeRequested()
         case .tapOption:
             presentedOverlay = .option
         case .tapGuidebook:
             presentedOverlay = .guidebook
-        case .dismissOverlay:
-            presentedOverlay = nil
         case .tapShowtime:
             onShowtimeRequested()
+        case .dismissOverlay:
+            presentedOverlay = nil
         }
     }
 }

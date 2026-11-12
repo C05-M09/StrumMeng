@@ -5,6 +5,8 @@ final class AppContainer {
 
     private let router: AppRouter
     private let repository: SessionRepository?
+    /// Showtime reads its song records through its own protocol. It is the same SwiftData object.
+    private let songRecords: (any SongRecordsRepository)?
     private let sessionHistory: (any SessionHistoryChecking)?
     private let settings: any SettingsStore
     private let pairingIntroductionStore: any PairingIntroductionStore
@@ -12,11 +14,20 @@ final class AppContainer {
     /// between screens.
     private let menuSounds: any MenuSoundService
     private let results = SessionResultStore()
-    private let songCatalog: any SongCatalog = DummySongCatalog()
+    private let songCatalog: any SongCatalog
     private let enablesHomeGuidance: Bool
     private let homeGuidanceStore: any HomeGuidanceStore
     /// The one pattern list of the app, so Retry can hand it the chosen tempo.
     private weak var patternListViewModel: PatternListViewModel?
+    /// The one song list of the app, so its records can be reloaded after a session.
+    private weak var songListViewModel: SongListViewModel?
+    private var customShowtimeSongPlayer: (any ShowtimeSongPlayer)?
+    private lazy var showtimeSongPlayer: (any ShowtimeSongPlayer)? = {
+        if let customShowtimeSongPlayer { return customShowtimeSongPlayer }
+        let player = AVShowtimeSongPlayer()
+        player.setVolume(settings.soundVolume)
+        return player
+    }()
     /// One synthesised guitar for the whole app, made when a screen first needs it. Notes are
     /// synthesised right away, so they are ready before the first strum.
     private lazy var guitar: GuitarEngine? = {
@@ -36,11 +47,15 @@ final class AppContainer {
         menuSounds: (any MenuSoundService)? = nil,
         pairingIntroductionStore: (any PairingIntroductionStore)? = nil,
         homeGuidanceStore: (any HomeGuidanceStore)? = nil,
-        controllerLink: (any ControllerLink)? = nil
+        controllerLink: (any ControllerLink)? = nil,
+        songCatalog: (any SongCatalog)? = nil,
+        showtimeSongPlayer: (any ShowtimeSongPlayer)? = nil
     ) {
         self.router = router
         self.homeGuidanceStore = homeGuidanceStore ?? UserDefaultsHomeGuidanceStore()
         self.controllerLink = controllerLink
+        self.songCatalog = songCatalog ?? DefaultSongCatalog()
+        self.customShowtimeSongPlayer = showtimeSongPlayer
         self.pairingIntroductionStore = pairingIntroductionStore ?? UserDefaultsPairingIntroductionStore()
         let settings = settings ?? UserDefaultsSettingsStore()
         self.settings = settings
@@ -58,10 +73,12 @@ final class AppContainer {
             )
             let sessions = SwiftDataSessionRepository(modelContainer: modelContainer)
             repository = sessions
+            songRecords = sessions
             sessionHistory = sessions
         } catch {
             // Show a records error when storage cannot be initialized.
             repository = nil
+            songRecords = nil
             sessionHistory = nil
         }
     }
@@ -97,14 +114,33 @@ final class AppContainer {
             onPracticeRequested: { [weak router] in
                 router?.push(.practiceList)
             },
-            onShowtimeRequested: { [weak router] in router?.push(.showtimeList) }
+            onShowtimeRequested: {
+                [weak router] in router?.push(.showtimeList)
+            }
         )
     }
 
     func makeSongListViewModel() -> SongListViewModel {
-        SongListViewModel(catalog: songCatalog,
-            onSelect: { [weak router] song in router?.push(.showtime(songID: song.id)) },
-            onBack: { [weak router] in router?.pop() })
+        showtimeSongPlayer?.setVolume(settings.soundVolume)
+        let records = songRecords.map { repository in
+            Dictionary(uniqueKeysWithValues: songCatalog.songs.map { song in
+                (song.id, ShowtimeRecordsViewModel(songID: song.id, repository: repository))
+            })
+        } ?? [:]
+        let viewModel = SongListViewModel(
+            songs: songCatalog.songs,
+            player: showtimeSongPlayer,
+            recordsViewModels: records,
+            recordsFallbackState: songRecords == nil ? .failed : .empty,
+            onSongSelected: { [weak router] songID in
+                router?.push(.showtime(songID: songID))
+            },
+            onBackRequested: { [weak router] in
+                router?.pop()
+            }
+        )
+        songListViewModel = viewModel
+        return viewModel
     }
 
     func makeShowtimeViewModel(songID: String) -> ShowtimeViewModel? {
@@ -211,6 +247,11 @@ final class AppContainer {
         Task { await patternListViewModel?.reloadRecords() }
     }
 
+    /// For the Showtime Summary: reloads the song records once a Showtime session is saved.
+    func reloadShowtimeRecords() {
+        Task { await songListViewModel?.reloadRecords() }
+    }
+
     func makePatternListViewModel() -> PatternListViewModel {
         let records = repository.map { repository in
             Dictionary(uniqueKeysWithValues: PatternCatalog.all.map { pattern in
@@ -234,6 +275,7 @@ final class AppContainer {
         patternListViewModel = viewModel
         return viewModel
     }
+
 
     /// Option is an overlay on Home, so whoever shows it decides what "back" means
     /// (close the overlay), instead of popping the router.

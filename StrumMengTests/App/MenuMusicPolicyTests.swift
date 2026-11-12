@@ -12,6 +12,10 @@ final class MenuMusicPolicyTests: XCTestCase {
         XCTAssertTrue(MenuMusicPolicy.playsMusic(on: .practiceList, isAppActive: true))
     }
 
+    func test_showtimeList_pausesMenuMusic() {
+        XCTAssertFalse(MenuMusicPolicy.playsMusic(on: .showtimeList, isAppActive: true))
+    }
+
     func test_deviceSetup_pausesMusic() {
         XCTAssertFalse(MenuMusicPolicy.playsMusic(on: .deviceSetup, isAppActive: true))
     }
@@ -32,9 +36,8 @@ final class MenuMusicPolicyTests: XCTestCase {
         XCTAssertFalse(MenuMusicPolicy.playsMusic(on: nil, isAppActive: false))
         XCTAssertFalse(MenuMusicPolicy.playsMusic(on: .practiceList, isAppActive: false))
     }
-    func test_showtimeListPlaysMusicButSessionPausesIt() {
-        XCTAssertTrue(MenuMusicPolicy.playsMusic(on: .showtimeList, isAppActive: true))
+
+    func test_showtimeSession_pausesMusic() {
         XCTAssertFalse(MenuMusicPolicy.playsMusic(on: .showtime(songID: "dummy-twinkle"), isAppActive: true))
     }
-
 }

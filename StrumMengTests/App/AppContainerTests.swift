@@ -54,7 +54,7 @@ final class AppContainerTests: XCTestCase {
         XCTAssertEqual(home.presentedOverlay, .option)
     }
 
-    func test_homeViewModel_tapShowtime_pushesSongList() {
+    func test_homeViewModel_tapShowtime_pushesShowtimeList() {
         let home = sut.makeHomeViewModel()
 
         home.send(.tapShowtime)
