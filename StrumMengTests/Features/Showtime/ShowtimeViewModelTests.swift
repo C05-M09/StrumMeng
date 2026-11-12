@@ -101,6 +101,40 @@ final class ShowtimeViewModelTests: XCTestCase {
         XCTAssertEqual(model.state, .listening(0))
         await model.disappear()
     }
+
+    func test_gameplayFinish_savesResultToRepository() async {
+        let repo = MockSessionRepository()
+        let demo = FakeSongDemoPlayer()
+        let game = FakeSongGameplay()
+        game.isControllerConnected = true
+        let model = ShowtimeViewModel(
+            song: DummySongCatalog().songs[0],
+            demo: demo,
+            gameplay: game,
+            repository: repo,
+            onBack: {}
+        )
+        model.appear()
+        let result = SessionResult(
+            id: UUID(),
+            patternID: "foundation",
+            songID: "dummy-twinkle",
+            bpm: 80,
+            accuracy: 1,
+            perfectCount: 1,
+            tooEarlyCount: 0,
+            missCount: 0,
+            createdAt: Date(),
+            beatEvents: PracticeFixtures.events([.perfect])
+        )
+        game.change(.finished(result))
+        for _ in 0..<10 { await Task.yield() }
+        let saved = await repo.savedResults
+        XCTAssertEqual(saved.count, 1)
+        XCTAssertEqual(saved.first?.id, result.id)
+        XCTAssertEqual(saved.first?.songID, "dummy-twinkle")
+        await model.disappear()
+    }
     func test_restartIgnoresCompletionFromPreviousPreview() async {
         let (model, demo, _) = make()
         await model.send(.next)

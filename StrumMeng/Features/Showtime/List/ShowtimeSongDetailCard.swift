@@ -10,8 +10,17 @@ struct ShowtimeSongDetailCard: View {
         song.primaryPatternID.flatMap(PatternCatalog.pattern(forID:))
     }
 
-    private var minutes: Int {
-        max(1, Int((song.durationSeconds / 60).rounded()))
+    private var formattedDuration: String {
+        let totalSeconds = Int(song.durationSeconds.rounded())
+        let mins = totalSeconds / 60
+        let secs = totalSeconds % 60
+        if mins > 0 && secs > 0 {
+            return "\(mins) min \(secs) sec"
+        } else if mins > 0 {
+            return "\(mins) min"
+        } else {
+            return "\(secs) sec"
+        }
     }
 
     var body: some View {
@@ -22,7 +31,7 @@ struct ShowtimeSongDetailCard: View {
                     .foregroundStyle(ShowtimeStyle.cream)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
-                Text("\(minutes) min")
+                Text(formattedDuration)
                     .font(ShowtimeStyle.body(22))
                     .foregroundStyle(ShowtimeStyle.orange)
             }
@@ -82,6 +91,7 @@ struct ShowtimeRecordsCard<Records: View>: View {
                 .resizable()
                 .scaledToFit()
                 .frame(height: 130)
+                .offset(y: -40)
         }
         .frame(width: 584, height: 533, alignment: .top)
     }

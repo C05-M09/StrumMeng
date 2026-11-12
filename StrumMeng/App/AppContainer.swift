@@ -159,9 +159,18 @@ final class AppContainer {
                 let delay = time - HostClock.now()
                 if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
             })
-        return ShowtimeViewModel(song: song,
+        return ShowtimeViewModel(
+            song: song,
             demo: PatternStrumDemoPlayer(clock: AudioBeatClock(), sound: guitarSound, now: HostClock.now),
-            gameplay: gameplay, onBack: { [weak router] in router?.popTo(.showtimeList) })
+            gameplay: gameplay,
+            repository: repository,
+            onBack: { [weak router, weak self] in
+                Task { [weak self] in
+                    await self?.songListViewModel?.reloadRecords()
+                }
+                router?.popTo(.showtimeList)
+            }
+        )
     }
 
     func makeListenViewModel(pattern: StrumPattern, bpm: Int) -> ListenViewModel {

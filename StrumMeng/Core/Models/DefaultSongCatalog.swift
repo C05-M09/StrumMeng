@@ -1,7 +1,8 @@
 import Foundation
 
 /// The 5 Showtime songs. All are public domain, with no lyrics. Chords are one per bar, 4/4.
-/// Source: table of US11 subtask 11.1.
+/// Order requested by user:
+/// 1. twinkle-twinkle, 2. jingle bells, 3. abc, 4. row row row your boat, 5. down by the riverside
 struct DefaultSongCatalog: SongCatalog {
     static let allowedChords: Set<String> = ["C", "F", "G", "Em", "D", "Am"]
 
@@ -19,6 +20,18 @@ struct DefaultSongCatalog: SongCatalog {
             suggestedOrder: 1
         ),
         Song(
+            id: "jingle-bells",
+            title: "Jingle Bells",
+            bpm: 120,
+            sections: [
+                SongSection(name: "Verse", patternID: "subdivision",
+                            bars: bars("G G C G | C G D D")),
+                SongSection(name: "Chorus", patternID: "subdivision",
+                            bars: bars("G G C G | C G D D | G G C G | C G D G")),
+            ],
+            suggestedOrder: 2
+        ),
+        Song(
             id: "abc-song",
             title: "ABC Song",
             bpm: 100,
@@ -28,7 +41,7 @@ struct DefaultSongCatalog: SongCatalog {
                 SongSection(name: "Chorus", patternID: "syncopation",
                             bars: bars("C F F G | C C C G | C F F C")),
             ],
-            suggestedOrder: 2
+            suggestedOrder: 3
         ),
         Song(
             id: "row-row-row-your-boat",
@@ -39,18 +52,6 @@ struct DefaultSongCatalog: SongCatalog {
                             bars: bars("G G C D | G G C D")),
                 SongSection(name: "Chorus", patternID: "upbeat",
                             bars: bars("G G C D | G G C D | G G C G")),
-            ],
-            suggestedOrder: 3
-        ),
-        Song(
-            id: "jingle-bells",
-            title: "Jingle Bells",
-            bpm: 120,
-            sections: [
-                SongSection(name: "Verse", patternID: "subdivision",
-                            bars: bars("G G C G | C G D D")),
-                SongSection(name: "Chorus", patternID: "subdivision",
-                            bars: bars("G G C G | C G D D | G G C G | C G D G")),
             ],
             suggestedOrder: 4
         ),

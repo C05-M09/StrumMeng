@@ -47,7 +47,7 @@ enum ShowtimeAssets {
         case "subdivision": name = "Showtime_subdivison pattern"
         case "syncopation": name = "showtime_snycopation pattern"
         case "upbeat": name = "Showtime_the upbeat pattern"
-        case "dynamic", "driving-pop", "drivingpop": name = "showtime_driving pop pattern"
+        case "dynamic", "driving", "driving-pop", "drivingpop": name = "showtime_driving pop pattern"
         default: return nil
         }
         return namespace + name
