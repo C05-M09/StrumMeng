@@ -10,7 +10,7 @@ import Observation
 
 /// View model driving the Showtime Summary screen.
 ///
-/// Holds the current `ShowtimeSummaryState`, computes star ratings via `ShowtimeStarPolicy`,
+/// Holds the current `ShowtimeSummaryState`, computes star ratings via `StarRating`,
 /// dispatches UI events through `reduce`, and coordinates side effects such as saving
 /// the finished session record to `SessionRepository` exactly once upon initial appearance.
 @Observable
@@ -32,7 +32,7 @@ final class ShowtimeSummaryViewModel {
         onNavigate: @escaping (ShowtimeSummaryDestination) -> Void = { _ in }
     ) {
         self.result = result
-        self.stars = ShowtimeStarPolicy.stars(for: result.accuracy)
+        self.stars = StarRating.stars(for: result.accuracy)
         self.repository = repository
         self.onNavigate = onNavigate
         self.state = .showing(result)
