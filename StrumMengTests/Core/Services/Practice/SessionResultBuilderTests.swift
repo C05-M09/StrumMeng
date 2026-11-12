@@ -63,6 +63,32 @@ final class SessionResultBuilderTests: XCTestCase {
         XCTAssertNil(result.songID)
     }
 
+    func test_showtimeSession_storesProvidedSongID() {
+        let result = SessionResultBuilder.build(
+            id: id,
+            patternID: "foundation",
+            songID: "twinkle",
+            bpm: 80,
+            beatEvents: [],
+            strums: [],
+            createdAt: date
+        )
+        XCTAssertEqual(result.songID, "twinkle")
+    }
+
+    func test_practiceSession_explicitNilSongID_storesNil() {
+        let result = SessionResultBuilder.build(
+            id: id,
+            patternID: "foundation",
+            songID: nil,
+            bpm: 80,
+            beatEvents: [],
+            strums: [],
+            createdAt: date
+        )
+        XCTAssertNil(result.songID)
+    }
+
     func test_beatEvents_areStoredInStepOrderForReplay() {
         let events = [BeatEvent(stepIndex: 2, result: .miss, offsetMs: nil),
                       BeatEvent(stepIndex: 0, result: .perfect, offsetMs: 3)]
