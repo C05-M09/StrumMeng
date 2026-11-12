@@ -19,8 +19,7 @@ This explicitly extends the older MVP decision that left Showtime inactive.
 
 ## Listen audio and Ready
 
-PatternStrumDemoPlayer uses GuitarSound backed by the same GuitarEngine(chord: .c)
-as Practice. This is the existing synthesized C guitar sound, not a recording of
+PatternStrumDemoPlayer uses GuitarSound backed by the same GuitarEngine as Practice, using GuitarSound’s default C-chord overload. This is the existing synthesized C guitar sound, not a recording of
 a whole song. One eighth-note BeatClock drives scheduled strums and highlight events.
 Rests are silent. Down/up follow the selected pattern at the song's BPM.
 
@@ -52,7 +51,12 @@ catalogue can replace SongCatalog in AppContainer. Gameplay sound is still metro
 only; the teammate's chord synthesis/backing audio is not implemented here.
 
 Song/visitor-request persistence and Showtime result saves are not implemented.
-SessionResult is prepared with songID but remains in memory. Restart and Back discard
+SessionResultBuilder.build(..., songID: song.id, ...) now creates the Showtime result
+with the selected catalogue ID directly. AppContainer passes it into the shared PlayViewModel;
+ShowtimeViewModel forwards the finished result unchanged. The builder contract and its
+base tests match the owner's Feat/session-result-builder-menerima-song-id branch.
+Practice omits the parameter and retains the nil default. Song IDs are still the
+sample catalogue IDs until the real catalogue is connected; results remain in memory. Restart and Back discard
 results. The existing SwiftData schema and shared connectivity/settings contracts are
 unchanged. Calibration remains zero, matching Practice, until SettingsStore exposes it.
 
@@ -96,8 +100,13 @@ They verify all-pattern gating, continued audio/highlights, switching/resetting 
 BPM scheduling, silent rests, pause/resume, cancellation and actual shared feedback.
 Practice and routing tests are regression checks for the reused components.
 
-Latest validation: 147 selected unit tests passed, including all-pattern gating,
-audio mute on disconnect/blocked Ready, sparse chord labels, shared Practice behavior
-and audio scheduling. One temporary render check passed; updated Listen, Intro and
-Play images were visually reviewed. The helper is not retained in the test target.
-Real-device audio and iPhone connection checks remain manual.
+Latest songID integration validation: 131 selected unit tests passed, covering the
+owner's builder tests, unchanged Practice nil identity, engine-to-Showtime result
+identity, Home navigation and repository behavior. Earlier UI validation covered
+all-pattern gating, audio mute on disconnect, sparse chord labels and reviewed
+Listen/Intro/Play renders. Real-device audio and iPhone connection checks remain manual.
+
+Merge compatibility cleanup follows the current dev APIs: GuitarEngine() prepares C
+through the GuitarSound default overload, and Home button sound is owned by the View's
+ButtonPressSound rather than the HomeViewModel. Obsolete merge leftovers in Home's
+initializer and tests were removed; Showtime navigation callbacks remain covered.

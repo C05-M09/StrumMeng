@@ -20,7 +20,7 @@ final class AppContainer {
     /// One synthesised guitar for the whole app, made when a screen first needs it. Notes are
     /// synthesised right away, so they are ready before the first strum.
     private lazy var guitar: GuitarEngine? = {
-        let engine = GuitarEngine(chord: .c)
+        let engine = GuitarEngine()
         if let engine { Task { await engine.prepare() } }
         return engine
     }()
@@ -111,7 +111,7 @@ final class AppContainer {
         guard let song = songCatalog.songs.first(where: { $0.id == songID }) else { return nil }
         let timeline = SongTimeline(song: song)
         let link = sharedControllerLink()
-        let gameplay = PlayViewModel(pattern: timeline.sessionPattern, bpm: song.bpm,
+        let gameplay = PlayViewModel(pattern: timeline.sessionPattern, bpm: song.bpm, songID: song.id,
             clock: AudioBeatClock(), input: link, touchInput: nil, controller: link,
             requiresController: true, metronome: metronomeSound,
             // Calibration is not exposed by SettingsStore yet; same zero offset as Practice.
@@ -302,7 +302,7 @@ final class AppContainer {
         let song = DummySongCatalog().songs[0]
         let timeline = SongTimeline(song: song)
         let sound = SilentGuitarSound()
-        let gameplay = PlayViewModel(pattern: timeline.sessionPattern, bpm: song.bpm,
+        let gameplay = PlayViewModel(pattern: timeline.sessionPattern, bpm: song.bpm, songID: song.id,
             clock: AudioBeatClock(), input: TouchStrumInputService(), touchInput: nil,
             requiresController: false, metronome: sound, leadInSteps: 0, repetitions: 1,
             finishBreak: 0, finishesAtDurationBoundary: true, now: HostClock.now,

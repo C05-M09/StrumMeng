@@ -187,12 +187,7 @@ final class ShowtimeViewModel {
         case .paused: state = reduce(state, .pause(.user))
         case .disconnected: state = reduce(state, .pause(.connection))
         case .finished(let result):
-            let songResult = SessionResult(id: result.id, patternID: timeline.song.patternID,
-                songID: timeline.song.id, bpm: result.bpm, accuracy: result.accuracy,
-                perfectCount: result.perfectCount, tooEarlyCount: result.tooEarlyCount,
-                missCount: result.missCount, createdAt: result.createdAt,
-                beatEvents: result.beatEvents, strums: result.strums)
-            state = reduce(state, .completed(songResult))
+            state = reduce(state, .completed(result))
         default: break
         }
     }

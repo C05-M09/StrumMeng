@@ -17,18 +17,17 @@ enum HomeOverlay: Equatable {
 /// Turns Home button taps into navigation requests, and owns which overlay
 /// (Option or Guidebook) is showing. Overlays are not routes, so they do not
 /// go through the router. There is no reducer: each event maps straight to one
-/// callback or one state change. Every navigation tap plays the button click.
+/// callback or one state change. ButtonPressSound on the View handles button audio.
 @MainActor
 @Observable
 final class HomeViewModel {
     let guidance: HomeGuidanceViewModel?
     private(set) var presentedOverlay: HomeOverlay?
 
-    private let sounds: any MenuSoundService
     private let onShowtimeRequested: () -> Void
     private let onPracticeRequested: () -> Void
 
-    init(sounds: any MenuSoundService, guidance: HomeGuidanceViewModel? = nil,
+    init(guidance: HomeGuidanceViewModel? = nil,
          onPracticeRequested: @escaping () -> Void, onShowtimeRequested: @escaping () -> Void = {}) {
         self.guidance = guidance
         self.onPracticeRequested = onPracticeRequested
@@ -47,7 +46,6 @@ final class HomeViewModel {
         case .dismissOverlay:
             presentedOverlay = nil
         case .tapShowtime:
-            sounds.playButtonSound()
             onShowtimeRequested()
         }
     }

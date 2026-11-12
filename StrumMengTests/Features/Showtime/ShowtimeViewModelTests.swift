@@ -90,13 +90,13 @@ final class ShowtimeViewModelTests: XCTestCase {
         XCTAssertEqual(model.state, .paused(.playing, .connection))
         await model.send(.resume)
         game.change(.playing)
-        let result = SessionResult(id: UUID(), patternID: "foundation", songID: nil, bpm: 80,
+        let result = SessionResult(id: UUID(), patternID: "foundation", songID: "dummy-twinkle", bpm: 80,
             accuracy: 1, perfectCount: 1, tooEarlyCount: 0, missCount: 0,
             createdAt: Date(timeIntervalSince1970: 0), beatEvents: PracticeFixtures.events([.perfect]))
         game.change(.finished(result))
         guard case .finished(let finished) = model.state else { return XCTFail("Expected finished") }
         XCTAssertEqual(finished.songID, "dummy-twinkle")
-        XCTAssertEqual(finished.beatEvents, result.beatEvents)
+        XCTAssertEqual(finished, result, "The coordinator must forward the builder result unchanged")
         await model.send(.restart)
         XCTAssertEqual(model.state, .listening(0))
         await model.disappear()

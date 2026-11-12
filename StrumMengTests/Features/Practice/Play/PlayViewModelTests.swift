@@ -354,6 +354,7 @@ final class PlayViewModelTests: XCTestCase {
         XCTAssertEqual(result.beatEvents.count, 6)
         XCTAssertEqual(result.missCount, 6)
         XCTAssertEqual(result.patternID, "syncopation")
+        XCTAssertNil(result.songID, "Practice must keep the default nil song identity")
         XCTAssertEqual(result.bpm, 80)
         XCTAssertEqual(finished, [result])
     }

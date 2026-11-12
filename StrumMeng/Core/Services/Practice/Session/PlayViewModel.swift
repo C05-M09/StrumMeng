@@ -27,6 +27,7 @@ final class PlayViewModel {
 
     let pattern: StrumPattern
     let bpm: Int
+    let songID: String?
 
     /// Integration hooks let another session coordinator observe the shared engine without UI.
     @ObservationIgnored var onStateChanged: ((PracticeState) -> Void)?
@@ -118,6 +119,7 @@ final class PlayViewModel {
     ///   - requiresController: true when the controller is the only input, so Ready and Resume
     ///     wait for it. False when on-screen swipes work too: the player may start without the
     ///     iPhone, and only a session started with it pauses when it drops.
+    ///   - songID: Showtime song identity, passed to the shared result builder; nil for Practice.
     ///   - guitar: sounds every swipe, in or out of a session, like a real guitar.
     ///   - metronome: clicks on every quarter note while counting in and playing.
     ///   - strumArrivalGrace: extra time a window stays open for strums that arrive late (network
@@ -128,6 +130,7 @@ final class PlayViewModel {
     ///   - waitUntil: suspends until a host-clock time; injected so tests control time.
     init(pattern: StrumPattern,
          bpm: Int,
+         songID: String? = nil,
          clock: BeatClock,
          input: StrumInputService,
          touchInput: TouchStrumInput?,
@@ -150,6 +153,7 @@ final class PlayViewModel {
          onExit: @escaping () -> Void = {}) {
         self.pattern = pattern
         self.bpm = bpm
+        self.songID = songID
         self.clock = clock
         self.input = input
         self.touchInput = touchInput
@@ -506,7 +510,7 @@ final class PlayViewModel {
         let strums = sessionStrums.map {
             RecordedStrum(time: $0.time, direction: $0.direction, isExtra: extra.contains($0.id))
         }
-        let result = SessionResultBuilder.build(id: makeID(), patternID: pattern.id, bpm: bpm,
+        let result = SessionResultBuilder.build(id: makeID(), patternID: pattern.id, songID: songID, bpm: bpm,
                                                 beatEvents: beatEvents, strums: strums,
                                                 createdAt: currentDate())
         // .finished from here on: strums in the break are ignored, not judged.

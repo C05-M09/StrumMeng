@@ -11,6 +11,7 @@ enum SessionResultBuilder {
 
     static func build(id: UUID,
                       patternID: String,
+                      songID: String? = nil,
                       bpm: Int,
                       beatEvents: [BeatEvent],
                       strums: [RecordedStrum] = [],
@@ -25,7 +26,7 @@ enum SessionResultBuilder {
         return SessionResult(
             id: id,
             patternID: patternID,
-            songID: nil,
+            songID: songID,
             bpm: bpm,
             accuracy: scored == 0 ? 0 : points / Double(scored),
             perfectCount: perfect,

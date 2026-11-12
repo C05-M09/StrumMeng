@@ -613,6 +613,9 @@ A pattern selector replaces song duration in Listen, without showing chord label
 SongPatternChange and SongChordChange share the song-slot grid. The shared Practice engine
 handles real iPhone timing/direction feedback and disconnects. Reusable session code
 is in Core/Services/Practice/Session; reusable lane/countdown/pause views are in
-Core/DesignSystem/Play, so Features do not depend on one another. No shared data or
-connectivity contracts change. Showtime results are in memory only; chord synthesis
+Core/DesignSystem/Play, so Features do not depend on one another. The builder adopts
+the owner's backward-compatible songID: String? = nil parameter. AppContainer supplies
+song.id to the shared engine, which passes it directly to SessionResultBuilder; the
+Showtime coordinator no longer copies results to attach identity. Practice retains nil.
+SessionResult and connectivity contracts are unchanged. Showtime results are in memory only; chord synthesis
 and persistent song/visitor-request integration remain owned by parallel work.
