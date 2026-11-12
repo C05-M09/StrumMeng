@@ -14,6 +14,7 @@ final class ShowtimeViewModel {
     @ObservationIgnored private let chordLabels: [Int: String]
     @ObservationIgnored private let demo: any SongDemoPlayer
     @ObservationIgnored private let gameplay: any SongGameplay
+    @ObservationIgnored private let repository: (any SessionRepository)?
     @ObservationIgnored private let onBack: () -> Void
     @ObservationIgnored private var connectionPauseTask: Task<Void, Never>?
     @ObservationIgnored private var demoTask: Task<Void, Never>?
@@ -21,11 +22,12 @@ final class ShowtimeViewModel {
     @ObservationIgnored private var started = false
 
     init(song: Song, demo: any SongDemoPlayer, gameplay: any SongGameplay,
+         repository: (any SessionRepository)? = nil,
          onBack: @escaping () -> Void) {
         timeline = SongTimeline(song: song)
         previewPatterns = SongTimeline(song: song).previewPatterns
         chordLabels = SongTimeline(song: song).chordLabels
-        self.demo = demo; self.gameplay = gameplay; self.onBack = onBack
+        self.demo = demo; self.gameplay = gameplay; self.repository = repository; self.onBack = onBack
         isControllerConnected = gameplay.isControllerConnected
         gameplay.onStateChanged = { [weak self] in self?.receiveGameplay($0) }
         gameplay.onConnectionChanged = { [weak self] connected in
@@ -188,6 +190,11 @@ final class ShowtimeViewModel {
         case .disconnected: state = reduce(state, .pause(.connection))
         case .finished(let result):
             state = reduce(state, .completed(result))
+            if let repository {
+                Task {
+                    try? await repository.save(result)
+                }
+            }
         default: break
         }
     }

@@ -33,12 +33,14 @@ struct ShowtimeSongSelectView: View {
         static let centerSize: CGFloat = 1800
         static let centerFeet: CGFloat = 900
         static let centerX: CGFloat = 941
-        /// The previous and next characters, beside the middle one (about 70% of its size).
-        static let sideSize: CGFloat = 1400
-        static let sideFeet: CGFloat = 805
-        /// Distance between the middle character and each neighbour. Smaller = closer together.
-        static let sideSpacing: CGFloat = 360
-        static let sideOpacity: Double = 0.35
+        /// The previous and next characters, beside the middle one (smaller than before).
+        static let sideSize: CGFloat = 1100
+        static let sideFeet: CGFloat = 820
+        /// Distance between the middle character and each neighbour.
+        static let sideSpacing: CGFloat = 310
+        /// Darkening for side characters (negative brightness and reduced exposure) instead of reducing opacity.
+        static let sideBrightness: Double = -0.38
+        static let sideExposure: Color = Color(white: 0.62)
         /// The middle character while the detail card is open.
         static let detailSize: CGFloat = 1450
         static let detailFeet: CGFloat = 650
@@ -49,9 +51,9 @@ struct ShowtimeSongSelectView: View {
         /// would cover its neighbours and swallow their taps.
         static let tapInset: CGFloat = 0.3
  
-        /// The records card (with its stars) and the Play button under it. Move both together.
-        static let recordsCardCenter = CGPoint(x: 1110, y: 672)
-        static let playButtonY: CGFloat = 992
+        /// The records card and the Play button under it.
+        static let recordsCardCenter = CGPoint(x: 1110, y: 710)
+        static let playButtonCenter = CGPoint(x: 1260, y: 925)
     }
     
     /// Drawing order, back to front. The vinyl changes layer: on the stage it is in front of the
@@ -59,13 +61,15 @@ struct ShowtimeSongSelectView: View {
         /// character, so the character stands in front of it.
         private enum Layer {
             static let background: Double = 0
+            static let swipeArea: Double = 0.5
+            /// Side characters stay behind vinyl and center character in both stage and detail view.
+            static let sideCharacter: Double = 1
             static let vinylBehind: Double = 2
-            static let swipeArea: Double = 3
-            static let sideCharacter: Double = 4
             static let centerCharacter: Double = 5
-            /// In front of the characters, so the floor hides their feet.
-            static let floor: Double = 5.5
-            static let vinylInFront: Double = 6
+            /// Behind floor and title box so floor covers bottom of vinyl and feet
+            static let vinylInFront: Double = 5.2
+            /// In front of the characters and vinyl, so the floor hides their feet and bottom of vinyl.
+            static let floor: Double = 6
             static let wall: Double = 7
             /// Plaque, hint, card panels, Play and Back. Ties keep the order they are written in.
             static let foreground: Double = 10
@@ -92,8 +96,8 @@ struct ShowtimeSongSelectView: View {
                 Image(ShowtimeAssets.vinyl)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 757, height: 757)
-                    .position(x: isDetailShown ? 716 : 55, y: isDetailShown ? 498 : 421)
+                    .frame(width: 1100, height: 1100)
+                    .position(x: isDetailShown ? 716 : 55, y: isDetailShown ? 498 : 516)
                     .zIndex(isDetailShown ? Layer.vinylBehind : Layer.vinylInFront)
                     .allowsHitTesting(false)
 
@@ -113,6 +117,22 @@ struct ShowtimeSongSelectView: View {
                     .zIndex(Layer.swipeArea)
 
                 carousel
+
+                if !isDetailShown {
+                    OutlinedText(
+                        text: "SHOWTIME",
+                        font: AppTypography.bungee(size: 64),
+                        foregroundColor: AppColors.white,
+                        outlineColor: AppColors.brownInk,
+                        outlineWidth: 6,
+                        shadowColor: AppColors.yellowAccent,
+                        shadowOffset: CGSize(width: 0, height: 8)
+                    )
+                    .position(x: reference.width / 2, y: 104)
+                    .transition(.opacity)
+                    .zIndex(Layer.foreground)
+                    .allowsHitTesting(false)
+                }
 
                 if let song = viewModel.state.selectedSong {
                     // The plaque is in front of the characters, like in the design.
@@ -156,6 +176,9 @@ struct ShowtimeSongSelectView: View {
         .animation(.spring(response: 0.5, dampingFraction: 0.85), value: viewModel.state.selectedIndex)
         .onAppear {
             viewModel.startPlayback()
+            Task {
+                await viewModel.reloadRecords()
+            }
         }
         .onDisappear {
             viewModel.stopPlayback()
@@ -227,14 +250,17 @@ struct ShowtimeSongSelectView: View {
                 // The middle of the frame, worked out from where the feet should stand.
                 y: feet - size * (Stage.feetFraction - 0.5)
             )
-            let opacity: Double = isCenter
-                ? 1
-                : (isNeighbor && !isDetailShown ? Stage.sideOpacity : 0)
+            let isVisible = isCenter || (isNeighbor && !isDetailShown)
+            let brightness: Double = isCenter ? 0 : Stage.sideBrightness
+            let exposure: Color = isCenter ? .white : Stage.sideExposure
+            let opacity: Double = isVisible ? 1.0 : 0.0
      
             return Image(ShowtimeAssets.character(forSongID: song.id))
                 .resizable()
                 .scaledToFit()
                 .frame(width: size, height: size)
+                .brightness(brightness)
+                .colorMultiply(exposure)
                 .opacity(opacity)
                 .contentShape(Rectangle().inset(by: size * Stage.tapInset))
                 .allowsHitTesting(isTappable)
@@ -282,41 +308,60 @@ struct ShowtimeSongSelectView: View {
         }
     }
 
-    /// Every title is the same size, with a brownPrimary outline. A long title goes onto a second
-    /// line. A short one sits on the lower line, right above the BPM, so the BPM never moves.
+    /// Every title is 2 lines, with a brownPrimary outline and tight line spacing.
     private enum Title {
-        static let fontSize: CGFloat = 30
+        static let fontSize: CGFloat = 36
         static let outlineWidth: CGFloat = 4
-        /// Wide enough for "TWINKLE TWINKLE" on one line; the rest of that title goes below it.
-        static let width: CGFloat = 400
-        /// Room for two lines.
+        static let width: CGFloat = 520
         static let blockHeight: CGFloat = 110
+    }
+
+    private func titleLines(for song: Song) -> [String] {
+        switch song.id {
+        case "twinkle-twinkle":
+            return ["TWINKLE TWINKLE", "LITTLE STAR"]
+        case "jingle-bells":
+            return ["JINGLE BELLS"]
+        case "abc-song":
+            return ["ABC SONG"]
+        case "row-row-row-your-boat":
+            return ["ROW, ROW, ROW", "YOUR BOAT"]
+        case "down-by-the-riverside":
+            return ["DOWN BY", "THE RIVERSIDE"]
+        default:
+            return TitleLineWrapping.lines(for: song.title.uppercased())
+        }
     }
  
     private func titlePlaque(_ song: Song) -> some View {
         let width: CGFloat = isDetailShown ? 787 : 644
+        let lines = titleLines(for: song)
         return ZStack(alignment: .trailing) {
             Image(ShowtimeAssets.titleBox)
                 .resizable()
                 .frame(width: width, height: 180)
             
-            VStack(alignment: .trailing, spacing: 2) {
-                OutlinedText(
-                    text: song.title.uppercased(),
-                    font: ShowtimeStyle.title(Title.fontSize),
-                    foregroundColor: ShowtimeStyle.cream,
-                    outlineColor: AppColors.brownPrimary,
-                    outlineWidth: Title.outlineWidth,
-                    shadowColor: .clear,
-                    shadowOffset: .zero,
-                    alignment: .trailing
-                )
-                .lineLimit(2)
-                .frame(width: Title.width, height: Title.blockHeight, alignment: .bottomTrailing)
+            VStack(alignment: .trailing, spacing: lines.count == 1 ? 6 : 2) {
+                VStack(alignment: .trailing, spacing: -6) {
+                    ForEach(lines, id: \.self) { line in
+                        OutlinedText(
+                            text: line,
+                            font: ShowtimeStyle.title(Title.fontSize),
+                            foregroundColor: ShowtimeStyle.cream,
+                            outlineColor: AppColors.brownPrimary,
+                            outlineWidth: Title.outlineWidth,
+                            shadowColor: .clear,
+                            shadowOffset: .zero,
+                            alignment: .trailing
+                        )
+                    }
+                }
+                .frame(width: Title.width, alignment: .trailing)
  
                 Text("\(song.bpm) BPM")
-                    .font(ShowtimeStyle.body(30))
+                    .font(ShowtimeStyle.body(28))
                     .foregroundStyle(ShowtimeStyle.darkBrown)
+                    .padding(.top, lines.count == 1 ? 2 : 4)
             }
             .id(song.id)
             .transition(.opacity)
@@ -331,15 +376,17 @@ struct ShowtimeSongSelectView: View {
         Button {
             viewModel.send(.selectSong)
         } label: {
-            Text("PLAY")
-                .font(ShowtimeStyle.body(40))
-                .foregroundStyle(ShowtimeStyle.cream)
-                .frame(width: 260, height: 64)
-                .background(Capsule().fill(ShowtimeStyle.downRed))
-                .overlay(Capsule().stroke(ShowtimeStyle.darkBrown, lineWidth: 5))
+            Color.clear
         }
-        .buttonStyle(.plain)
-        .position(x: Stage.recordsCardCenter.x, y: Stage.playButtonY)
+        .buttonStyle(
+            AssetButtonStyle(
+                normalAssetName: "Button_Play_Normal",
+                pressedAssetName: "Button_Play_Pressed",
+                size: CGSize(width: 130, height: 140)
+            )
+        )
+        .position(Stage.playButtonCenter)
+        .accessibilityLabel("Play")
     }
 }
 
@@ -348,7 +395,12 @@ struct ShowtimeSongSelectView: View {
 #if DEBUG
 @MainActor
 private func previewScreen(songIndex: Int, detail: Bool = false) -> some View {
-    let viewModel = SongListViewModel(onSongSelected: { _ in }, onBackRequested: {})
+    let player = AVShowtimeSongPlayer()
+    let viewModel = SongListViewModel(
+        player: player,
+        onSongSelected: { _ in },
+        onBackRequested: {}
+    )
     for _ in 0..<songIndex { viewModel.send(.swipeLeft) }
     return ShowtimeSongSelectView(viewModel: viewModel, initiallyShowsDetail: detail)
 }

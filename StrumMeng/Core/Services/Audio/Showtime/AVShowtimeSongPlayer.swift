@@ -21,7 +21,7 @@ final class AVShowtimeSongPlayer: ShowtimeSongPlayer {
         }
         stop()
         guard let resourceName = ShowtimeAssets.audioResource(forSongID: id),
-              let url = bundle.url(forResource: resourceName, withExtension: "mp3")
+              let url = findAudioURL(resourceName: resourceName)
         else {
             return
         }
@@ -38,6 +38,21 @@ final class AVShowtimeSongPlayer: ShowtimeSongPlayer {
             currentPlayer = nil
             currentSongID = nil
         }
+    }
+
+    private func findAudioURL(resourceName: String) -> URL? {
+        if let url = bundle.url(forResource: resourceName, withExtension: "mp3") {
+            return url
+        }
+        if let url = Bundle.main.url(forResource: resourceName, withExtension: "mp3") {
+            return url
+        }
+        for b in Bundle.allBundles + Bundle.allFrameworks {
+            if let url = b.url(forResource: resourceName, withExtension: "mp3") {
+                return url
+            }
+        }
+        return nil
     }
 
     func stop() {
@@ -64,7 +79,7 @@ final class AVShowtimeSongPlayer: ShowtimeSongPlayer {
     private static func usePlaybackSession() {
         let session = AVAudioSession.sharedInstance()
         guard session.category != .playback else { return }
-        try? session.setCategory(.playback, mode: .default)
+        try? session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
         try? session.setActive(true)
     }
 }

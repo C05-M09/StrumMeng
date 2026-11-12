@@ -37,9 +37,9 @@ final class SongListViewModelTests: XCTestCase {
 
         viewModel.send(.swipeLeft)
 
-        XCTAssertEqual(viewModel.state.selectedSong?.id, "abc-song")
-        XCTAssertEqual(mockPlayer.playSongCalls, ["twinkle-twinkle", "abc-song"])
-        XCTAssertEqual(mockPlayer.currentSongID, "abc-song")
+        XCTAssertEqual(viewModel.state.selectedSong?.id, "jingle-bells")
+        XCTAssertEqual(mockPlayer.playSongCalls, ["twinkle-twinkle", "jingle-bells"])
+        XCTAssertEqual(mockPlayer.currentSongID, "jingle-bells")
     }
 
     func test_swipeRight_wrapsAroundToLastSong_andPlaysIt() {
@@ -56,17 +56,17 @@ final class SongListViewModelTests: XCTestCase {
     func test_multipleSwipes_switchSongsSequentially() {
         let viewModel = makeViewModel()
 
+        viewModel.send(.swipeLeft) // jingle-bells
         viewModel.send(.swipeLeft) // abc-song
         viewModel.send(.swipeLeft) // row-row-row-your-boat
-        viewModel.send(.swipeLeft) // jingle-bells
         viewModel.send(.swipeLeft) // down-by-the-riverside
         viewModel.send(.swipeLeft) // twinkle-twinkle
 
         XCTAssertEqual(viewModel.state.selectedSong?.id, "twinkle-twinkle")
         XCTAssertEqual(mockPlayer.playSongCalls, [
+            "jingle-bells",
             "abc-song",
             "row-row-row-your-boat",
-            "jingle-bells",
             "down-by-the-riverside",
             "twinkle-twinkle"
         ])

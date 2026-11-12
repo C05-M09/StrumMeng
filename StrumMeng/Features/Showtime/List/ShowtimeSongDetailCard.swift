@@ -10,8 +10,17 @@ struct ShowtimeSongDetailCard: View {
         song.primaryPatternID.flatMap(PatternCatalog.pattern(forID:))
     }
 
-    private var minutes: Int {
-        max(1, Int((song.durationSeconds / 60).rounded()))
+    private var formattedDuration: String {
+        let totalSeconds = Int(song.durationSeconds.rounded())
+        let mins = totalSeconds / 60
+        let secs = totalSeconds % 60
+        if mins > 0 && secs > 0 {
+            return "\(mins) min \(secs) sec"
+        } else if mins > 0 {
+            return "\(mins) min"
+        } else {
+            return "\(secs) sec"
+        }
     }
 
     var body: some View {
@@ -22,7 +31,7 @@ struct ShowtimeSongDetailCard: View {
                     .foregroundStyle(ShowtimeStyle.cream)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
-                Text("\(minutes) min")
+                Text(formattedDuration)
                     .font(ShowtimeStyle.body(22))
                     .foregroundStyle(ShowtimeStyle.orange)
             }
@@ -61,29 +70,19 @@ struct ShowtimeSongDetailCard: View {
     private static let artworkTop: CGFloat = 250
 }
 
-/// Right side of the detail card: the best record's stars on top of the records.
+/// Right side of the detail card: the records card.
 /// `records` is the Showtime records content (`ShowtimeRecordsView`), which already draws the
 /// "RECORDS:" title, the record box, 3 visible rows and the empty state.
 struct ShowtimeRecordsCard<Records: View>: View {
-    let stars: Int
     private let records: Records
 
-    init(stars: Int, @ViewBuilder records: () -> Records) {
-        self.stars = stars
+    init(stars: Int = 0, @ViewBuilder records: () -> Records) {
         self.records = records()
     }
 
     var body: some View {
-        ZStack(alignment: .top) {
-            records
-                .padding(.top, 65)
-
-            Image(ShowtimeAssets.star(stars))
-                .resizable()
-                .scaledToFit()
-                .frame(height: 130)
-        }
-        .frame(width: 584, height: 533, alignment: .top)
+        records
+            .frame(width: 584, height: 480)
     }
 }
 

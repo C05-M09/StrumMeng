@@ -46,12 +46,15 @@ struct Song: Identifiable, Equatable, Sendable, Hashable {
 
     /// Chords in order of first appearance, e.g. ["C", "F", "G"]. Shown on the detail card.
     var distinctChords: [String] {
+        if !chords.isEmpty {
+            var seen = Set<String>()
+            return chords.map(\.chord).filter { seen.insert($0).inserted }
+        }
         if !sections.isEmpty {
             var seen = Set<String>()
             return sections.flatMap(\.bars).map(\.chord).filter { seen.insert($0).inserted }
         }
-        var seen = Set<String>()
-        return chords.map(\.chord).filter { seen.insert($0).inserted }
+        return []
     }
 
     /// Pattern of the first section. Its name is shown on the detail card.
