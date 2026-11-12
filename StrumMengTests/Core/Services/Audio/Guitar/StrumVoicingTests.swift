@@ -9,11 +9,52 @@ final class StrumVoicingTests: XCTestCase {
         return settings
     }
 
-    private func notes(_ direction: StrumDirection, settings: GuitarSoundSettings? = nil,
+    private func notes(_ direction: StrumDirection, chord: GuitarChord = .c, settings: GuitarSoundSettings? = nil,
                        accent: Double = 1, seed: UInt64 = 1) -> [StrumNote] {
         var random = SeededRandom(seed: seed)
-        return StrumVoicing.notes(chord: .c, direction: direction, accent: accent,
+        return StrumVoicing.notes(chord: chord, direction: direction, accent: accent,
                                   settings: settings ?? steady, random: &random)
+    }
+
+    /// Steady settings where an upstroke always reaches the bass strings.
+    private var fullUpstroke: GuitarSoundSettings {
+        var settings = steady
+        settings.upstrokeBass = 1
+        return settings
+    }
+
+    private func soundingStrings(of chord: GuitarChord) -> [Int] {
+        chord.frets.indices.filter { chord.frets[$0] >= 0 }
+    }
+
+    func test_downstroke_everyChord_playsItsSoundingStrings_lowToHigh_withItsFrets() {
+        for chord in GuitarChord.catalog {
+            let played = notes(.down, chord: chord)
+            let strings = soundingStrings(of: chord)
+            XCTAssertEqual(played.map(\.string), strings, chord.name)
+            XCTAssertEqual(played.map(\.fret), strings.map { chord.frets[$0] }, chord.name)
+        }
+    }
+
+    func test_upstroke_everyChord_playsItsSoundingStrings_highToLow() {
+        for chord in GuitarChord.catalog {
+            let played = notes(.up, chord: chord, settings: fullUpstroke)
+            XCTAssertEqual(played.map(\.string), soundingStrings(of: chord).reversed(), chord.name)
+        }
+    }
+
+    func test_dChord_skipsTheTwoMutedBassStrings_butKeepsTheirPlaceInTime() {
+        let played = notes(.down, chord: .d)
+        XCTAssertEqual(played.map(\.string), [2, 3, 4, 5])
+        // The D string is third in the strum, so it starts two fifths into the spread.
+        XCTAssertEqual(played.first?.offset ?? -1, 0.045 * 2 / 5, accuracy: 1e-9)
+    }
+
+    func test_fBarre_downstroke_startsOnTheLowEString() {
+        let played = notes(.down, chord: .f)
+        XCTAssertEqual(played.count, 6)
+        XCTAssertEqual(played.first?.string, 0)
+        XCTAssertEqual(played.first?.offset ?? -1, 0, accuracy: 1e-9)
     }
 
     func test_downstroke_playsTheFiveStringsOfC_lowToHigh() {
