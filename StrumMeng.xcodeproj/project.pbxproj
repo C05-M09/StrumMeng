@@ -30,7 +30,6 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Core/Services/Audio/.gitkeep,
-				Core/Services/Audio/Showtime/.gitkeep,
 				Core/Services/Connectivity/.gitkeep,
 				Core/Services/Settings/.gitkeep,
 				Features/Controller/Connection/.gitkeep,
@@ -45,7 +44,6 @@
 				Features/Showtime/Listen/.gitkeep,
 				Features/Showtime/Play/.gitkeep,
 				Features/Showtime/Replay/.gitkeep,
-				Features/Showtime/Summary/.gitkeep,
 				Info.plist,
 			);
 			target = 000000000000000100000000 /* StrumMeng */;
@@ -58,7 +56,6 @@
 				Core/Services/Audio/.gitkeep,
 				Core/Services/Connectivity/.gitkeep,
 				Core/Services/Settings/.gitkeep,
-				Core/Services/Showtime/.gitkeep,
 				Features/Controller/.gitkeep,
 				Features/Controller/Connection/.gitkeep,
 				Features/Controller/Touchpad/.gitkeep,
@@ -74,7 +71,6 @@
 				Features/Showtime/Listen/.gitkeep,
 				Features/Showtime/Play/.gitkeep,
 				Features/Showtime/Replay/.gitkeep,
-				Features/Showtime/Summary/.gitkeep,
 				TestSupport/.gitkeep,
 			);
 			target = 000000000000000200000000 /* StrumMengTests */;
