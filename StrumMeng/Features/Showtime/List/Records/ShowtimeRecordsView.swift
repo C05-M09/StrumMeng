@@ -26,7 +26,7 @@ struct ShowtimeRecordsContentView: View {
 
         // Where the rows may go, as a fraction of the card. Tune these three to the asset:
         /// Space above the rows: the heading that is drawn in the asset.
-        static let topInset: CGFloat = 0.24
+        static let topInset: CGFloat = 0.16
         /// Space below the rows: the red base of the card.
         static let bottomInset: CGFloat = 0.10
         static let horizontalInset: CGFloat = 0.06
@@ -127,8 +127,9 @@ struct ShowtimeRecordRowView: View {
     let model: ShowtimeRecordRowModel
 
     private enum Layout {
-        static let columnSpacing: CGFloat = 10
-        static let statSpacing: CGFloat = 12
+        static let columnSpacing: CGFloat = 26
+        static let statSpacing: CGFloat = 32
+        static let perfectMissRightShift: CGFloat = 16
         static let rankWidth: CGFloat = 52
         static let labelSpacing: CGFloat = -2
         static let rankSize: CGFloat = 28
@@ -155,6 +156,7 @@ struct ShowtimeRecordRowView: View {
                     valueFont: AppTypography.bungee(size: Layout.accuracySize)
                 )
                 statColumn(value: "\(model.perfectCount)", label: "Perfect")
+                    .padding(.leading, Layout.perfectMissRightShift)
                 statColumn(value: "\(model.missCount)", label: "Miss")
             }
 

@@ -70,30 +70,19 @@ struct ShowtimeSongDetailCard: View {
     private static let artworkTop: CGFloat = 250
 }
 
-/// Right side of the detail card: the best record's stars on top of the records.
+/// Right side of the detail card: the records card.
 /// `records` is the Showtime records content (`ShowtimeRecordsView`), which already draws the
 /// "RECORDS:" title, the record box, 3 visible rows and the empty state.
 struct ShowtimeRecordsCard<Records: View>: View {
-    let stars: Int
     private let records: Records
 
-    init(stars: Int, @ViewBuilder records: () -> Records) {
-        self.stars = stars
+    init(stars: Int = 0, @ViewBuilder records: () -> Records) {
         self.records = records()
     }
 
     var body: some View {
-        ZStack(alignment: .top) {
-            records
-                .padding(.top, 65)
-
-            Image(ShowtimeAssets.star(stars))
-                .resizable()
-                .scaledToFit()
-                .frame(height: 130)
-                .offset(y: -40)
-        }
-        .frame(width: 584, height: 533, alignment: .top)
+        records
+            .frame(width: 584, height: 480)
     }
 }
 
