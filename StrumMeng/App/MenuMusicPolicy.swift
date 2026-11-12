@@ -15,7 +15,7 @@ enum MenuMusicPolicy {
         switch top {
         case nil, .practiceList, .showtimeList, .deviceSetup:
             return true
-        case .deviceSetup, .listen, .play, .summary:
+        case .deviceSetup, .listen, .play, .summary, .showtime:
             return false
         }
     }
