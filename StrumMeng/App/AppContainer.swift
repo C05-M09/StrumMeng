@@ -66,6 +66,13 @@ final class AppContainer {
         }
     }
 
+    /// The UI sounds (clicks, garage, page turns, pop-ups, wheel ticks) for the iPad's views,
+    /// put in the environment by ContentView. They follow the SFX volume like the rest.
+    var soundEffectAction: SoundEffectAction {
+        let sounds = menuSounds
+        return SoundEffectAction { effect in sounds.play(effect) }
+    }
+
     /// Plays or pauses the menu music for the screen on top. Called whenever the route stack or the
     /// app's active state changes; `MenuMusicPolicy` decides.
     func updateMenuMusic(for path: [AppRoute], isAppActive: Bool) {
@@ -86,7 +93,6 @@ final class AppContainer {
 
     func makeHomeViewModel() -> HomeViewModel {
         HomeViewModel(
-            sounds: menuSounds,
             guidance: enablesHomeGuidance ? HomeGuidanceViewModel(store: homeGuidanceStore) : nil,
             onPracticeRequested: { [weak router] in
                 router?.push(.practiceList)
@@ -245,7 +251,8 @@ final class AppContainer {
         CompanionViewModel(
             client: BonjourControllerClient(deviceName: deviceName),
             pairCodes: UserDefaultsPairCodeStore(),
-            makeGuitar: { GuitarEngine() }
+            makeGuitar: { GuitarEngine() },
+            makeSounds: { AVMenuSoundService(files: .controller) }
         )
     }
 

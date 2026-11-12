@@ -70,6 +70,7 @@ private struct ArtworkSwapButtonStyle: ButtonStyle {
                 .opacity(configuration.isPressed ? 1 : 0)
         }
         .transaction { $0.animation = nil }   // no implicit animation on press / release
+        .clicksWhenPressed(configuration.isPressed)
     }
 
     private func artwork(_ name: String) -> some View {

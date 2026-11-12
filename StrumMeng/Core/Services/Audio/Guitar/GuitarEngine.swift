@@ -4,6 +4,8 @@ import AVFoundation
 /// nodes (one per string) → mixer → guitar-body EQ → reverb → limiter → output, plus a click
 /// player straight to the output. Notes are synthesised once (KarplusStrong) and cached; strums and
 /// clicks are scheduled sample-accurately on the host clock, the same clock as AudioBeatClock.
+/// Each strum names its chord; notes are cached per string and fret, so chords share the notes
+/// they have in common.
 ///
 /// One instance for the whole app, so Listen and Play never fight over the audio session.
 @MainActor
@@ -14,7 +16,6 @@ final class GuitarEngine: GuitarSound, MetronomeSound {
     private static let immediateLead: TimeInterval = 0.015
 
     private let settings: GuitarSoundSettings
-    private let chord: GuitarChord
     private let engine = AVAudioEngine()
     private let players: [AVAudioPlayerNode] = (0..<6).map { _ in AVAudioPlayerNode() }
     private let stringMixer = AVAudioMixerNode()
@@ -33,7 +34,7 @@ final class GuitarEngine: GuitarSound, MetronomeSound {
     private var preparing: Task<Void, Never>?
     private var observers: [Task<Void, Never>] = []
 
-    private struct NoteKey: Hashable {
+    nonisolated struct NoteKey: Hashable {
         let string: Int
         let fret: Int
         let layer: Int
@@ -41,7 +42,7 @@ final class GuitarEngine: GuitarSound, MetronomeSound {
     }
 
     /// nil if the audio format cannot be made; the app then runs silent instead of crashing.
-    init?(settings: GuitarSoundSettings = .favourite, chord: GuitarChord = .c) {
+    init?(settings: GuitarSoundSettings = .favourite) {
         let session = AVAudioSession.sharedInstance()
         do {
             // .playback keeps sounding with the silent switch on.
@@ -54,7 +55,6 @@ final class GuitarEngine: GuitarSound, MetronomeSound {
         let rate = session.sampleRate > 0 ? session.sampleRate : 48_000
         guard let mono = AVAudioFormat(standardFormatWithSampleRate: rate, channels: 1) else { return nil }
         self.settings = settings
-        self.chord = chord
         sampleRate = rate
         format = mono
 
@@ -65,16 +65,19 @@ final class GuitarEngine: GuitarSound, MetronomeSound {
 
     // MARK: GuitarSound
 
-    func prepare() async {
-        if let preparing { return await preparing.value }
-        let wanted = noteKeys().filter { notes[$0] == nil }
-        let (rate, settings, chord) = (sampleRate, settings, chord)
+    func prepare(chords: [GuitarChord]) async {
+        // Each call waits for the one before, so a note is never synthesised twice.
+        let previous = preparing
+        let (rate, settings) = (sampleRate, settings)
         let task = Task { [weak self] in
+            await previous?.value
+            let wanted = self.map { engine in Self.noteKeys(for: chords).filter { engine.notes[$0] == nil } } ?? []
+            guard !wanted.isEmpty else { return }
             // Synthesis is pure and slow-ish, so it runs off the main actor.
             let rendered = await Task.detached(priority: .userInitiated) {
                 var random = SystemRandomNumberGenerator()
                 return wanted.map { key in
-                    (key, Self.render(key, chord: chord, settings: settings, sampleRate: rate, random: &random))
+                    (key, Self.render(key, settings: settings, sampleRate: rate, random: &random))
                 }
             }.value
             guard let self else { return }
@@ -86,7 +89,7 @@ final class GuitarEngine: GuitarSound, MetronomeSound {
         await task.value
     }
 
-    func strum(_ direction: StrumDirection, at time: TimeInterval?, accent: Double) {
+    func strum(_ direction: StrumDirection, chord: GuitarChord, at time: TimeInterval?, accent: Double) {
         ensureRunning()
         let start = time ?? HostClock.now() + Self.immediateLead
         var random = SystemRandomNumberGenerator()
@@ -220,12 +223,16 @@ final class GuitarEngine: GuitarSound, MetronomeSound {
 
     // MARK: Notes
 
-    private func noteKeys() -> [NoteKey] {
-        var keys: [NoteKey] = []
-        for (string, fret) in chord.frets.enumerated() where fret >= 0 {
-            for layer in StrumVoicing.layerVelocities.indices {
-                for variant in 0..<Self.variants {
-                    keys.append(NoteKey(string: string, fret: fret, layer: layer, variant: variant))
+    /// Every note the chords can play: each sounding string and fret, in every layer and variant.
+    /// A note two chords share appears once.
+    nonisolated static func noteKeys(for chords: [GuitarChord]) -> Set<NoteKey> {
+        var keys: Set<NoteKey> = []
+        for chord in chords {
+            for (string, fret) in chord.frets.enumerated() where fret >= 0 {
+                for layer in StrumVoicing.layerVelocities.indices {
+                    for variant in 0..<variants {
+                        keys.insert(NoteKey(string: string, fret: fret, layer: layer, variant: variant))
+                    }
                 }
             }
         }
@@ -236,13 +243,12 @@ final class GuitarEngine: GuitarSound, MetronomeSound {
     private func buffer(for key: NoteKey) -> AVAudioPCMBuffer? {
         if let cached = notes[key] { return cached }
         var random = SystemRandomNumberGenerator()
-        let made = makeBuffer(Self.render(key, chord: chord, settings: settings,
-                                          sampleRate: sampleRate, random: &random))
+        let made = makeBuffer(Self.render(key, settings: settings, sampleRate: sampleRate, random: &random))
         notes[key] = made
         return made
     }
 
-    nonisolated private static func render(_ key: NoteKey, chord: GuitarChord, settings: GuitarSoundSettings,
+    nonisolated private static func render(_ key: NoteKey, settings: GuitarSoundSettings,
                                            sampleRate: Double, random: inout some RandomNumberGenerator) -> [Float] {
         KarplusStrong.pluck(sampleRate: sampleRate, midi: KarplusStrong.openMidi[key.string] + key.fret,
                             velocity: StrumVoicing.layerVelocities[key.layer],

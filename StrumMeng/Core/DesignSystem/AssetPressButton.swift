@@ -21,6 +21,8 @@ struct AssetPressButton: View {
     /// Lifts the button after a tap shorter than the style's minimum press; cancelled by a new press.
     @State private var release: Task<Void, Never>?
 
+    @Environment(\.playSoundEffect) private var playSoundEffect
+
     init(normalAsset: String, pressedAsset: String, size: CGSize, accessibilityLabel: String,
          isLatched: Bool = false, isPressed: Bool = false, style: AssetPressStyle = .standard,
          action: @escaping () -> Void) {
@@ -71,6 +73,7 @@ struct AssetPressButton: View {
                     if inside, !isPressed {
                         release?.cancel()
                         pressedAt = .now
+                        playSoundEffect(.button)
                     }
                     isPressed = inside
                 }

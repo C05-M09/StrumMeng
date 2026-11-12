@@ -7,5 +7,6 @@ struct PressableButtonStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 0.94 : 1)
             .offset(y: configuration.isPressed ? 2 : 0)
             .animation(.spring(response: 0.2, dampingFraction: 0.6), value: configuration.isPressed)
+            .clicksWhenPressed(configuration.isPressed)
     }
 }

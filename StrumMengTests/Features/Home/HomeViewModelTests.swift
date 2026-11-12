@@ -17,11 +17,6 @@ final class HomeViewModelTests: XCTestCase {
     }
 
     private func makeSUT() -> (sut: HomeViewModel, recorder: CallbackRecorder) {
-        let (sut, recorder, _) = makeSUTWithSounds()
-        return (sut, recorder)
-    }
-
-    private func makeSUTWithSounds() -> (sut: HomeViewModel, recorder: CallbackRecorder, sounds: MockMenuSoundService) {
         let recorder = CallbackRecorder()
         let sounds = MockMenuSoundService()
         let sut = HomeViewModel(sounds: sounds, onPracticeRequested: { recorder.practiceCount += 1 },

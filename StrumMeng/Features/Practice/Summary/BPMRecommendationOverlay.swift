@@ -23,6 +23,7 @@ struct BPMRecommendationOverlay: View {
     @State private var mascotEntered: Bool = false
     @State private var bubbleEntered: Bool = false
     @State private var buttonsEntered: Bool = false
+    @Environment(\.playSoundEffect) private var playSoundEffect
 
     init(
         recommendation: RecommendedBPM,
@@ -66,6 +67,7 @@ struct BPMRecommendationOverlay: View {
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
         .onAppear {
+            playSoundEffect(.popUp)
             triggerEntranceAnimation()
         }
     }
@@ -245,6 +247,7 @@ private struct OverlayScaleButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
             .animation(.easeOut(duration: 0.02), value: configuration.isPressed)
+            .clicksWhenPressed(configuration.isPressed)
     }
 }
 

@@ -111,29 +111,15 @@ final class OptionViewModelTests: XCTestCase {
         XCTAssertEqual(sounds.effectsVolumes, [1])
     }
 
-    func test_tapSetUpDevice_playsTheButtonSound() {
+    func test_events_playNoSound_theButtonsClickThemselves() {
         let (viewModel, _, sounds) = makeViewModelWithSounds()
 
         viewModel.send(.tapSetUpDevice)
-
-        XCTAssertEqual(sounds.buttonSoundCount, 1)
-    }
-
-    func test_tapBack_leavesTheClickToTheOverlayDismiss() {
-        let (viewModel, _, sounds) = makeViewModelWithSounds()
-
-        viewModel.send(.tapBack)
-
-        XCTAssertEqual(sounds.buttonSoundCount, 0)
-    }
-
-    func test_sliderChanges_playNoButtonSound() {
-        let (viewModel, _, sounds) = makeViewModelWithSounds()
-
         viewModel.send(.changeSoundVolume(0.3))
         viewModel.send(.changeSFXVolume(0.3))
+        viewModel.send(.tapBack)
 
-        XCTAssertEqual(sounds.buttonSoundCount, 0)
+        XCTAssertEqual(sounds.playedEffects, [])
     }
 
     func test_tapBack_doesNotChangeAnyVolume() {

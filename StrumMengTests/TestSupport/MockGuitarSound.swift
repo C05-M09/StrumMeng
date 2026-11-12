@@ -7,6 +7,8 @@ final class MockGuitarSound: GuitarSound, MetronomeSound {
         let direction: StrumDirection
         let time: TimeInterval?
         let accent: Double
+        /// Defaults to C so tests written before chords existed still compare equal.
+        var chord: GuitarChord = .c
     }
 
     struct Click: Equatable {
@@ -20,10 +22,15 @@ final class MockGuitarSound: GuitarSound, MetronomeSound {
     private(set) var stopStrumsCount = 0
     private(set) var cancelClicksCount = 0
 
-    func prepare() async { prepareCount += 1 }
+    private(set) var preparedChords: [[GuitarChord]] = []
 
-    func strum(_ direction: StrumDirection, at time: TimeInterval?, accent: Double) {
-        strums.append(Strum(direction: direction, time: time, accent: accent))
+    func prepare(chords: [GuitarChord]) async {
+        prepareCount += 1
+        preparedChords.append(chords)
+    }
+
+    func strum(_ direction: StrumDirection, chord: GuitarChord, at time: TimeInterval?, accent: Double) {
+        strums.append(Strum(direction: direction, time: time, accent: accent, chord: chord))
     }
 
     func stopStrums() { stopStrumsCount += 1 }

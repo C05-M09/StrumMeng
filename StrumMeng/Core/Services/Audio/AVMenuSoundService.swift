@@ -1,6 +1,6 @@
 import AVFoundation
 
-/// Plays the menu music and the button click from the bundled audio files with `AVAudioPlayer`.
+/// Plays the menu music and the sound effects from the bundled audio files with `AVAudioPlayer`.
 ///
 /// A missing or unreadable file leaves that sound silent: the app keeps working without it.
 /// It shares the app's `.playback` audio session with the guitar engine, so both mix.
@@ -8,38 +8,73 @@ import AVFoundation
 final class AVMenuSoundService: MenuSoundService {
     /// The audio files to load, by name and extension.
     nonisolated struct Files {
-        let musicName: String
+        /// nil plays no music (the iPhone controller).
+        let musicName: String?
         let musicExtension: String
-        let buttonName: String
-        let buttonExtension: String
+        let effects: [SoundEffect: String]
+        let effectsExtension: String
 
-        /// The placeholder sounds in Resources/Audio (M09-153).
+        /// The sounds in Resources/Audio.
         static let bundled = Files(
             musicName: "Background_MSC",
             musicExtension: "mp3",
-            buttonName: "Button_SFX",
-            buttonExtension: "wav"
+            effects: [
+                .button: "Button_SFX",
+                .garage: "Garage_SFX",
+                .guidebookPage: "Guidebook_Page_SFX",
+                .popUp: "Popup_SFX",
+                .wheelTick: "Wheel_Tick_SFX"
+            ],
+            effectsExtension: "mp3"
+        )
+
+        /// The iPhone controller: only the button click, no music.
+        static let controller = Files(
+            musicName: nil,
+            musicExtension: "mp3",
+            effects: [.button: "Button_SFX"],
+            effectsExtension: "mp3"
         )
     }
 
+    /// How many copies of an effect can sound at once. A fast wheel spin ticks faster than the
+    /// tick lasts, and fast taps should not cut each other off; one copy is enough for the rest.
+    static func voiceCount(for effect: SoundEffect) -> Int {
+        switch effect {
+        case .wheelTick: 4
+        case .button: 2
+        case .garage, .guidebookPage, .popUp: 1
+        }
+    }
+
     private let music: AVAudioPlayer?
-    private let button: AVAudioPlayer?
+    /// Each effect's copies, used round-robin.
+    private var effectVoices: [SoundEffect: [AVAudioPlayer]] = [:]
+    private var nextVoice: [SoundEffect: Int] = [:]
 
     private(set) var musicVolume = VolumeConfig.defaultVolume
     private(set) var effectsVolume = VolumeConfig.defaultVolume
 
     init(bundle: Bundle = .main, files: Files = .bundled) {
-        music = Self.makePlayer(bundle: bundle, name: files.musicName, fileExtension: files.musicExtension)
-        button = Self.makePlayer(bundle: bundle, name: files.buttonName, fileExtension: files.buttonExtension)
-
+        music = files.musicName.flatMap {
+            Self.makePlayer(bundle: bundle, name: $0, fileExtension: files.musicExtension)
+        }
         music?.numberOfLoops = -1  // loop until paused
         music?.prepareToPlay()
-        button?.prepareToPlay()
+
+        for (effect, name) in files.effects {
+            let voices = (0..<Self.voiceCount(for: effect)).compactMap { _ in
+                Self.makePlayer(bundle: bundle, name: name, fileExtension: files.effectsExtension)
+            }
+            voices.forEach { $0.prepareToPlay() }
+            effectVoices[effect] = voices.isEmpty ? nil : voices
+        }
         applyVolumes()
     }
 
     var hasMusic: Bool { music != nil }
-    var hasButtonSound: Bool { button != nil }
+
+    func hasSound(for effect: SoundEffect) -> Bool { effectVoices[effect] != nil }
 
     /// Read from the player, so a pause by the system (a phone call) shows here too
     /// and the next `startMusic()` resumes it.
@@ -57,11 +92,14 @@ final class AVMenuSoundService: MenuSoundService {
         music?.pause()
     }
 
-    func playButtonSound() {
-        guard let button, effectsVolume > 0 else { return }
+    func play(_ effect: SoundEffect) {
+        guard let voices = effectVoices[effect], effectsVolume > 0 else { return }
+        let index = nextVoice[effect, default: 0] % voices.count
+        nextVoice[effect] = index + 1
         Self.usePlaybackSession()
-        button.currentTime = 0
-        button.play()
+        let voice = voices[index]
+        voice.currentTime = 0
+        voice.play()
     }
 
     func setMusicVolume(_ volume: Double) {
@@ -78,7 +116,9 @@ final class AVMenuSoundService: MenuSoundService {
 
     private func applyVolumes() {
         music?.volume = Float(musicVolume)
-        button?.volume = Float(effectsVolume)
+        for voice in effectVoices.values.joined() {
+            voice.volume = Float(effectsVolume)
+        }
     }
 
     private static func makePlayer(bundle: Bundle, name: String, fileExtension: String) -> AVAudioPlayer? {

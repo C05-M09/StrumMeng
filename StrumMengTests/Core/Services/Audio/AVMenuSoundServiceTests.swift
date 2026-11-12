@@ -6,15 +6,46 @@ final class AVMenuSoundServiceTests: XCTestCase {
     private let missingFiles = AVMenuSoundService.Files(
         musicName: "NoSuchMusic",
         musicExtension: "mp3",
-        buttonName: "NoSuchButton",
-        buttonExtension: "wav"
+        effects: Dictionary(uniqueKeysWithValues: SoundEffect.allCases.map { ($0, "NoSuchEffect") }),
+        effectsExtension: "mp3"
     )
 
-    func test_init_withBundledFiles_loadsMusicAndButtonSound() {
+    func test_init_withBundledFiles_loadsTheMusicAndEverySoundEffect() {
         let service = AVMenuSoundService()
 
         XCTAssertTrue(service.hasMusic)
-        XCTAssertTrue(service.hasButtonSound)
+        for effect in SoundEffect.allCases {
+            XCTAssertTrue(service.hasSound(for: effect), "\(effect) has no bundled sound")
+        }
+    }
+
+    func test_controllerFiles_loadOnlyTheButtonClick_andNoMusic() {
+        let service = AVMenuSoundService(files: .controller)
+
+        XCTAssertFalse(service.hasMusic)
+        XCTAssertTrue(service.hasSound(for: .button))
+        XCTAssertFalse(service.hasSound(for: .wheelTick))
+    }
+
+    func test_bundledFiles_nameASoundForEveryEffect() {
+        XCTAssertEqual(Set(AVMenuSoundService.Files.bundled.effects.keys), Set(SoundEffect.allCases))
+    }
+
+    func test_wheelTick_hasEnoughVoicesToOverlapAFastSpin() {
+        XCTAssertGreaterThan(AVMenuSoundService.voiceCount(for: .wheelTick), 1)
+        for effect in SoundEffect.allCases {
+            XCTAssertGreaterThanOrEqual(AVMenuSoundService.voiceCount(for: effect), 1)
+        }
+    }
+
+    func test_playingEveryEffect_repeatedly_doesNotCrash() {
+        let service = AVMenuSoundService()
+        service.setEffectsVolume(0)  // keep the test run quiet; a muted effect is skipped
+        service.setEffectsVolume(0.01)
+
+        for _ in 0..<6 {
+            SoundEffect.allCases.forEach(service.play)
+        }
     }
 
     func test_init_startsWithTheDefaultVolumes() {
@@ -28,11 +59,13 @@ final class AVMenuSoundServiceTests: XCTestCase {
         let service = AVMenuSoundService(files: missingFiles)
 
         service.startMusic()
-        service.playButtonSound()
+        SoundEffect.allCases.forEach(service.play)
         service.pauseMusic()
 
         XCTAssertFalse(service.hasMusic)
-        XCTAssertFalse(service.hasButtonSound)
+        for effect in SoundEffect.allCases {
+            XCTAssertFalse(service.hasSound(for: effect))
+        }
         XCTAssertFalse(service.isMusicPlaying)
     }
 

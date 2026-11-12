@@ -9,6 +9,12 @@ struct PatternWheelView: View {
     @State private var isRotating = false
     @State private var isDragging = false
     @State private var interactionGeneration = 0
+    /// The pattern under the pointer during a drag, for ticking as each one passes.
+    @State private var dragSlot: Int?
+    /// Plays the ticks while the wheel settles; cancelled by the next move and on disappear.
+    @State private var settleTicks: Task<Void, Never>?
+
+    @Environment(\.playSoundEffect) private var playSoundEffect
 
     private let pivot = CGPoint(x: -260, y: 516)
     private let highlightRadius: CGFloat = 720
@@ -35,6 +41,10 @@ struct PatternWheelView: View {
         .contentShape(Rectangle())
         .gesture(dragGesture.exclusively(before: sectorTapGesture))
         .clipped()
+        .onDisappear {
+            settleTicks?.cancel()
+            settleTicks = nil
+        }
     }
 
     private var rotatingWheel: some View {
@@ -75,6 +85,8 @@ struct PatternWheelView: View {
                 if !isDragging {
                     isDragging = true
                     interactionGeneration += 1
+                    settleTicks?.cancel()
+                    dragSlot = selectedIndex
 
                     withAnimation(.linear(duration: 0.02)) {
                         isRotating = true
@@ -89,6 +101,13 @@ struct PatternWheelView: View {
                     max(proposedAngle, minimumAngle),
                     maximumAngle
                 )
+
+                let slot = PatternWheelTicks.slot(selectedIndex: selectedIndex, dragAngle: dragAngle,
+                                                  angleBetween: angleBetweenPatterns, count: patterns.count)
+                if slot != dragSlot {
+                    dragSlot = slot
+                    playSoundEffect(.wheelTick)
+                }
             }
             .onEnded { value in
                 isDragging = false
@@ -219,6 +238,9 @@ struct PatternWheelView: View {
         guard patterns.indices.contains(index) else { return }
         interactionGeneration += 1
         let generation = interactionGeneration
+        // A drag already ticked up to the pattern it let go on; a tap starts from the selected one.
+        tickWhileSettling(from: dragSlot ?? selectedIndex, to: index, duration: duration)
+        dragSlot = nil
 
         withAnimation(.linear(duration: 0.02)) {
             isRotating = true
@@ -235,6 +257,26 @@ struct PatternWheelView: View {
 
             withAnimation(.linear(duration: 0.02)) {
                 isRotating = false
+            }
+        }
+    }
+
+    /// Ticks once for every pattern the settle animation still passes. Purely cosmetic timing,
+    /// so a sleeping task is fine here (this is not beat timing).
+    private func tickWhileSettling(from: Int, to: Int, duration: Double) {
+        settleTicks?.cancel()
+        let delays = PatternWheelTicks.settleDelays(from: from, to: to, duration: duration)
+        guard !delays.isEmpty else { return }
+        let play = playSoundEffect
+        settleTicks = Task { @MainActor in
+            var waited = 0.0
+            for delay in delays {
+                if delay > waited {
+                    try? await Task.sleep(for: .seconds(delay - waited))
+                    waited = delay
+                }
+                guard !Task.isCancelled else { return }
+                play(.wheelTick)
             }
         }
     }

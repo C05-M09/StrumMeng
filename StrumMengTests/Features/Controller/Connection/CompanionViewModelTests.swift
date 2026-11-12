@@ -110,6 +110,39 @@ final class CompanionViewModelTests: XCTestCase {
         return (viewModel, client, guitar)
     }
 
+    func test_outsideASession_aButtonClicks() {
+        let sounds = MockMenuSoundService()
+        let viewModel = CompanionViewModel(client: MockControllerClient(), pairCodes: MockPairCodeStore(),
+                                           state: .enteringCode(""), makeSounds: { sounds })
+        viewModel.appear()
+
+        viewModel.playSoundEffect(.button)
+
+        XCTAssertEqual(sounds.playedEffects, [.button])
+        viewModel.stop()
+    }
+
+    func test_duringASession_buttonsAreSilent_andClickAgainAfterIt() async {
+        let sounds = MockMenuSoundService()
+        let guitar = MockGuitarSound()
+        let client = MockControllerClient()
+        let viewModel = CompanionViewModel(client: client, pairCodes: MockPairCodeStore(), state: .connected,
+                                           makeGuitar: { guitar }, makeSounds: { sounds })
+        viewModel.appear()
+
+        client.emitSessionActive(true)
+        await waitUntil { guitar.stopStrumsCount == 1 }
+        viewModel.playSoundEffect(.button)
+        XCTAssertEqual(sounds.playedEffects, [])
+
+        client.emitSessionActive(false)
+        await Task.yield()
+        await Task.yield()
+        viewModel.playSoundEffect(.button)
+        XCTAssertEqual(sounds.playedEffects, [.button])
+        viewModel.stop()
+    }
+
     func test_outsideASession_aSwipeSoundsOnTheiPhone_inItsDirection() {
         let (viewModel, _, guitar) = makeSoundingViewModel()
 

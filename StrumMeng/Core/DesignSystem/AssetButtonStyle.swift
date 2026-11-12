@@ -14,5 +14,6 @@ struct AssetButtonStyle: ButtonStyle {
             .transaction { transaction in
                 transaction.animation = nil
             }
+            .clicksWhenPressed(configuration.isPressed)
     }
 }
