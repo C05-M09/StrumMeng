@@ -67,11 +67,10 @@ struct HomeView: View {
                 viewModel.send(.tapPractice)
             }
 
-            menuButton(HomeLayout.showtime, "Showtime", hint: "Not available yet") {
+            // Showtime opens the song list now, so it clicks and reads like Practice.
+            menuButton(HomeLayout.showtime, "Showtime") {
                 viewModel.send(.tapShowtime)
             }
-            // Showtime has no action yet, so it does not click either.
-            .environment(\.playSoundEffect, .silent)
 
             menuButton(HomeLayout.option, "Option") {
                 viewModel.send(.tapOption)
@@ -146,8 +145,9 @@ struct HomeView: View {
     }
 }
 
+// A #Preview body is a ViewBuilder, so it must not contain `return`.
 #Preview {
-    let home = HomeViewModel(onPracticeRequested: {})
+    let home = HomeViewModel(onPracticeRequested: {}, onShowtimeRequested: {})
     let option = OptionViewModel(
         settings: UserDefaultsSettingsStore(),
         sounds: AVMenuSoundService(),
@@ -156,7 +156,7 @@ struct HomeView: View {
     let guidebook = GuidebookViewModel(
         onBackRequested: { [weak home] in home?.send(.dismissOverlay) }
     )
-    return HomeView(
+    HomeView(
         viewModel: home,
         optionViewModel: option,
         guidebookViewModel: guidebook

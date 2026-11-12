@@ -17,8 +17,8 @@ enum HomeOverlay: Equatable {
 /// Turns Home button taps into navigation requests, and owns which overlay
 /// (Option or Guidebook) is showing. Overlays are not routes, so they do not
 /// go through the router. There is no reducer: each event maps straight to one
-/// callback or one state change. Every tap that does something plays the button click; Showtime
-/// does nothing, so it stays silent.
+/// callback or one state change. Button clicks are played by the buttons themselves, through the
+/// `playSoundEffect` environment, so this view model plays no sound.
 @MainActor
 @Observable
 final class HomeViewModel {
@@ -26,15 +26,18 @@ final class HomeViewModel {
     private(set) var presentedOverlay: HomeOverlay?
 
     private let onPracticeRequested: () -> Void
+    private let onShowtimeRequested: () -> Void
 
-    init(guidance: HomeGuidanceViewModel? = nil, onPracticeRequested: @escaping () -> Void) {
+    init(guidance: HomeGuidanceViewModel? = nil,
+         onPracticeRequested: @escaping () -> Void,
+         onShowtimeRequested: @escaping () -> Void = {}) {
         self.guidance = guidance
         self.onPracticeRequested = onPracticeRequested
+        self.onShowtimeRequested = onShowtimeRequested
     }
 
     func send(_ event: HomeEvent) {
         switch event {
-        // The buttons click on their own (ButtonPressSound), so no sound is played here.
         case .tapPractice:
             onPracticeRequested()
         case .tapOption:
@@ -42,9 +45,10 @@ final class HomeViewModel {
         case .tapGuidebook:
             presentedOverlay = .guidebook
         case .dismissOverlay:
+            // Sent by the Back button of Option and of Guidebook.
             presentedOverlay = nil
         case .tapShowtime:
-            break   // Showtime is not connected yet: no navigation, no message.
+            onShowtimeRequested()
         }
     }
 }

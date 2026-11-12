@@ -2,10 +2,12 @@ import Foundation
 
 /// Decides on which screens the menu background music plays.
 ///
-/// It plays on Home (with its Option and Guidebook overlays) and the pattern list.
-/// Set Up Device is quiet, like the screens from Listen on.
+/// It plays on Home (with its Option and Guidebook overlays) and the pattern list. Set Up Device
+/// is quiet, like the screens from Listen on.
+/// Showtime song list plays the character's own song, so menu music is paused there.
 /// It is paused from Listen on: Listen, Play and Summary (with Replay) play the guitar and the
-/// metronome, and the player must hear those clearly to strum on tempo.
+/// metronome, and the player must hear those clearly to strum on tempo. The Showtime intro is
+/// quiet too, because it leads straight into the song's Listen.
 enum MenuMusicPolicy {
     /// - Parameters:
     ///   - top: the route on top of the stack; nil is Home.
@@ -15,7 +17,8 @@ enum MenuMusicPolicy {
         switch top {
         case nil, .practiceList:
             return true
-        case .deviceSetup, .listen, .play, .summary:
+        case .showtimeList, .deviceSetup, .listen, .play, .summary,
+             .showtimeIntro, .showtimeListen, .showtimePlay, .showtimeSummary:
             return false
         }
     }

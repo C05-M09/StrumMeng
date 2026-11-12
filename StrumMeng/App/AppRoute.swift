@@ -9,4 +9,11 @@ enum AppRoute: Hashable {
     /// A finished session. Carries only its id: the result waits in SessionResultStore.
     case summary(sessionID: UUID)
     case deviceSetup
+
+    // Showtime (US11). The song carries its own fixed BPM, so routes only need the song id.
+    case showtimeList
+    case showtimeIntro(songID: String)
+    case showtimeListen(songID: String)
+    case showtimePlay(songID: String)
+    case showtimeSummary
 }

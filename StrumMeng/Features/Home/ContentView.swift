@@ -6,6 +6,7 @@ struct ContentView: View {
     @State private var homeViewModel: HomeViewModel
     @State private var pairingIntroduction: PairingIntroductionViewModel
     @State private var patternListViewModel: PatternListViewModel
+    @State private var songListViewModel: SongListViewModel
     @State private var optionViewModel: OptionViewModel
     @State private var guidebookViewModel: GuidebookViewModel
     @Environment(\.scenePhase) private var scenePhase
@@ -21,6 +22,7 @@ struct ContentView: View {
         _pairingIntroduction = State(initialValue:
             container.makePairingIntroductionViewModel(isEnabled: !inMemory))
         _patternListViewModel = State(initialValue: container.makePatternListViewModel())
+        _songListViewModel = State(initialValue: container.makeSongListViewModel())
         // Option is an overlay on Home, so "back" closes the overlay instead of popping the router.
         _optionViewModel = State(initialValue: container.makeOptionViewModel { [weak homeViewModel] in
             homeViewModel?.send(.dismissOverlay)
@@ -67,6 +69,17 @@ struct ContentView: View {
 
                     case .deviceSetup:
                         DeviceSetupRoute(container: container)
+
+                    // MARK: Showtime (US11)
+                    case .showtimeList:
+                        ShowtimeSongSelectView(viewModel: songListViewModel)
+                            .navigationBarBackButtonHidden()
+                            .toolbar(.hidden, for: .navigationBar)
+
+                    // TODO: replace with the real screens when intro, Listen, Play and Summary of
+                    // Showtime land. Until then, choosing a song opens an empty screen.
+                    case .showtimeIntro, .showtimeListen, .showtimePlay, .showtimeSummary:
+                        EmptyView()
                     }
                 }
         }

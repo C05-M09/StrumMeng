@@ -54,12 +54,12 @@ final class AppContainerTests: XCTestCase {
         XCTAssertEqual(home.presentedOverlay, .option)
     }
 
-    func test_homeViewModel_tapShowtime_doesNotPushRoute() {
+    func test_homeViewModel_tapShowtime_pushesShowtimeList() {
         let home = sut.makeHomeViewModel()
 
         home.send(.tapShowtime)
 
-        XCTAssertEqual(router.path.count, 0)
+        XCTAssertEqual(router.path, [.showtimeList])
         XCTAssertNil(home.presentedOverlay)
     }
 
