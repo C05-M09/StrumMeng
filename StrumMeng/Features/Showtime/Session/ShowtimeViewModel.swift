@@ -54,8 +54,15 @@ final class ShowtimeViewModel {
     var isAnimating: Bool {
         switch state {
         case .listening, .ready, .countIn, .playing: true
+        case .finished: isWrappingUp
         default: false
         }
+    }
+    /// The break after the last node, as in Practice: the session is finished and saved, but the
+    /// lane keeps sliding until the gameplay's break is over; the results show after it.
+    var isWrappingUp: Bool {
+        guard case .finished = state else { return false }
+        return gameplay.isAnimating
     }
     func appear() {
         guard !started else { return }
@@ -203,12 +210,15 @@ final class ShowtimeViewModel {
         frame.chordLabels = chordLabels
         frame.titleLines = TitleLineWrapping.lines(for: timeline.song.title)
         // Before the first clock tick, briefly show the same READY? callout as Practice.
-        if case .countIn = state, frame.songTime <= -6 * timeline.slotInterval { frame = readyFrame(frame) }
+        // The lead-in before the first node comes after the 6-slot count-in.
+        if case .countIn = state,
+           frame.songTime <= -Double(6 + frame.leadInSlots) * timeline.slotInterval { frame = readyFrame(frame) }
         return frame
     }
     private func readyFrame(_ frame: PlayScreenModel) -> PlayScreenModel {
         PlayScreenModel(title: frame.title, bpm: frame.bpm, duration: frame.duration,
             slotInterval: frame.slotInterval, songTime: frame.songTime, phase: .ready,
-            nodes: frame.nodes, lastJudgement: nil, readyLeadTime: 0, chordLabels: frame.chordLabels, titleLines: frame.titleLines)
+            nodes: frame.nodes, lastJudgement: nil, readyLeadTime: frame.readyLeadTime,
+            leadInSlots: frame.leadInSlots, chordLabels: frame.chordLabels, titleLines: frame.titleLines)
     }
 }

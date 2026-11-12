@@ -102,6 +102,36 @@ final class ShowtimeViewModelTests: XCTestCase {
         await model.disappear()
     }
 
+    func test_finishedSession_keepsTheLaneMovingThroughTheEndBreak_thenShowsResults() async {
+        let (model, _, game) = make()
+        await model.send(.next); await model.send(.previewFinished); await model.send(.ready)
+        game.change(.playing)
+        let result = SessionResult(id: UUID(), patternID: "foundation", songID: "dummy-twinkle", bpm: 80,
+            accuracy: 1, perfectCount: 1, tooEarlyCount: 0, missCount: 0,
+            createdAt: Date(timeIntervalSince1970: 0), beatEvents: PracticeFixtures.events([.perfect]))
+        game.isAnimating = true    // the gameplay's 2 s break after the last node
+        game.change(.finished(result))
+        XCTAssertTrue(model.isWrappingUp)
+        XCTAssertTrue(model.isAnimating)
+        game.isAnimating = false
+        XCTAssertFalse(model.isWrappingUp, "The results show once the break is over")
+        XCTAssertFalse(model.isAnimating)
+        await model.disappear()
+    }
+
+    func test_readyCallout_coversTheCountInAndTheLeadIn() async {
+        let (model, _, game) = make()
+        await model.send(.next); await model.send(.previewFinished); await model.send(.ready)
+        game.change(.countIn(3))
+        let slot = model.timeline.slotInterval
+        game.frameLeadInSlots = 4
+        game.frameSongTime = -10 * slot
+        XCTAssertEqual(model.playFrame().phase, .ready)
+        game.frameSongTime = -9 * slot
+        XCTAssertNotEqual(model.playFrame().phase, .ready, "Counting in once the first tick played")
+        await model.disappear()
+    }
+
     func test_gameplayFinish_savesResultToRepository() async {
         let repo = MockSessionRepository()
         let demo = FakeSongDemoPlayer()
@@ -289,7 +319,9 @@ private final class FakeSongDemoPlayer: SongDemoPlayer {
 private final class FakeSongGameplay: SongGameplay {
     var state = PracticeState.ready
     var isControllerConnected = true
-    var isAnimating: Bool { false }
+    var isAnimating = false
+    var frameSongTime: TimeInterval = 0
+    var frameLeadInSlots = 0
     var onStateChanged: ((PracticeState) -> Void)?
     var onConnectionChanged: ((Bool) -> Void)?
     var readyCalls = 0; var disappears = 0
@@ -301,7 +333,7 @@ private final class FakeSongGameplay: SongGameplay {
         change(reduce(state, event))
     }
     func screenModel() -> PlayScreenModel {
-        PlayScreenModel(title: "Song", bpm: 80, duration: 60, slotInterval: 0.375, songTime: 0,
-                        phase: .playing, nodes: [], lastJudgement: nil)
+        PlayScreenModel(title: "Song", bpm: 80, duration: 60, slotInterval: 0.375, songTime: frameSongTime,
+                        phase: .playing, nodes: [], lastJudgement: nil, leadInSlots: frameLeadInSlots)
     }
 }

@@ -27,6 +27,10 @@ final class AVShowtimeSongPlayerTests: XCTestCase {
         XCTAssertFalse(player.isPlaying)
     }
 
+    func test_player_startsAtFullLevel_soTheDeviceVolumeSetsIt() {
+        XCTAssertEqual(AVShowtimeSongPlayer().volume, 1)
+    }
+
     func test_player_stopsCleanly() {
         let player = AVShowtimeSongPlayer()
         player.playSong(id: "twinkle-twinkle")

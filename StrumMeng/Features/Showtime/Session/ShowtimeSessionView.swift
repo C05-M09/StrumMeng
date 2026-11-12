@@ -50,7 +50,7 @@ struct ShowtimeSessionView: View {
                     }
                 }
             }
-        } else if case .finished(let result) = viewModel.state {
+        } else if case .finished(let result) = viewModel.state, !viewModel.isWrappingUp {
             ShowtimeFinishedView(title: viewModel.timeline.song.title, result: result,
                 onRestart: { send(.restart) }, onBack: { send(.back) })
         } else {

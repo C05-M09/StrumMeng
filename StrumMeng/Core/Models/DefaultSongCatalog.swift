@@ -10,7 +10,8 @@ struct DefaultSongCatalog: SongCatalog {
         Song(
             id: "twinkle-twinkle",
             title: "Twinkle Twinkle Little Star",
-            bpm: 100,
+            // The bundled recording is 80 BPM (beat-grid fit), so the nodes follow the song.
+            bpm: 80,
             patternID: "foundation",
             barCount: 12,
             chords: [

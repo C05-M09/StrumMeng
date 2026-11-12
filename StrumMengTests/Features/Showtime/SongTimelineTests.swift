@@ -21,6 +21,35 @@ final class SongTimelineTests: XCTestCase {
         XCTAssertEqual(timeline.stroke(at: timeline.totalSlots), .rest)
         XCTAssertEqual(timeline.slotInterval * 8, 3, accuracy: 1e-9)
     }
+    func test_stepChords_followTheChart_oneChordPerSlot() {
+        let timeline = SongTimeline(song: DummySongCatalog().songs[0])
+        let chords = timeline.stepChords
+        XCTAssertEqual(chords.count, timeline.totalSlots)
+        for slot in [0, 7, 8, 9, timeline.totalSlots - 1] {
+            XCTAssertEqual(chords[slot].name, timeline.chord(at: slot), "slot \(slot)")
+        }
+    }
+    func test_stepChords_changeMidBar_onTheChartsSlot() {
+        // Riverside changes D -> D7 -> G inside one bar (slots 48, 52, 54).
+        guard let song = DefaultSongCatalog.song(forID: "down-by-the-riverside") else { return XCTFail() }
+        let chords = SongTimeline(song: song).stepChords
+        XCTAssertEqual(chords[51], .d)
+        XCTAssertEqual(chords[52], .d7)
+        XCTAssertEqual(chords[53], .d7)
+        XCTAssertEqual(chords[54], .g)
+    }
+    func test_stepChords_unknownChordName_playsC() {
+        var song = DummySongCatalog().songs[0]
+        song.chords = [SongChordChange(slot: 0, chord: "Bm")]
+        XCTAssertTrue(SongTimeline(song: song).stepChords.allSatisfy { $0 == .c })
+    }
+    func test_everyCatalogSong_hasAChordForEveryStep() {
+        for song in DefaultSongCatalog.all {
+            let timeline = SongTimeline(song: song)
+            XCTAssertEqual(timeline.stepChords.count, timeline.totalSlots, song.id)
+            XCTAssertEqual(timeline.stepChords.first?.name, song.chords.first?.chord, song.id)
+        }
+    }
     func test_listenExtractsDistinctPatternsAndGameplayChangesOnTheirScheduledSlot() {
         let one = SongTimeline(song: DummySongCatalog().songs[0])
         XCTAssertEqual(one.previewPatterns.count, 1)

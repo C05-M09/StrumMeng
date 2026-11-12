@@ -5,7 +5,8 @@ final class AVShowtimeSongPlayer: ShowtimeSongPlayer {
     private var currentPlayer: AVAudioPlayer?
     private(set) var currentSongID: String?
     private let bundle: Bundle
-    private(set) var volume: Double = VolumeConfig.defaultVolume
+    /// Full level by default: the player sets the song preview with the device volume buttons.
+    private(set) var volume: Double = 1
 
     init(bundle: Bundle = .main) {
         self.bundle = bundle
