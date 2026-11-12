@@ -71,6 +71,11 @@ final class PlayViewModel {
     @ObservationIgnored private let finishesAtDurationBoundary: Bool
     @ObservationIgnored private var endBoundaryReached = false
     @ObservationIgnored private let finishBreak: TimeInterval
+    /// The chord each step sounds when strummed (Showtime); empty = every strum is C (Practice).
+    @ObservationIgnored private let stepChords: [GuitarChord]
+    /// The song's recording under the session (Showtime); nil in Practice.
+    @ObservationIgnored private let backingTrack: (any SongBackingTrack)?
+    @ObservationIgnored private var prepareTask: Task<Void, Never>?
 
     @ObservationIgnored let stepInterval: TimeInterval
     @ObservationIgnored let totalSteps: Int
@@ -125,6 +130,10 @@ final class PlayViewModel {
     ///   - strumArrivalGrace: extra time a window stays open for strums that arrive late (network
     ///     delay); 0 for on-screen swipes, controllerStrumArrivalGrace for the iPhone.
     ///   - repetitions: how many times the pattern repeats (PracticeSessionConfig).
+    ///   - stepChords: the chord of every step, so each strum sounds the chord at its place in the
+    ///     song (Showtime). Empty: every strum is C, as Practice never asks for a chord.
+    ///   - backingTrack: the song's recording, started with the count-in so its first beat meets
+    ///     step 0, and stopped on pause, restart and leaving (Showtime).
     ///   - latencyOffset: from calibration (SettingsStore, later); applied only inside TimingJudge.
     ///   - now: the host clock.
     ///   - waitUntil: suspends until a host-clock time; injected so tests control time.
@@ -145,6 +154,8 @@ final class PlayViewModel {
          repetitions: Int = PracticeSessionConfig.patternRepetitions,
          finishBreak: TimeInterval = PlayViewModel.finishBreak,
          finishesAtDurationBoundary: Bool = false,
+         stepChords: [GuitarChord] = [],
+         backingTrack: (any SongBackingTrack)? = nil,
          now: @escaping () -> TimeInterval,
          waitUntil: @escaping (TimeInterval) async -> Void,
          makeID: @escaping () -> UUID = UUID.init,
@@ -173,6 +184,8 @@ final class PlayViewModel {
         self.onExit = onExit
         self.finishBreak = finishBreak
         self.finishesAtDurationBoundary = finishesAtDurationBoundary
+        self.stepChords = stepChords
+        self.backingTrack = backingTrack
 
         stepInterval = AudioBeatClock.stepInterval(bpm: bpm)
         totalSteps = pattern.strokes.count * max(1, repetitions)
@@ -199,6 +212,14 @@ final class PlayViewModel {
         strumTask = Task { [weak self] in
             for await strum in strums { self?.handle(strum) }
         }
+        // The song's chords are synthesised before the first strum, so a chord change never waits.
+        var chords: [GuitarChord] = []
+        for chord in stepChords where !chords.contains(chord) { chords.append(chord) }
+        if !chords.isEmpty, let guitar {
+            prepareTask?.cancel()
+            prepareTask = Task { await guitar.prepare(chords: chords) }
+        }
+        if let songID { backingTrack?.prepare(songID: songID) }
         controllerTask?.cancel()
         if let states = controller?.connectionStates {
             controllerTask = Task { [weak self] in
@@ -209,8 +230,9 @@ final class PlayViewModel {
 
     /// Leaving the screen discards an unfinished session and stops every task.
     func onDisappear() async {
-        [tickTask, strumTask, windowTask, controllerTask, finishTask].forEach { $0?.cancel() }
+        [tickTask, strumTask, windowTask, controllerTask, finishTask, prepareTask].forEach { $0?.cancel() }
         isWrappingUp = false
+        backingTrack?.stop()
         metronome?.cancelClicks()
         await clock.stop()
         await controller?.setSessionActive(false)
@@ -249,8 +271,10 @@ final class PlayViewModel {
             await controller?.setSessionActive(false)
             await pause()
         case (.tapRestart, .ready):
+            backingTrack?.stop()
             resetSession()
         case (.tapBackToMenu, .idle):
+            backingTrack?.stop()
             metronome?.cancelClicks()
             resetSession()
             await clock.stop()
@@ -294,6 +318,9 @@ final class PlayViewModel {
                 stepOffset = first + Self.countInSteps + lead - resumeStep
                 // Nothing scheduled the first count-in click ahead of time.
                 scheduleClick(forStep: tick.index - stepOffset, at: tick.expectedTime)
+                // The count-in ends at this song time: the lead-in before step 0, or where it paused.
+                backingTrack?.play(fromSongTime: pausedSongTime ?? -leadInTime,
+                                   atHostTime: tick.expectedTime + Double(Self.countInSteps) * stepInterval)
             }
             scheduleClick(forStep: tick.index + 1 - stepOffset, at: tick.expectedTime + stepInterval)
             anchorTime = tick.expectedTime - Double(tick.index - stepOffset) * stepInterval
@@ -324,8 +351,8 @@ final class PlayViewModel {
     /// Strums count during the count-in too, because the first beat's early window starts before
     /// step 0. Outside a running session they are ignored, not judged.
     func handle(_ strum: StrumEvent) {
-        // Heard straight away, whether or not it is judged.
-        guitar?.strum(strum.direction, at: nil, accent: 1)
+        // Heard straight away, whether or not it is judged, as the chord at its place in the song.
+        guitar?.strum(strum.direction, chord: chord(for: strum), at: nil, accent: 1)
         switch state {
         case .countIn, .playing:
             // The ring reacts when the strum arrives, not at its touch time: an iPhone strum can
@@ -537,6 +564,7 @@ final class PlayViewModel {
 
     private func pause() async {
         windowTask?.cancel()
+        backingTrack?.stop()
         metronome?.cancelClicks()
         await clock.pause()
         let time = currentSongTime()
@@ -554,6 +582,7 @@ final class PlayViewModel {
 
     private func resetSession() {
         windowTask?.cancel()
+        backingTrack?.stop()
         engine = FeedbackEngine(config: tolerance, latencyOffset: latencyOffset, stepInterval: stepInterval)
         beatEvents = []
         endBoundaryReached = false
@@ -569,6 +598,18 @@ final class PlayViewModel {
         pausedSongTime = nil
         lastStrumSongTime = nil
         lastExtraStrumSongTime = nil
+    }
+
+    /// The chord of the step nearest to the strum's touch time, so a strum slightly early for a new
+    /// chord already plays it. While paused or finished, the chord where the song stands; before
+    /// step 0 the first chord, after the last step the last one; C when the session has no chords.
+    private func chord(for strum: StrumEvent) -> GuitarChord {
+        guard let last = stepChords.indices.last else { return .c }
+        let songTime = frozenSongTime == nil && anchorTime != nil
+            ? strum.time - latencyOffset - (anchorTime ?? 0)
+            : currentSongTime()
+        let step = Int((songTime / stepInterval).rounded())
+        return stepChords[min(max(step, 0), last)]
     }
 
     /// The direction a step must be strummed in; nil for a rest, which is never judged.

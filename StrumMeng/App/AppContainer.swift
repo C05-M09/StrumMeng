@@ -24,9 +24,9 @@ final class AppContainer {
     private var customShowtimeSongPlayer: (any ShowtimeSongPlayer)?
     private lazy var showtimeSongPlayer: (any ShowtimeSongPlayer)? = {
         if let customShowtimeSongPlayer { return customShowtimeSongPlayer }
-        let player = AVShowtimeSongPlayer()
-        player.setVolume(settings.soundVolume)
-        return player
+        // The song previews are songs, not menu music: the device volume buttons set their level,
+        // not the music or sound setting in Option.
+        return AVShowtimeSongPlayer()
     }()
     /// One synthesised guitar for the whole app, made when a screen first needs it. Notes are
     /// synthesised right away, so they are ready before the first strum.
@@ -121,7 +121,6 @@ final class AppContainer {
     }
 
     func makeSongListViewModel() -> SongListViewModel {
-        showtimeSongPlayer?.setVolume(settings.soundVolume)
         let records = songRecords.map { repository in
             Dictionary(uniqueKeysWithValues: songCatalog.songs.map { song in
                 (song.id, ShowtimeRecordsViewModel(songID: song.id, repository: repository))
@@ -149,11 +148,16 @@ final class AppContainer {
         let link = sharedControllerLink()
         let gameplay = PlayViewModel(pattern: timeline.sessionPattern, bpm: song.bpm, songID: song.id,
             clock: AudioBeatClock(), input: link, touchInput: nil, controller: link,
-            requiresController: true, metronome: metronomeSound,
+            requiresController: true, guitar: guitarSound, metronome: metronomeSound,
             // Calibration is not exposed by SettingsStore yet; same zero offset as Practice.
             latencyOffset: 0,
             strumArrivalGrace: PlayViewModel.controllerStrumArrivalGrace,
-            leadInSteps: 0, repetitions: 1, finishBreak: 0, finishesAtDurationBoundary: true,
+            // Default lead-in before the first node and the 2 s break after the last, as Practice.
+            repetitions: 1, finishesAtDurationBoundary: true,
+            // Every strum sounds the chord at its place in the song.
+            stepChords: timeline.stepChords,
+            // The song's recording; the player sets its level with the device volume, not Option.
+            backingTrack: AVSongBackingTrack(),
             now: HostClock.now,
             waitUntil: { time in
                 let delay = time - HostClock.now()

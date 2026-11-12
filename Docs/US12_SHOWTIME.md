@@ -12,8 +12,9 @@ This explicitly extends the older MVP decision that left Showtime inactive.
 | Intro | Connected from sample cards, Next, supplied copy and shared entrance animation | Final designer approval |
 | Listen | C-chord guitar, pattern-only lane, all-pattern Ready gate, no chords or song duration | Final song/pattern metadata |
 | Multiple patterns | Selector replaces duration area; each required pattern must finish a loop before Ready unlocks | Final song pattern-change data |
-| Count-in | Shared Practice callout/countdown, song starts at beat 0 | Physical-device timing feel |
-| Play | Moving arrows, chord labels, hit ring and song-duration progress, white BPM | Teammate's chord synthesis and verified arrangements |
+| Count-in | Shared Practice callout/countdown, then the same lead-in as Practice before the first node | Physical-device timing feel |
+| Play | Moving arrows, chord labels, hit ring and song-duration progress, white BPM; each strum sounds the chord at its step; the song's mp3 plays under it | Charts built from the recordings |
+| End | The same 2 s break as Practice (lane keeps moving), then the results | |
 | Feedback | Existing Practice engine and real iPhone controller integration | Physical pair/reconnect validation |
 | Pause | Shared Resume/Restart/Back overlay, automatic pause on disconnect/background | Physical-device validation |
 
@@ -59,6 +60,25 @@ Practice omits the parameter and retains the nil default. Song IDs are still the
 sample catalogue IDs until the real catalogue is connected; results remain in memory. Restart and Back discard
 results. The existing SwiftData schema and shared connectivity/settings contracts are
 unchanged. Calibration remains zero, matching Practice, until SettingsStore exposes it.
+
+## Gameplay sound
+
+- Chords: SongTimeline.stepChords gives every step its chord (GuitarChord.named; a name outside
+  the catalog plays C). PlayViewModel sounds each strum as the chord of the step nearest to its
+  touch time, so a strum slightly early for a change already plays the new chord. The song's
+  chords are pre-rendered when the screen appears. GuitarChord adds A7, D7 and G7 for the
+  catalog. Chords are not judged.
+- Recording: AVSongBackingTrack plays the song's mp3 on its own AVAudioEngine, scheduled on the
+  host clock so bar 1 (SongBackingTrackInfo.firstBeat, from a beat-grid fit of each file) sounds
+  on node 1. It starts with the count-in, stops on pause, restart, back and leaving, resumes from
+  the paused place, and is not cut when the last node passes. The file plays untouched, as in
+  the list preview (an earlier +8 dB boost under a limiter squashed the plucks and sounded
+  doubled). Its level follows the device's volume buttons only, not Option.
+- Chart tempos follow the recordings (beat-grid fit: 100, 120, 100, 110, 100 BPM; Twinkle is
+  the 100 BPM re-recording of PR #62, which fits its 12-bar chart). Bar 1 is at 0 s in four files and at 2.38 s in Riverside, after
+  its pickups. Riverside's recording runs about 64 bars against a 16-bar chart.
+- The song-list preview loops at full level; like the gameplay recording, the device volume
+  buttons set it, not Option.
 
 ## Layout and code
 

@@ -33,6 +33,11 @@ struct SongTimeline: Equatable, Sendable {
     func chord(at slot: Int) -> String? {
         song.chords.filter { $0.slot <= slot }.max(by: { $0.slot < $1.slot })?.chord
     }
+    /// The chord every step sounds when strummed, one per slot. A name outside the guitar's
+    /// catalog plays C, so a typo in a chart never silences the guitar.
+    var stepChords: [GuitarChord] {
+        (0..<totalSlots).map { slot in chord(at: slot).flatMap(GuitarChord.named) ?? .c }
+    }
     /// Initial chord plus actual changes only; repeated metadata entries do not create extra labels.
     var chordLabels: [Int: String] {
         var labels: [Int: String] = [:]

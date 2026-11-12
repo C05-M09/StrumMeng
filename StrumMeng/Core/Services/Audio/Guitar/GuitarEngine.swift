@@ -11,7 +11,7 @@ import AVFoundation
 @MainActor
 final class GuitarEngine: GuitarSound, MetronomeSound {
     /// Two takes of every note, picked at random, so repeated strums do not sound identical.
-    private static let variants = 2
+    nonisolated private static let variants = 2
     /// A strum with no time is scheduled this far ahead, so its first string is not cut short.
     private static let immediateLead: TimeInterval = 0.015
 

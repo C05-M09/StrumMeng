@@ -30,8 +30,9 @@ final class GuitarEngineTests: XCTestCase {
         XCTAssertEqual(together.count, 7 * takesPerNote)
     }
 
-    func test_noteKeys_forTheWholeCatalog_need18Notes() {
-        XCTAssertEqual(notes(GuitarEngine.noteKeys(for: GuitarChord.catalog)).count, 18)
+    func test_noteKeys_forTheWholeCatalog_need19Notes() {
+        // The sevenths add one note: A7's C# on the B string; D7 and G7 reuse notes of D, Am and F.
+        XCTAssertEqual(notes(GuitarEngine.noteKeys(for: GuitarChord.catalog)).count, 19)
     }
 
     func test_noteKeys_forNoChords_isEmpty() {
