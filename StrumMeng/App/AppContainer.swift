@@ -12,6 +12,7 @@ final class AppContainer {
     /// between screens.
     private let menuSounds: any MenuSoundService
     private let results = SessionResultStore()
+    private let songCatalog: any SongCatalog = DummySongCatalog()
     private let enablesHomeGuidance: Bool
     private let homeGuidanceStore: any HomeGuidanceStore
     /// The one pattern list of the app, so Retry can hand it the chosen tempo.
@@ -95,8 +96,36 @@ final class AppContainer {
             guidance: enablesHomeGuidance ? HomeGuidanceViewModel(store: homeGuidanceStore) : nil,
             onPracticeRequested: { [weak router] in
                 router?.push(.practiceList)
-            }
+            },
+            onShowtimeRequested: { [weak router] in router?.push(.showtimeList) }
         )
+    }
+
+    func makeSongListViewModel() -> SongListViewModel {
+        SongListViewModel(catalog: songCatalog,
+            onSelect: { [weak router] song in router?.push(.showtime(songID: song.id)) },
+            onBack: { [weak router] in router?.pop() })
+    }
+
+    func makeShowtimeViewModel(songID: String) -> ShowtimeViewModel? {
+        guard let song = songCatalog.songs.first(where: { $0.id == songID }) else { return nil }
+        let timeline = SongTimeline(song: song)
+        let link = sharedControllerLink()
+        let gameplay = PlayViewModel(pattern: timeline.sessionPattern, bpm: song.bpm, songID: song.id,
+            clock: AudioBeatClock(), input: link, touchInput: nil, controller: link,
+            requiresController: true, metronome: metronomeSound,
+            // Calibration is not exposed by SettingsStore yet; same zero offset as Practice.
+            latencyOffset: 0,
+            strumArrivalGrace: PlayViewModel.controllerStrumArrivalGrace,
+            leadInSteps: 0, repetitions: 1, finishBreak: 0, finishesAtDurationBoundary: true,
+            now: HostClock.now,
+            waitUntil: { time in
+                let delay = time - HostClock.now()
+                if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
+            })
+        return ShowtimeViewModel(song: song,
+            demo: PatternStrumDemoPlayer(clock: AudioBeatClock(), sound: guitarSound, now: HostClock.now),
+            gameplay: gameplay, onBack: { [weak router] in router?.popTo(.showtimeList) })
     }
 
     func makeListenViewModel(pattern: StrumPattern, bpm: Int) -> ListenViewModel {
@@ -267,4 +296,23 @@ final class AppContainer {
             onBackRequested: onBackRequested
         )
     }
+#if DEBUG
+    /// Canvas-only flow: no persistence and no network; unplayed nodes are judged Miss normally.
+    static func makeShowtimePreviewViewModel() -> ShowtimeViewModel {
+        let song = DummySongCatalog().songs[0]
+        let timeline = SongTimeline(song: song)
+        let sound = SilentGuitarSound()
+        let gameplay = PlayViewModel(pattern: timeline.sessionPattern, bpm: song.bpm, songID: song.id,
+            clock: AudioBeatClock(), input: TouchStrumInputService(), touchInput: nil,
+            requiresController: false, metronome: sound, leadInSteps: 0, repetitions: 1,
+            finishBreak: 0, finishesAtDurationBoundary: true, now: HostClock.now,
+            waitUntil: { deadline in
+                let delay = deadline - HostClock.now()
+                if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
+            })
+        return ShowtimeViewModel(song: song,
+            demo: PatternStrumDemoPlayer(clock: AudioBeatClock(), sound: sound, now: HostClock.now), gameplay: gameplay, onBack: {})
+    }
+#endif
+
 }

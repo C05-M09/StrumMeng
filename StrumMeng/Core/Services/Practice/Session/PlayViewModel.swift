@@ -27,11 +27,19 @@ final class PlayViewModel {
 
     let pattern: StrumPattern
     let bpm: Int
+    let songID: String?
 
-    private(set) var state: PracticeState = .ready
+    /// Integration hooks let another session coordinator observe the shared engine without UI.
+    @ObservationIgnored var onStateChanged: ((PracticeState) -> Void)?
+    @ObservationIgnored var onConnectionChanged: ((Bool) -> Void)?
+    private(set) var state: PracticeState = .ready {
+        didSet { if oldValue != state { onStateChanged?(state) } }
+    }
     private(set) var beatEvents: [BeatEvent] = []
     /// Always true without a controller. With one, a session only starts or resumes while it is true.
-    private(set) var isControllerConnected = false
+    private(set) var isControllerConnected = false {
+        didSet { if oldValue != isControllerConnected { onConnectionChanged?(isControllerConnected) } }
+    }
 
     var isAnimating: Bool {
         switch state {
@@ -60,6 +68,8 @@ final class PlayViewModel {
     @ObservationIgnored private let currentDate: () -> Date
     @ObservationIgnored private let onFinished: (SessionResult) -> Void
     @ObservationIgnored private let onExit: () -> Void
+    @ObservationIgnored private let finishesAtDurationBoundary: Bool
+    @ObservationIgnored private var endBoundaryReached = false
     @ObservationIgnored private let finishBreak: TimeInterval
 
     @ObservationIgnored let stepInterval: TimeInterval
@@ -109,6 +119,7 @@ final class PlayViewModel {
     ///   - requiresController: true when the controller is the only input, so Ready and Resume
     ///     wait for it. False when on-screen swipes work too: the player may start without the
     ///     iPhone, and only a session started with it pauses when it drops.
+    ///   - songID: Showtime song identity, passed to the shared result builder; nil for Practice.
     ///   - guitar: sounds every swipe, in or out of a session, like a real guitar.
     ///   - metronome: clicks on every quarter note while counting in and playing.
     ///   - strumArrivalGrace: extra time a window stays open for strums that arrive late (network
@@ -119,6 +130,7 @@ final class PlayViewModel {
     ///   - waitUntil: suspends until a host-clock time; injected so tests control time.
     init(pattern: StrumPattern,
          bpm: Int,
+         songID: String? = nil,
          clock: BeatClock,
          input: StrumInputService,
          touchInput: TouchStrumInput?,
@@ -132,6 +144,7 @@ final class PlayViewModel {
          leadInSteps: Int? = nil,
          repetitions: Int = PracticeSessionConfig.patternRepetitions,
          finishBreak: TimeInterval = PlayViewModel.finishBreak,
+         finishesAtDurationBoundary: Bool = false,
          now: @escaping () -> TimeInterval,
          waitUntil: @escaping (TimeInterval) async -> Void,
          makeID: @escaping () -> UUID = UUID.init,
@@ -140,6 +153,7 @@ final class PlayViewModel {
          onExit: @escaping () -> Void = {}) {
         self.pattern = pattern
         self.bpm = bpm
+        self.songID = songID
         self.clock = clock
         self.input = input
         self.touchInput = touchInput
@@ -158,6 +172,7 @@ final class PlayViewModel {
         self.onFinished = onFinished
         self.onExit = onExit
         self.finishBreak = finishBreak
+        self.finishesAtDurationBoundary = finishesAtDurationBoundary
 
         stepInterval = AudioBeatClock.stepInterval(bpm: bpm)
         totalSteps = pattern.strokes.count * max(1, repetitions)
@@ -414,6 +429,7 @@ final class PlayViewModel {
             armWindowTimer()
         } else {
             nextStep = totalSteps
+            endBoundaryReached = true
         }
         finishIfDone()
     }
@@ -486,14 +502,15 @@ final class PlayViewModel {
     }
 
     private func finishIfDone() {
-        guard state == .playing, nextStep >= totalSteps, engine.openBeats.isEmpty else { return }
+        guard state == .playing, nextStep >= totalSteps, engine.openBeats.isEmpty,
+              !finishesAtDurationBoundary || endBoundaryReached else { return }
         windowTask?.cancel()
         metronome?.cancelClicks()
         let extra = Set(engine.extraStrumIDs)
         let strums = sessionStrums.map {
             RecordedStrum(time: $0.time, direction: $0.direction, isExtra: extra.contains($0.id))
         }
-        let result = SessionResultBuilder.build(id: makeID(), patternID: pattern.id, bpm: bpm,
+        let result = SessionResultBuilder.build(id: makeID(), patternID: pattern.id, songID: songID, bpm: bpm,
                                                 beatEvents: beatEvents, strums: strums,
                                                 createdAt: currentDate())
         // .finished from here on: strums in the break are ignored, not judged.
@@ -539,6 +556,7 @@ final class PlayViewModel {
         windowTask?.cancel()
         engine = FeedbackEngine(config: tolerance, latencyOffset: latencyOffset, stepInterval: stepInterval)
         beatEvents = []
+        endBoundaryReached = false
         sessionStrums = []
         judgedAt = [:]
         countInFirstIndex = nil

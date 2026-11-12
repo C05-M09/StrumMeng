@@ -42,6 +42,10 @@ struct ContentView: View {
                 .allowsHitTesting(!pairingIntroduction.state.blocksHome)
                 .navigationDestination(for: AppRoute.self) { route in
                     switch route {
+                    case .showtimeList:
+                        SongListRoute(container: container)
+                    case let .showtime(songID, _):
+                        ShowtimeRoute(songID: songID, container: container).id(route)
                     case .practiceList:
                         PatternListView(viewModel: patternListViewModel)
 
@@ -175,4 +179,22 @@ private struct SummaryRoute: View {
 
 #Preview {
     ContentView(inMemory: true)
+}
+
+/// Own each screen's view model for the lifetime of its route, as with Practice.
+private struct SongListRoute: View {
+    @State private var viewModel: SongListViewModel
+    init(container: AppContainer) { _viewModel = State(initialValue: container.makeSongListViewModel()) }
+    var body: some View { SongListView(viewModel: viewModel) }
+}
+
+private struct ShowtimeRoute: View {
+    @State private var viewModel: ShowtimeViewModel?
+    init(songID: String, container: AppContainer) {
+        _viewModel = State(initialValue: container.makeShowtimeViewModel(songID: songID))
+    }
+    var body: some View {
+        if let viewModel { ShowtimeSessionView(viewModel: viewModel) }
+        else { Text("This song is unavailable.") }
+    }
 }

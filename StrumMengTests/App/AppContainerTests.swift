@@ -54,12 +54,12 @@ final class AppContainerTests: XCTestCase {
         XCTAssertEqual(home.presentedOverlay, .option)
     }
 
-    func test_homeViewModel_tapShowtime_doesNotPushRoute() {
+    func test_homeViewModel_tapShowtime_pushesSongList() {
         let home = sut.makeHomeViewModel()
 
         home.send(.tapShowtime)
 
-        XCTAssertEqual(router.path.count, 0)
+        XCTAssertEqual(router.path, [.showtimeList])
         XCTAssertNil(home.presentedOverlay)
     }
 
@@ -298,4 +298,19 @@ final class AppContainerTests: XCTestCase {
 
         XCTAssertNil(home.presentedOverlay)
     }
+    func test_songCardOpensSessionAndBackReturnsToShowtimeList() async throws {
+        let router = AppRouter()
+        let container = AppContainer(router: router, inMemory: true,
+            menuSounds: MockMenuSoundService(), controllerLink: MockControllerLink())
+        container.makeHomeViewModel().send(.tapShowtime)
+        let list = container.makeSongListViewModel()
+        list.select(list.songs[0].id)
+        guard case .showtime(let id, _) = router.path.last else { return XCTFail("Expected song route") }
+        let session = try XCTUnwrap(container.makeShowtimeViewModel(songID: id))
+        XCTAssertEqual(session.state, .intro)
+        await session.send(.back)
+        XCTAssertEqual(router.path, [.showtimeList])
+        XCTAssertNil(container.makeShowtimeViewModel(songID: "unknown-song"))
+    }
+
 }

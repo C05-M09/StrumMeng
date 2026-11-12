@@ -13,11 +13,13 @@ final class HomeViewModelTests: XCTestCase {
 
     private final class CallbackRecorder {
         var practiceCount = 0
+        var showtimeCount = 0
     }
 
     private func makeSUT() -> (sut: HomeViewModel, recorder: CallbackRecorder) {
         let recorder = CallbackRecorder()
-        let sut = HomeViewModel(onPracticeRequested: { recorder.practiceCount += 1 })
+        let sut = HomeViewModel(onPracticeRequested: { recorder.practiceCount += 1 },
+                                onShowtimeRequested: { recorder.showtimeCount += 1 })
         return (sut, recorder)
     }
 
@@ -133,12 +135,13 @@ final class HomeViewModelTests: XCTestCase {
 
     // MARK: - Showtime
 
-    func test_tapShowtime_doesNothing() {
+    func test_tapShowtime_requestsSongList() {
         let (sut, recorder) = makeSUT()
 
         sut.send(.tapShowtime)
 
-        XCTAssertEqual(recorder.practiceCount, 0, "Showtime tidak boleh navigasi")
+        XCTAssertEqual(recorder.practiceCount, 0)
+        XCTAssertEqual(recorder.showtimeCount, 1)
         XCTAssertNil(sut.presentedOverlay, "Showtime tidak boleh membuka overlay")
     }
 

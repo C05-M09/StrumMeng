@@ -18,4 +18,7 @@ struct PlayScreenModel: Equatable {
     var readyLeadTime: TimeInterval? = nil
     var leadInSlots: Int = 0
     var countInBeatProgress: Double? = nil
+    /// Empty in Practice; Showtime adds the chord at each song slot.
+    var chordLabels: [Int: String] = [:]
+    var titleLines: [String]? = nil
 }
