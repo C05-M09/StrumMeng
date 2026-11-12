@@ -38,7 +38,9 @@ struct ShowtimeSongSelectView: View {
         static let sideFeet: CGFloat = 805
         /// Distance between the middle character and each neighbour. Smaller = closer together.
         static let sideSpacing: CGFloat = 360
-        static let sideOpacity: Double = 0.35
+        /// Darkening for side characters (negative brightness and reduced exposure) instead of reducing opacity.
+        static let sideBrightness: Double = -0.38
+        static let sideExposure: Color = Color(white: 0.62)
         /// The middle character while the detail card is open.
         static let detailSize: CGFloat = 1450
         static let detailFeet: CGFloat = 650
@@ -113,6 +115,22 @@ struct ShowtimeSongSelectView: View {
                     .zIndex(Layer.swipeArea)
 
                 carousel
+
+                if !isDetailShown {
+                    OutlinedText(
+                        text: "SHOWTIME",
+                        font: AppTypography.bungee(size: 64),
+                        foregroundColor: AppColors.white,
+                        outlineColor: AppColors.brownInk,
+                        outlineWidth: 6,
+                        shadowColor: AppColors.redAccent,
+                        shadowOffset: CGSize(width: 0, height: 8)
+                    )
+                    .position(x: reference.width / 2, y: 104)
+                    .transition(.opacity)
+                    .zIndex(Layer.foreground)
+                    .allowsHitTesting(false)
+                }
 
                 if let song = viewModel.state.selectedSong {
                     // The plaque is in front of the characters, like in the design.
@@ -227,14 +245,17 @@ struct ShowtimeSongSelectView: View {
                 // The middle of the frame, worked out from where the feet should stand.
                 y: feet - size * (Stage.feetFraction - 0.5)
             )
-            let opacity: Double = isCenter
-                ? 1
-                : (isNeighbor && !isDetailShown ? Stage.sideOpacity : 0)
+            let isVisible = isCenter || (isNeighbor && !isDetailShown)
+            let brightness: Double = isCenter ? 0 : Stage.sideBrightness
+            let exposure: Color = isCenter ? .white : Stage.sideExposure
+            let opacity: Double = isVisible ? 1.0 : 0.0
      
             return Image(ShowtimeAssets.character(forSongID: song.id))
                 .resizable()
                 .scaledToFit()
                 .frame(width: size, height: size)
+                .brightness(brightness)
+                .colorMultiply(exposure)
                 .opacity(opacity)
                 .contentShape(Rectangle().inset(by: size * Stage.tapInset))
                 .allowsHitTesting(isTappable)
@@ -348,7 +369,12 @@ struct ShowtimeSongSelectView: View {
 #if DEBUG
 @MainActor
 private func previewScreen(songIndex: Int, detail: Bool = false) -> some View {
-    let viewModel = SongListViewModel(onSongSelected: { _ in }, onBackRequested: {})
+    let player = AVShowtimeSongPlayer()
+    let viewModel = SongListViewModel(
+        player: player,
+        onSongSelected: { _ in },
+        onBackRequested: {}
+    )
     for _ in 0..<songIndex { viewModel.send(.swipeLeft) }
     return ShowtimeSongSelectView(viewModel: viewModel, initiallyShowsDetail: detail)
 }
