@@ -13,6 +13,7 @@ final class HomeViewModelTests: XCTestCase {
 
     private final class CallbackRecorder {
         var practiceCount = 0
+        var showtimeCount = 0
     }
 
     private func makeSUT() -> (sut: HomeViewModel, recorder: CallbackRecorder) {
@@ -23,7 +24,8 @@ final class HomeViewModelTests: XCTestCase {
     private func makeSUTWithSounds() -> (sut: HomeViewModel, recorder: CallbackRecorder, sounds: MockMenuSoundService) {
         let recorder = CallbackRecorder()
         let sounds = MockMenuSoundService()
-        let sut = HomeViewModel(sounds: sounds, onPracticeRequested: { recorder.practiceCount += 1 })
+        let sut = HomeViewModel(sounds: sounds, onPracticeRequested: { recorder.practiceCount += 1 },
+                                onShowtimeRequested: { recorder.showtimeCount += 1 })
         return (sut, recorder, sounds)
     }
 
@@ -139,21 +141,22 @@ final class HomeViewModelTests: XCTestCase {
 
     // MARK: - Showtime
 
-    func test_tapShowtime_doesNothing() {
+    func test_tapShowtime_requestsSongList() {
         let (sut, recorder) = makeSUT()
 
         sut.send(.tapShowtime)
 
-        XCTAssertEqual(recorder.practiceCount, 0, "Showtime tidak boleh navigasi")
+        XCTAssertEqual(recorder.practiceCount, 0)
+        XCTAssertEqual(recorder.showtimeCount, 1)
         XCTAssertNil(sut.presentedOverlay, "Showtime tidak boleh membuka overlay")
     }
 
-    func test_tapShowtime_playsNoButtonSound() {
+    func test_tapShowtime_playsButtonSound() {
         let (sut, _, sounds) = makeSUTWithSounds()
 
         sut.send(.tapShowtime)
 
-        XCTAssertEqual(sounds.buttonSoundCount, 0, "Showtime has no action, so no click either")
+        XCTAssertEqual(sounds.buttonSoundCount, 1)
     }
 
     // MARK: - Button sound

@@ -599,3 +599,18 @@ Closing Set Up Device through Back or connected Done schedules the once-only Hom
 guidance before the router returns. Pairing success is not required: Option appears
 first, then Guidebook. Unconnected Done keeps setup open without scheduling the tour.
 HomeGuidanceStore persists the pending handoff and ignores scheduling after completion.
+
+
+### US12: Showtime session prototype (scope extension, November 2026)
+The user explicitly authorizes Showtime on this branch, superseding the earlier
+MVP exclusion for this work. See US12_SHOWTIME.md for implemented versus dummy parts.
+SongCatalog isolates sample arrangements. SongDemoPlayer previews individual strumming
+patterns using Practice’s C-chord guitar; Ready activates after every required pattern
+has been heard for a full loop. The disabled Ready artwork remains visible beforehand.
+A pattern selector replaces song duration in Listen, without showing chord labels.
+SongPatternChange and SongChordChange share the song-slot grid. The shared Practice engine
+handles real iPhone timing/direction feedback and disconnects. Reusable session code
+is in Core/Services/Practice/Session; reusable lane/countdown/pause views are in
+Core/DesignSystem/Play, so Features do not depend on one another. No shared data or
+connectivity contracts change. Showtime results are in memory only; chord synthesis
+and persistent song/visitor-request integration remain owned by parallel work.

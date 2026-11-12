@@ -12,9 +12,9 @@ enum MenuMusicPolicy {
     static func playsMusic(on top: AppRoute?, isAppActive: Bool) -> Bool {
         guard isAppActive else { return false }
         switch top {
-        case nil, .practiceList, .deviceSetup:
+        case nil, .practiceList, .showtimeList, .deviceSetup:
             return true
-        case .listen, .play, .summary:
+        case .listen, .play, .summary, .showtime:
             return false
         }
     }

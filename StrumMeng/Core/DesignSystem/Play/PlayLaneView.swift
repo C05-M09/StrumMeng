@@ -33,6 +33,12 @@ struct PlayLaneView: View {
                 let look = HitAnimation.node(judgement: node.judgement, songTime: model.songTime)
                 nodeView(node, look: look)
                     .position(x: look.snapsToRing ? hitX : x, y: railY)
+                if let chord = model.chordLabels[node.index] {
+                    Text(chord)
+                        .font(AppFont.mono(layout.labelFontSize))
+                        .foregroundStyle(AppColor.laneLabel)
+                        .position(x: x, y: railY - layout.nodeSize * 0.85)
+                }
                 Text(node.countLabel)
                     .font(AppFont.mono(layout.labelFontSize))
                     .foregroundStyle(AppColor.laneLabel.opacity(node.arrow == nil ? 0.5 : 1))

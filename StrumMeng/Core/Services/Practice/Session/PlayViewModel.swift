@@ -28,10 +28,17 @@ final class PlayViewModel {
     let pattern: StrumPattern
     let bpm: Int
 
-    private(set) var state: PracticeState = .ready
+    /// Integration hooks let another session coordinator observe the shared engine without UI.
+    @ObservationIgnored var onStateChanged: ((PracticeState) -> Void)?
+    @ObservationIgnored var onConnectionChanged: ((Bool) -> Void)?
+    private(set) var state: PracticeState = .ready {
+        didSet { if oldValue != state { onStateChanged?(state) } }
+    }
     private(set) var beatEvents: [BeatEvent] = []
     /// Always true without a controller. With one, a session only starts or resumes while it is true.
-    private(set) var isControllerConnected = false
+    private(set) var isControllerConnected = false {
+        didSet { if oldValue != isControllerConnected { onConnectionChanged?(isControllerConnected) } }
+    }
 
     var isAnimating: Bool {
         switch state {
@@ -60,6 +67,8 @@ final class PlayViewModel {
     @ObservationIgnored private let currentDate: () -> Date
     @ObservationIgnored private let onFinished: (SessionResult) -> Void
     @ObservationIgnored private let onExit: () -> Void
+    @ObservationIgnored private let finishesAtDurationBoundary: Bool
+    @ObservationIgnored private var endBoundaryReached = false
     @ObservationIgnored private let finishBreak: TimeInterval
 
     @ObservationIgnored let stepInterval: TimeInterval
@@ -132,6 +141,7 @@ final class PlayViewModel {
          leadInSteps: Int? = nil,
          repetitions: Int = PracticeSessionConfig.patternRepetitions,
          finishBreak: TimeInterval = PlayViewModel.finishBreak,
+         finishesAtDurationBoundary: Bool = false,
          now: @escaping () -> TimeInterval,
          waitUntil: @escaping (TimeInterval) async -> Void,
          makeID: @escaping () -> UUID = UUID.init,
@@ -158,6 +168,7 @@ final class PlayViewModel {
         self.onFinished = onFinished
         self.onExit = onExit
         self.finishBreak = finishBreak
+        self.finishesAtDurationBoundary = finishesAtDurationBoundary
 
         stepInterval = AudioBeatClock.stepInterval(bpm: bpm)
         totalSteps = pattern.strokes.count * max(1, repetitions)
@@ -414,6 +425,7 @@ final class PlayViewModel {
             armWindowTimer()
         } else {
             nextStep = totalSteps
+            endBoundaryReached = true
         }
         finishIfDone()
     }
@@ -486,7 +498,8 @@ final class PlayViewModel {
     }
 
     private func finishIfDone() {
-        guard state == .playing, nextStep >= totalSteps, engine.openBeats.isEmpty else { return }
+        guard state == .playing, nextStep >= totalSteps, engine.openBeats.isEmpty,
+              !finishesAtDurationBoundary || endBoundaryReached else { return }
         windowTask?.cancel()
         metronome?.cancelClicks()
         let extra = Set(engine.extraStrumIDs)
@@ -539,6 +552,7 @@ final class PlayViewModel {
         windowTask?.cancel()
         engine = FeedbackEngine(config: tolerance, latencyOffset: latencyOffset, stepInterval: stepInterval)
         beatEvents = []
+        endBoundaryReached = false
         sessionStrums = []
         judgedAt = [:]
         countInFirstIndex = nil

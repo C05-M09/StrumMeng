@@ -13,6 +13,10 @@ struct PracticePlayView: View {
     /// main thread then handles strums (especially from the iPhone) later. Same cap as the prototype.
     private static let frameInterval: TimeInterval = 1.0 / 60
 
+    private let bpmColor: Color?
+    private let titleLineSpacing: CGFloat?
+    private let titleFontScale: CGFloat
+    private let backgroundAssetName: String
     private let liveModel: () -> PlayScreenModel
     private let isAnimating: Bool
     private let onReady: () -> Void
@@ -23,23 +27,36 @@ struct PracticePlayView: View {
 
     /// A still frame (previews, the hit-animation gallery, a caller with its own timeline).
     init(model: PlayScreenModel,
+         backgroundAssetName: String = "Play_BG",
+         titleFontScale: CGFloat = 1,
+         titleLineSpacing: CGFloat? = nil,
+         bpmColor: Color? = nil,
          onReady: @escaping () -> Void = {},
          onPause: @escaping () -> Void = {},
          onResume: @escaping () -> Void = {},
          onRestart: @escaping () -> Void = {},
          onBackToMenu: @escaping () -> Void = {}) {
-        self.init(isAnimating: false, liveModel: { model }, onReady: onReady,
+        self.init(isAnimating: false, liveModel: { model }, backgroundAssetName: backgroundAssetName,
+                  titleFontScale: titleFontScale, titleLineSpacing: titleLineSpacing, bpmColor: bpmColor, onReady: onReady,
                   onPause: onPause, onResume: onResume, onRestart: onRestart, onBackToMenu: onBackToMenu)
     }
 
     /// A live session: `liveModel` is read every frame while `isAnimating`, for the moving parts only.
     init(isAnimating: Bool,
          liveModel: @escaping () -> PlayScreenModel,
+         backgroundAssetName: String = "Play_BG",
+         titleFontScale: CGFloat = 1,
+         titleLineSpacing: CGFloat? = nil,
+         bpmColor: Color? = nil,
          onReady: @escaping () -> Void = {},
          onPause: @escaping () -> Void = {},
          onResume: @escaping () -> Void = {},
          onRestart: @escaping () -> Void = {},
          onBackToMenu: @escaping () -> Void = {}) {
+        self.bpmColor = bpmColor
+        self.titleLineSpacing = titleLineSpacing
+        self.titleFontScale = titleFontScale
+        self.backgroundAssetName = backgroundAssetName
         self.liveModel = liveModel
         self.isAnimating = isAnimating
         self.onReady = onReady
@@ -55,7 +72,7 @@ struct PracticePlayView: View {
             // Read once per state change (phase, title, BPM), not once per frame.
             let model = liveModel()
             ZStack(alignment: .topLeading) {
-                Image("Play_BG")
+                Image(backgroundAssetName)
                     .resizable()
                     .frame(width: geo.size.width, height: geo.size.height)
                 TimelineView(.animation(minimumInterval: Self.frameInterval, paused: !isAnimating)) { _ in
@@ -81,21 +98,35 @@ struct PracticePlayView: View {
                         action: onPause)
                 .position(layout.pauseCenter)
 
-            OutlinedText(text: model.title.uppercased(), font: AppFont.display(layout.titleFontSize),
-                         foregroundColor: AppColor.titleText, outlineColor: AppColor.ink,
-                         outlineWidth: layout.titleFontSize * 0.07, shadowColor: .clear, shadowOffset: .zero,
-                         alignment: .center)
-                .minimumScaleFactor(0.5)
-                .frame(maxWidth: layout.titleMaxWidth)
-                .position(layout.titleCenter)
+            Group {
+                if let spacing = titleLineSpacing, let lines = model.titleLines {
+                    VStack(spacing: spacing * layout.unit) {
+                        ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                            titleText(line.uppercased(), layout: layout)
+                        }
+                    }
+                } else {
+                    titleText(model.title.uppercased(), layout: layout)
+                }
+            }
+            .minimumScaleFactor(0.5)
+            .frame(maxWidth: layout.titleMaxWidth)
+            .position(layout.titleCenter)
 
             Text("BPM \(model.bpm)")
                 .font(AppFont.mono(layout.bpmFontSize))
-                .foregroundStyle(AppColor.ink)
+                .foregroundStyle(bpmColor ?? AppColor.ink)
                 .fixedSize()
                 .frame(width: layout.size.width - layout.bpmTrailing, alignment: .trailing)
                 .position(x: (layout.size.width - layout.bpmTrailing) / 2, y: layout.bpmCenterY)
         }
+    }
+
+    private func titleText(_ text: String, layout: PlayScreenLayout) -> some View {
+        OutlinedText(text: text, font: AppFont.display(layout.titleFontSize * titleFontScale),
+                     foregroundColor: AppColor.titleText, outlineColor: AppColor.ink,
+                     outlineWidth: layout.titleFontSize * 0.07, shadowColor: .clear,
+                     shadowOffset: .zero, alignment: .center)
     }
 
     private func assetButton(_ label: String, normal: String, pressed: String, size: CGSize,
