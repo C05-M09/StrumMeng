@@ -36,4 +36,8 @@ final class MenuMusicPolicyTests: XCTestCase {
         XCTAssertFalse(MenuMusicPolicy.playsMusic(on: nil, isAppActive: false))
         XCTAssertFalse(MenuMusicPolicy.playsMusic(on: .practiceList, isAppActive: false))
     }
+
+    func test_showtimeSession_pausesMusic() {
+        XCTAssertFalse(MenuMusicPolicy.playsMusic(on: .showtime(songID: "dummy-twinkle"), isAppActive: true))
+    }
 }

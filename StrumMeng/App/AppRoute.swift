@@ -1,6 +1,8 @@
 import Foundation
 
 enum AppRoute: Hashable {
+    case showtimeList
+    case showtime(songID: String, visit: UUID = UUID())
     case practiceList
     /// `visit` makes every opening of Listen a new screen. Without it, Retry at the same tempo would
     /// equal the Listen already in the stack, and SwiftUI would show that old, finished screen again.
@@ -9,11 +11,4 @@ enum AppRoute: Hashable {
     /// A finished session. Carries only its id: the result waits in SessionResultStore.
     case summary(sessionID: UUID)
     case deviceSetup
-
-    // Showtime (US11). The song carries its own fixed BPM, so routes only need the song id.
-    case showtimeList
-    case showtimeIntro(songID: String)
-    case showtimeListen(songID: String)
-    case showtimePlay(songID: String)
-    case showtimeSummary
 }

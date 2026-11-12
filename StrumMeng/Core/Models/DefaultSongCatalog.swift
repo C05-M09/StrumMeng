@@ -2,7 +2,7 @@ import Foundation
 
 /// The 5 Showtime songs. All are public domain, with no lyrics. Chords are one per bar, 4/4.
 /// Source: table of US11 subtask 11.1.
-nonisolated enum SongCatalog {
+struct DefaultSongCatalog: SongCatalog {
     static let allowedChords: Set<String> = ["C", "F", "G", "Em", "D", "Am"]
 
     static let all: [Song] = [
@@ -67,6 +67,8 @@ nonisolated enum SongCatalog {
             suggestedOrder: 5
         ),
     ]
+
+    var songs: [Song] { Self.all }
 
     static func song(forID id: String) -> Song? {
         all.first { $0.id == id }

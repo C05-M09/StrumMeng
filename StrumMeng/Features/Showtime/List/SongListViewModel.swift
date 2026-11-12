@@ -18,6 +18,10 @@ final class SongListViewModel {
     /// Shown when a song has no records view model (storage could not start).
     let recordsFallbackState: ShowtimeRecordsViewState
 
+    var songs: [Song] {
+        state.songs
+    }
+
     @ObservationIgnored private let player: (any ShowtimeSongPlayer)?
     private let onSongSelected: (String) -> Void
     private let onBackRequested: () -> Void
@@ -30,7 +34,7 @@ final class SongListViewModel {
         onSongSelected: @escaping (String) -> Void,
         onBackRequested: @escaping () -> Void
     ) {
-        let ordered = (songs ?? SongCatalog.all)
+        let ordered = (songs ?? DefaultSongCatalog.all)
             .sorted { $0.suggestedOrder < $1.suggestedOrder }
         state = ordered.isEmpty ? .empty : .loaded(songs: ordered, selectedIndex: 0)
         self.player = player
@@ -38,6 +42,25 @@ final class SongListViewModel {
         self.recordsFallbackState = recordsFallbackState
         self.onSongSelected = onSongSelected
         self.onBackRequested = onBackRequested
+    }
+
+    /// Convenience initializer compatible with catalog injection from tests and previews.
+    convenience init(
+        catalog: any SongCatalog,
+        player: (any ShowtimeSongPlayer)? = nil,
+        onSelect: @escaping (Song) -> Void,
+        onBack: @escaping () -> Void
+    ) {
+        self.init(
+            songs: catalog.songs,
+            player: player,
+            onSongSelected: { id in
+                if let song = catalog.songs.first(where: { $0.id == id }) {
+                    onSelect(song)
+                }
+            },
+            onBackRequested: onBack
+        )
     }
 
     /// The tempo of the song on screen. Read only: nothing can change it.
@@ -69,6 +92,17 @@ final class SongListViewModel {
     /// Resumes the character song playback if paused.
     func resumePlayback() {
         player?.resume()
+    }
+
+    func select(_ id: String) {
+        guard let song = songs.first(where: { $0.id == id }) else { return }
+        player?.stop()
+        onSongSelected(song.id)
+    }
+
+    func back() {
+        player?.stop()
+        onBackRequested()
     }
 
     func send(_ event: SongListEvent) {

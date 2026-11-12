@@ -4,7 +4,7 @@ import XCTest
 @MainActor
 final class AVShowtimeSongPlayerTests: XCTestCase {
     func test_allShowtimeSongs_haveAudioResourceDefined() {
-        for song in SongCatalog.all {
+        for song in DefaultSongCatalog.all {
             let resource = ShowtimeAssets.audioResource(forSongID: song.id)
             XCTAssertNotNil(resource, "Song \(song.id) is missing an audio resource mapping")
         }
@@ -13,7 +13,7 @@ final class AVShowtimeSongPlayerTests: XCTestCase {
     func test_bundledAudioFiles_existInBundle() {
         let bundle = Bundle(for: AVShowtimeSongPlayerTests.self)
         // Test that the audio files are in the main bundle or test bundle
-        for song in SongCatalog.all {
+        for song in DefaultSongCatalog.all {
             let resource = ShowtimeAssets.audioResource(forSongID: song.id)!
             let url = Bundle.main.url(forResource: resource, withExtension: "mp3")
                 ?? bundle.url(forResource: resource, withExtension: "mp3")

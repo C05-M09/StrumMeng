@@ -6,7 +6,6 @@ struct ContentView: View {
     @State private var homeViewModel: HomeViewModel
     @State private var pairingIntroduction: PairingIntroductionViewModel
     @State private var patternListViewModel: PatternListViewModel
-    @State private var songListViewModel: SongListViewModel
     @State private var optionViewModel: OptionViewModel
     @State private var guidebookViewModel: GuidebookViewModel
     @Environment(\.scenePhase) private var scenePhase
@@ -22,7 +21,6 @@ struct ContentView: View {
         _pairingIntroduction = State(initialValue:
             container.makePairingIntroductionViewModel(isEnabled: !inMemory))
         _patternListViewModel = State(initialValue: container.makePatternListViewModel())
-        _songListViewModel = State(initialValue: container.makeSongListViewModel())
         // Option is an overlay on Home, so "back" closes the overlay instead of popping the router.
         _optionViewModel = State(initialValue: container.makeOptionViewModel { [weak homeViewModel] in
             homeViewModel?.send(.dismissOverlay)
@@ -44,6 +42,10 @@ struct ContentView: View {
                 .allowsHitTesting(!pairingIntroduction.state.blocksHome)
                 .navigationDestination(for: AppRoute.self) { route in
                     switch route {
+                    case .showtimeList:
+                        SongListRoute(container: container)
+                    case let .showtime(songID, _):
+                        ShowtimeRoute(songID: songID, container: container).id(route)
                     case .practiceList:
                         PatternListView(viewModel: patternListViewModel)
 
@@ -70,16 +72,6 @@ struct ContentView: View {
                     case .deviceSetup:
                         DeviceSetupRoute(container: container)
 
-                    // MARK: Showtime (US11)
-                    case .showtimeList:
-                        ShowtimeSongSelectView(viewModel: songListViewModel)
-                            .navigationBarBackButtonHidden()
-                            .toolbar(.hidden, for: .navigationBar)
-
-                    // TODO: replace with the real screens when intro, Listen, Play and Summary of
-                    // Showtime land. Until then, choosing a song opens an empty screen.
-                    case .showtimeIntro, .showtimeListen, .showtimePlay, .showtimeSummary:
-                        EmptyView()
                     }
                 }
         }
@@ -188,4 +180,26 @@ private struct SummaryRoute: View {
 
 #Preview {
     ContentView(inMemory: true)
+}
+
+/// Own each screen's view model for the lifetime of its route, as with Practice.
+private struct SongListRoute: View {
+    @State private var viewModel: SongListViewModel
+    init(container: AppContainer) { _viewModel = State(initialValue: container.makeSongListViewModel()) }
+    var body: some View {
+        ShowtimeSongSelectView(viewModel: viewModel)
+            .navigationBarBackButtonHidden()
+            .toolbar(.hidden, for: .navigationBar)
+    }
+}
+
+private struct ShowtimeRoute: View {
+    @State private var viewModel: ShowtimeViewModel?
+    init(songID: String, container: AppContainer) {
+        _viewModel = State(initialValue: container.makeShowtimeViewModel(songID: songID))
+    }
+    var body: some View {
+        if let viewModel { ShowtimeSessionView(viewModel: viewModel) }
+        else { Text("This song is unavailable.") }
+    }
 }

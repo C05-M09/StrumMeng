@@ -135,7 +135,7 @@ The user hears the correct pattern before playing\. It can be replayed any numbe
 - If the Wi\-Fi Aware session is close to its time limit, it is refreshed after Ready and before the<br>count\-in, and the count\-in waits until the controller is back \(§3\.2\.3\)\.
 - After it, a 3\-2\-1 count\-in aligned to the beat interval at the chosen BPM\. After "1", the session<br>enters playing exactly on the first beat\.
 - Play renders the pattern as a row of beat nodes with a moving beat marker\. The marker is driven by<br>BeatClock ticks, never by its own timer\.
-- The metronome is scheduled by the same BeatClock: on each tick, the next quarter note's click is<br>scheduled on the host clock \(GuitarEngine, MetronomeSound\), and the first beat of a bar is<br>accented\. Every swipe also sounds the synthesised guitar \(a C chord in the swipe's direction,<br>GuitarSound\), in or out of a session\. No slider sets their volume yet: the Music slider is the menu music \(§3\.6, decision 21\)\.
+- The metronome is scheduled by the same BeatClock: on each tick, the next quarter note's click is<br>scheduled on the host clock \(GuitarEngine, MetronomeSound\), and the first beat of a bar is<br>accented\. Every swipe also sounds the synthesised guitar \(a C chord in the swipe's direction,<br>GuitarSound\), in or out of a session\. GuitarSound can also play any chord of GuitarChord\.catalog \(C, G, Em, D, F barre, Am; strum\(\_:chord:at:accent:\)\), and prepare\(chords:\) pre\-renders a song's chords so a chord change never waits for synthesis \(US12\)\. Practice still plays C\. No slider sets their volume yet: the Music slider is the menu music \(§3\.6, decision 21\)\.
 - Beat node colours come from design tokens, not hard\-coded values\.
 
 ### 3\.2 Real\-time feedback engine \(US 1, US 6\)
@@ -601,3 +601,21 @@ Closing Set Up Device through Back or connected Done schedules the once-only Hom
 guidance before the router returns. Pairing success is not required: Option appears
 first, then Guidebook. Unconnected Done keeps setup open without scheduling the tour.
 HomeGuidanceStore persists the pending handoff and ignores scheduling after completion.
+
+
+### US12: Showtime session prototype (scope extension, November 2026)
+The user explicitly authorizes Showtime on this branch, superseding the earlier
+MVP exclusion for this work. See US12_SHOWTIME.md for implemented versus dummy parts.
+SongCatalog isolates sample arrangements. SongDemoPlayer previews individual strumming
+patterns using Practice’s C-chord guitar; Ready activates after every required pattern
+has been heard for a full loop. The disabled Ready artwork remains visible beforehand.
+A pattern selector replaces song duration in Listen, without showing chord labels.
+SongPatternChange and SongChordChange share the song-slot grid. The shared Practice engine
+handles real iPhone timing/direction feedback and disconnects. Reusable session code
+is in Core/Services/Practice/Session; reusable lane/countdown/pause views are in
+Core/DesignSystem/Play, so Features do not depend on one another. The builder adopts
+the owner's backward-compatible songID: String? = nil parameter. AppContainer supplies
+song.id to the shared engine, which passes it directly to SessionResultBuilder; the
+Showtime coordinator no longer copies results to attach identity. Practice retains nil.
+SessionResult and connectivity contracts are unchanged. Showtime results are in memory only; chord synthesis
+and persistent song/visitor-request integration remain owned by parallel work.

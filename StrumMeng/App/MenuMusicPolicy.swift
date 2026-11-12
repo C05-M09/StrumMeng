@@ -6,8 +6,8 @@ import Foundation
 /// is quiet, like the screens from Listen on.
 /// Showtime song list plays the character's own song, so menu music is paused there.
 /// It is paused from Listen on: Listen, Play and Summary (with Replay) play the guitar and the
-/// metronome, and the player must hear those clearly to strum on tempo. The Showtime intro is
-/// quiet too, because it leads straight into the song's Listen.
+/// metronome, and the player must hear those clearly to strum on tempo. Showtime sessions are
+/// quiet too, because they lead straight into song audio.
 enum MenuMusicPolicy {
     /// - Parameters:
     ///   - top: the route on top of the stack; nil is Home.
@@ -17,8 +17,7 @@ enum MenuMusicPolicy {
         switch top {
         case nil, .practiceList:
             return true
-        case .showtimeList, .deviceSetup, .listen, .play, .summary,
-             .showtimeIntro, .showtimeListen, .showtimePlay, .showtimeSummary:
+        case .showtimeList, .deviceSetup, .listen, .play, .summary, .showtime:
             return false
         }
     }
