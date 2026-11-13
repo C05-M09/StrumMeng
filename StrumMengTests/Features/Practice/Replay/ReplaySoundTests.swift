@@ -115,4 +115,64 @@ final class ReplaySoundTests: XCTestCase {
 
         XCTAssertEqual(sound.clicks.count, clicksBefore)
     }
+
+    // MARK: - Showtime
+
+    private func makeShowtimeViewModel(strums: [RecordedStrum], track: MockSongBackingTrack) -> ReplayViewModel {
+        let result = SessionResultBuilder.build(id: UUID(), patternID: "foundation", songID: "song", bpm: 80,
+                                                beatEvents: [], strums: strums,
+                                                createdAt: Date(timeIntervalSince1970: 0))
+        // Steps 0-3 on G, steps 4-7 on D7.
+        let chords: [GuitarChord] = Array(repeating: .named("G") ?? .c, count: 4)
+            + Array(repeating: .named("D7") ?? .c, count: 4)
+        return ReplayViewModel(result: result, repetitions: 1, guitar: sound, metronome: sound,
+                               stepChords: chords, chordLabels: [0: "G", 4: "D7"], backingTrack: track,
+                               now: { [unowned self] in self.songClock },
+                               soundClock: { [unowned self] in self.hostClock })
+    }
+
+    func test_showtimeReplay_strumsTheChordOfTheirStep() {
+        let track = MockSongBackingTrack()
+        let viewModel = makeShowtimeViewModel(strums: [
+            RecordedStrum(time: 0.01, direction: .down, isExtra: false),           // step 0: G
+            RecordedStrum(time: 4 * step - 0.02, direction: .up, isExtra: false),  // nearest step 4: D7
+        ], track: track)
+        viewModel.send(.play)
+
+        advance(viewModel, by: -viewModel.songTime() + 4 * step)
+
+        XCTAssertEqual(sound.strums.map(\.chord), [GuitarChord.named("G"), GuitarChord.named("D7")])
+    }
+
+    func test_showtimeReplay_showsTheSongsChordLabels() {
+        let viewModel = makeShowtimeViewModel(strums: [], track: MockSongBackingTrack())
+        XCTAssertEqual(viewModel.screenModel().chordLabels, [0: "G", 4: "D7"])
+    }
+
+    func test_showtimeReplay_playsTheSongFromTheReplayPosition_andStopsItOnPause() {
+        let track = MockSongBackingTrack()
+        let viewModel = makeShowtimeViewModel(strums: [], track: track)
+        viewModel.send(.play)
+        XCTAssertEqual(track.plays.last?.songTime ?? 0, viewModel.songTime(), accuracy: 1e-9)
+        XCTAssertEqual(track.plays.last?.hostTime, hostClock)
+
+        songClock += 1; hostClock += 1
+        viewModel.send(.pause)
+        XCTAssertGreaterThan(track.stopCount, 0)
+
+        let stops = track.stopCount
+        viewModel.send(.resume)
+        XCTAssertEqual(track.plays.count, 2)
+        XCTAssertEqual(track.plays.last?.songTime ?? 0, viewModel.songTime(), accuracy: 1e-9)
+        viewModel.send(.backToSummary)
+        XCTAssertGreaterThan(track.stopCount, stops)
+    }
+
+    func test_practiceReplay_staysOnC_withoutSongOrLabels() {
+        let viewModel = makeViewModel([BeatEvent(stepIndex: 0, result: .perfect, offsetMs: 0)])
+        viewModel.send(.play)
+        advance(viewModel, by: -viewModel.songTime() + 0.1)
+        XCTAssertEqual(sound.strums.map(\.chord), [.c])
+        XCTAssertTrue(viewModel.screenModel().chordLabels.isEmpty)
+    }
 }

@@ -18,9 +18,15 @@ import SwiftUI
 struct ReplayView: View {
     @State private var viewModel: ReplayViewModel
     var onDismiss: (() -> Void)?
+    /// Showtime replays on its own stage, with the BPM in white as in its game.
+    private let backgroundAssetName: String
+    private let bpmColor: Color?
 
-    init(viewModel: ReplayViewModel, onDismiss: (() -> Void)? = nil) {
+    init(viewModel: ReplayViewModel, backgroundAssetName: String = "Play_BG", bpmColor: Color? = nil,
+         onDismiss: (() -> Void)? = nil) {
         _viewModel = State(initialValue: viewModel)
+        self.backgroundAssetName = backgroundAssetName
+        self.bpmColor = bpmColor
         self.onDismiss = onDismiss
     }
 
@@ -35,7 +41,7 @@ struct ReplayView: View {
 
             ZStack(alignment: .topLeading) {
                 // 1. Background Penuh (Play_BG)
-                Image("Play_BG")
+                Image(backgroundAssetName)
                     .resizable()
                     .frame(width: geo.size.width, height: geo.size.height)
 
@@ -110,7 +116,7 @@ struct ReplayView: View {
             // Indikator BPM di kanan atas
             Text("BPM \(model.bpm)")
                 .font(AppFont.mono(layout.bpmFontSize))
-                .foregroundStyle(AppColor.ink)
+                .foregroundStyle(bpmColor ?? AppColor.ink)
                 .fixedSize()
                 .frame(width: layout.size.width - layout.bpmTrailing, alignment: .trailing)
                 .position(x: (layout.size.width - layout.bpmTrailing) / 2, y: layout.bpmCenterY)

@@ -2,6 +2,8 @@ import SwiftUI
 
 struct ShowtimeSessionView: View {
     @State var viewModel: ShowtimeViewModel
+    /// Builds the summary's Replay screen. Given by the route, because Replay belongs to Practice.
+    var makeReplayView: ((SessionResult, @escaping () -> Void) -> AnyView)?
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.playSoundEffect) private var playSoundEffect
     // The end transition, as in Practice: banner, garage shutting, then the summary.
@@ -80,7 +82,7 @@ struct ShowtimeSessionView: View {
                 }
             }
         } else if case .finished = viewModel.state, isSummaryReady, let summary = viewModel.summary {
-            ShowtimeSummaryView(viewModel: summary, songInfo: viewModel.songInfo)
+            ShowtimeSummaryView(viewModel: summary, songInfo: viewModel.songInfo, makeReplayView: makeReplayView)
         } else {
             PracticePlayView(model: viewModel.playFrame(), backgroundAssetName: "Showtime_Assets/Showtime_BG", titleFontScale: 0.8,
                 titleLineSpacing: ShowtimeLayout.titleLineSpacing, bpmColor: AppColors.white,

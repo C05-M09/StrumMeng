@@ -14,6 +14,9 @@ struct ShowtimeSummaryView: View {
     var makeReplayView: ((SessionResult, @escaping () -> Void) -> AnyView)?
 
     @State private var activeReplayResult: SessionResult?
+    /// Built once when Replay opens: the replay owns its sound and the song's recording, so a
+    /// summary redraw must not build (and restart) a second one.
+    @State private var replayContent: AnyView?
     @State private var isShowingFeedbackOverlay: Bool
     @State private var isGarageOpen: Bool = false
     @Environment(\.playSoundEffect) private var playSoundEffect
@@ -99,6 +102,7 @@ struct ShowtimeSummaryView: View {
         .onChange(of: viewModel.state) { _, newState in
             if case .navigating(let destination) = newState {
                 if case .replay(let result) = destination {
+                    replayContent = makeReplayView?(result, dismissReplay)
                     withAnimation(.easeInOut(duration: 0.35)) {
                         activeReplayResult = result
                     }
@@ -327,17 +331,17 @@ struct ShowtimeSummaryView: View {
     }
 
     // MARK: - Replay Overlay
+    private func dismissReplay() {
+        withAnimation(.easeInOut(duration: 0.35)) {
+            activeReplayResult = nil
+        }
+        viewModel.send(.returnFromReplay)
+    }
+
     @ViewBuilder
     private func replayOverlay(for replayResult: SessionResult) -> some View {
-        let dismissReplay = {
-            withAnimation(.easeInOut(duration: 0.35)) {
-                activeReplayResult = nil
-            }
-            viewModel.send(.returnFromReplay)
-        }
-
-        if let makeReplayView {
-            makeReplayView(replayResult, dismissReplay)
+        if let replayContent {
+            replayContent
         } else {
             ZStack {
                 AppColors.cream.ignoresSafeArea()
