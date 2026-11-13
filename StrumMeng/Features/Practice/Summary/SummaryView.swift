@@ -209,7 +209,7 @@ struct SummaryView: View {
         
         // 3. Tombol REPLAY & RETRY (di bawah area teal)
         // 💡 Atur posisi y untuk menaikkan/menurunkan kedua tombol ini
-        VStack(spacing: 24) {
+        VStack(spacing: 8) {
             Button {
                 viewModel.send(.tapReplay)
             } label: {
@@ -237,7 +237,7 @@ struct SummaryView: View {
             )
         }
         .frame(width: 760)
-        .position(x: 1133, y: 850)
+        .position(x: 1133, y: 860)
 
     }
 
