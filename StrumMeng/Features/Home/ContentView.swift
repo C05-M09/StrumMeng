@@ -195,11 +195,21 @@ private struct SongListRoute: View {
 
 private struct ShowtimeRoute: View {
     @State private var viewModel: ShowtimeViewModel?
+    private let container: AppContainer
     init(songID: String, container: AppContainer) {
+        self.container = container
         _viewModel = State(initialValue: container.makeShowtimeViewModel(songID: songID))
     }
     var body: some View {
-        if let viewModel { ShowtimeSessionView(viewModel: viewModel) }
+        if let viewModel {
+            ShowtimeSessionView(viewModel: viewModel, makeReplayView: { [container] result, dismiss in
+                guard let replay = container.makeShowtimeReplayViewModel(result: result) else {
+                    return AnyView(Color.clear.onAppear(perform: dismiss))
+                }
+                return AnyView(ReplayView(viewModel: replay, backgroundAssetName: "Showtime_Assets/Showtime_BG",
+                                          bpmColor: AppColors.white, onDismiss: dismiss))
+            })
+        }
         else { Text("This song is unavailable.") }
     }
 }

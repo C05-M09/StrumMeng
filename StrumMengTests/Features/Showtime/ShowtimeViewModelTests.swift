@@ -8,7 +8,8 @@ final class ShowtimeViewModelTests: XCTestCase {
         let demo = FakeSongDemoPlayer()
         let game = FakeSongGameplay()
         game.isControllerConnected = connected
-        let model = ShowtimeViewModel(song: DummySongCatalog().songs[songIndex], demo: demo, gameplay: game, onBack: {})
+        let model = ShowtimeViewModel(song: DummySongCatalog().songs[songIndex], demo: demo, gameplay: game,
+                                      repository: MockSessionRepository(), onBack: {})
         model.appear()
         return (model, demo, game)
     }
@@ -132,39 +133,88 @@ final class ShowtimeViewModelTests: XCTestCase {
         await model.disappear()
     }
 
-    func test_gameplayFinish_savesResultToRepository() async {
+    /// A finished run on a song model with its summary, and the repository the summary saves to.
+    private func makeFinished(onBack: @escaping () -> Void = {}) async
+        -> (ShowtimeViewModel, FakeSongGameplay, MockSessionRepository, SessionResult) {
         let repo = MockSessionRepository()
-        let demo = FakeSongDemoPlayer()
         let game = FakeSongGameplay()
         game.isControllerConnected = true
-        let model = ShowtimeViewModel(
-            song: DummySongCatalog().songs[0],
-            demo: demo,
-            gameplay: game,
-            repository: repo,
-            onBack: {}
-        )
+        let model = ShowtimeViewModel(song: DummySongCatalog().songs[0], demo: FakeSongDemoPlayer(),
+                                      gameplay: game, repository: repo, onBack: onBack)
         model.appear()
-        let result = SessionResult(
-            id: UUID(),
-            patternID: "foundation",
-            songID: "dummy-twinkle",
-            bpm: 80,
-            accuracy: 1,
-            perfectCount: 1,
-            tooEarlyCount: 0,
-            missCount: 0,
-            createdAt: Date(),
-            beatEvents: PracticeFixtures.events([.perfect])
-        )
+        await model.send(.next)
+        await model.send(.previewFinished)
+        await model.send(.ready)
+        game.change(.countIn(3))
+        game.change(.playing)
+        let result = SessionResult(id: UUID(), patternID: "foundation", songID: "dummy-twinkle", bpm: 80,
+            accuracy: 1, perfectCount: 1, tooEarlyCount: 0, missCount: 0, createdAt: Date(),
+            beatEvents: PracticeFixtures.events([.perfect]))
         game.change(.finished(result))
+        return (model, game, repo, result)
+    }
+
+    private func waitForState(_ expected: ShowtimeState, of model: ShowtimeViewModel) async {
+        for _ in 0..<100 where model.state != expected { await Task.yield() }
+    }
+
+    func test_gameplayFinish_opensSummaryWithResultAndSongInfo_withoutSavingYet() async {
+        let (model, _, repo, result) = await makeFinished()
         for _ in 0..<10 { await Task.yield() }
+        XCTAssertEqual(model.state, .finished(result))
+        XCTAssertEqual(model.summary?.result, result)
+        XCTAssertEqual(model.songInfo.title, DummySongCatalog().songs[0].title)
+        XCTAssertEqual(model.songInfo.chords, DummySongCatalog().songs[0].distinctChords)
         let saved = await repo.savedResults
-        XCTAssertEqual(saved.count, 1)
-        XCTAssertEqual(saved.first?.id, result.id)
+        XCTAssertTrue(saved.isEmpty, "Only the summary saves, when it first appears")
+        await model.disappear()
+    }
+
+    func test_summaryAppearingTwice_savesTheRunOnce() async {
+        let (model, _, repo, result) = await makeFinished()
+        let summary = try? XCTUnwrap(model.summary)
+        await summary?.onAppear()
+        await summary?.onAppear()
+        let saved = await repo.savedResults
+        XCTAssertEqual(saved.map(\.id), [result.id])
         XCTAssertEqual(saved.first?.songID, "dummy-twinkle")
         await model.disappear()
     }
+
+    func test_summaryRetry_savesThenReturnsToListenAndDropsSummary() async {
+        let (model, game, repo, result) = await makeFinished()
+        model.summary?.send(.tapRetry)
+        await waitForState(.listening(0), of: model)
+        XCTAssertEqual(model.state, .listening(0))
+        XCTAssertNil(model.summary)
+        XCTAssertEqual(game.restartCalls, 1)
+        let saved = await repo.savedResults
+        XCTAssertEqual(saved.map(\.id), [result.id])
+        await model.disappear()
+    }
+
+    func test_summaryBackToMain_savesThenLeavesForTheSongList() async {
+        var exits = 0
+        let (model, _, repo, result) = await makeFinished(onBack: { exits += 1 })
+        model.summary?.send(.tapBackToMain)
+        await waitForState(.exited, of: model)
+        XCTAssertEqual(model.state, .exited)
+        XCTAssertEqual(exits, 1)
+        XCTAssertNil(model.summary)
+        let saved = await repo.savedResults
+        XCTAssertEqual(saved.map(\.id), [result.id])
+        await model.disappear()
+    }
+
+    func test_summaryReplay_staysOnTheFinishedRun() async {
+        let (model, _, _, result) = await makeFinished()
+        model.summary?.send(.tapReplay)
+        for _ in 0..<10 { await Task.yield() }
+        XCTAssertEqual(model.state, .finished(result))
+        XCTAssertNotNil(model.summary)
+        await model.disappear()
+    }
+
     func test_restartIgnoresCompletionFromPreviousPreview() async {
         let (model, demo, _) = make()
         await model.send(.next)
@@ -281,7 +331,7 @@ final class ShowtimeViewModelTests: XCTestCase {
     func test_backCancelsSourcesExitsAndIgnoresStaleDemoEvents() async {
         let demo = FakeSongDemoPlayer(); let game = FakeSongGameplay(); var exits = 0
         let model = ShowtimeViewModel(song: DummySongCatalog().songs[0], demo: demo, gameplay: game,
-                                     onBack: { exits += 1 })
+                                     repository: MockSessionRepository(), onBack: { exits += 1 })
         model.appear(); await model.send(.next)
         await model.send(.back)
         demo.emit(.finished)
@@ -324,12 +374,13 @@ private final class FakeSongGameplay: SongGameplay {
     var frameLeadInSlots = 0
     var onStateChanged: ((PracticeState) -> Void)?
     var onConnectionChanged: ((Bool) -> Void)?
-    var readyCalls = 0; var disappears = 0
+    var readyCalls = 0; var restartCalls = 0; var disappears = 0
     func onAppear() {}
     func onDisappear() async { disappears += 1 }
     func change(_ state: PracticeState) { self.state = state; onStateChanged?(state) }
     func send(_ event: PracticeEvent) async {
         if case .tapReady = event { readyCalls += 1 }
+        if case .tapRestart = event { restartCalls += 1 }
         change(reduce(state, event))
     }
     func screenModel() -> PlayScreenModel {

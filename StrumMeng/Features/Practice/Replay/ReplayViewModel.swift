@@ -77,6 +77,13 @@ final class ReplayViewModel {
     /// The host clock the audio engine schedules on (separate from `now`, which drives song time).
     private let soundClock: () -> TimeInterval
     private let cues: [ReplayCue]
+    /// Showtime only: the chord of every step, so each replayed strum sounds the chord it sounded in
+    /// the game. Empty in Practice, which plays C.
+    private let stepChords: [GuitarChord]
+    /// Showtime only: the song's chord names along the lane, as in the game.
+    private let chordLabels: [Int: String]
+    /// Showtime only: the song's recording, kept in step with the replay as in the game.
+    private let backingTrack: (any SongBackingTrack)?
     private var nextCue = 0
     private var soundTask: Task<Void, Never>?
 
@@ -95,6 +102,9 @@ final class ReplayViewModel {
         repetitions: Int? = nil,
         guitar: (any GuitarSound)? = nil,
         metronome: (any MetronomeSound)? = nil,
+        stepChords: [GuitarChord] = [],
+        chordLabels: [Int: String] = [:],
+        backingTrack: (any SongBackingTrack)? = nil,
         now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
         soundClock: @escaping () -> TimeInterval = HostClock.now,
         onDismiss: @escaping () -> Void = {}
@@ -108,6 +118,14 @@ final class ReplayViewModel {
         self.guitar = guitar
         self.metronome = metronome
         self.soundClock = soundClock
+        self.stepChords = stepChords
+        self.chordLabels = chordLabels
+        self.backingTrack = backingTrack
+        if let guitar, !stepChords.isEmpty {
+            // Usually already made by the game that just finished; this only covers the rest.
+            let chords = stepChords.reduce(into: [GuitarChord]()) { if !$0.contains($1) { $0.append($1) } }
+            Task { await guitar.prepare(chords: chords) }
+        }
 
         // 1. Hitung interval waktu per slot ketukan berdasarkan BPM
         let reps = repetitions ?? PracticeSessionConfig.patternRepetitions
@@ -326,7 +344,8 @@ final class ReplayViewModel {
             phase: phase,
             nodes: nodes,
             lastJudgement: lastJudgement,
-            lastStrumTime: lastStrumTime
+            lastStrumTime: lastStrumTime,
+            chordLabels: chordLabels
         )
     }
 
@@ -342,7 +361,7 @@ final class ReplayViewModel {
             let cue = cues[nextCue]
             let at = hostNow + (cue.time - songNow)
             switch cue.sound {
-            case let .strum(direction): guitar?.strum(direction, at: at, accent: 1)
+            case let .strum(direction): guitar?.strum(direction, chord: chord(at: cue.time), at: at, accent: 1)
             case let .click(accent): metronome?.click(at: at, accent: accent)
             }
             nextCue += 1
@@ -352,8 +371,9 @@ final class ReplayViewModel {
     /// Starts (or restarts) the sound from the current song time.
     private func startSound() {
         stopSound(silence: true)
-        guard guitar != nil || metronome != nil else { return }
         let songNow = songTime()
+        backingTrack?.play(fromSongTime: songNow, atHostTime: soundClock())
+        guard guitar != nil || metronome != nil else { return }
         nextCue = cues.firstIndex { $0.time >= songNow } ?? cues.count
         scheduleDueSounds()
         soundTask = Task { [weak self] in
@@ -369,11 +389,20 @@ final class ReplayViewModel {
     private func stopSound(silence: Bool) {
         soundTask?.cancel()
         soundTask = nil
+        backingTrack?.stop()
         metronome?.cancelClicks()
         if silence { guitar?.stopStrums() }
     }
 
     // MARK: - Helper
+
+    /// The chord of the step nearest to a strum's time, as the game picks it. C when there are no
+    /// step chords (Practice).
+    private func chord(at time: TimeInterval) -> GuitarChord {
+        guard let last = stepChords.indices.last else { return .c }
+        let step = Int((time / stepInterval).rounded())
+        return stepChords[min(max(step, 0), last)]
+    }
 
     /// Mengonversi nilai stroke model gitar (`.down`, `.up`, `.rest`) ke visual panah (`BeatNodeView.Arrow`).
     private static func arrow(for stroke: Stroke) -> BeatNodeView.Arrow? {

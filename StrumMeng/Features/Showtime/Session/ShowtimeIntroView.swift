@@ -4,6 +4,7 @@ struct ShowtimeIntroView: View {
     let onNext: () -> Void
     @State private var visible = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.playSoundEffect) private var playSoundEffect
 
     init(onNext: @escaping () -> Void, visibleInitially: Bool = false) {
         self.onNext = onNext
@@ -41,7 +42,11 @@ struct ShowtimeIntroView: View {
                 .position(ShowtimeLayout.informationNextCenter).modifier(entrance(.buttons))
         }
         .accessibilityAddTraits(.isModal)
-        .onAppear { visible = true }
+        // Pops in like Practice's Listen information.
+        .onAppear {
+            playSoundEffect(.popUp)
+            visible = true
+        }
     }
     private func entrance(_ stage: ListenInformationEntrance.Stage) -> ListenInformationEntrance {
         ListenInformationEntrance(visible: visible, reduceMotion: reduceMotion, stage: stage,

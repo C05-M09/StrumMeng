@@ -12,9 +12,10 @@ enum ShowtimeAssets {
     static let woodWall = namespace + "Showtime_Wood wall"
     static let recordBox = namespace + "Showtime_Record box"
 
-    /// "Showtime_0 star" ... "Showtime_3 star".
+    /// "Showtime_0 star" ... "Showtime_3 star". They live in the catalog's `Star` folder, which has
+    /// no namespace, so the name has no "Showtime_Assets/" prefix.
     static func star(_ count: Int) -> String {
-        namespace + "Showtime_\(min(max(count, 0), 3)) star"
+        "Showtime_\(min(max(count, 0), 3)) star"
     }
 
     static func character(forSongID id: String) -> String {

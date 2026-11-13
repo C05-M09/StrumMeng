@@ -7,6 +7,7 @@ struct ShowtimeSongSelectView: View {
     let viewModel: SongListViewModel
 
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.playSoundEffect) private var playSoundEffect
     @State private var isDetailShown: Bool
 
     init(viewModel: SongListViewModel, initiallyShowsDetail: Bool = false) {
@@ -182,6 +183,10 @@ struct ShowtimeSongSelectView: View {
         }
         .onDisappear {
             viewModel.stopPlayback()
+        }
+        // Moving to the next song ticks like turning Practice's pattern wheel.
+        .onChange(of: viewModel.state.selectedIndex) { old, new in
+            if old != nil, new != nil { playSoundEffect(.wheelTick) }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {

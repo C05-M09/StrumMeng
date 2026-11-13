@@ -167,7 +167,7 @@ final class AppContainer {
             song: song,
             demo: PatternStrumDemoPlayer(clock: AudioBeatClock(), sound: guitarSound, now: HostClock.now),
             gameplay: gameplay,
-            repository: repository,
+            repository: repository ?? UnavailableSessionRepository(),
             onBack: { [weak router, weak self] in
                 Task { [weak self] in
                     await self?.songListViewModel?.reloadRecords()
@@ -175,6 +175,19 @@ final class AppContainer {
                 router?.popTo(.showtimeList)
             }
         )
+    }
+
+    /// Replay of a finished Showtime run, as in Practice: the stored colours, every recorded swipe on
+    /// the chord it sounded in the game, the metronome and the song's recording. nil for an unknown song.
+    func makeShowtimeReplayViewModel(result: SessionResult) -> ReplayViewModel? {
+        guard let song = songCatalog.songs.first(where: { $0.id == result.songID }) else { return nil }
+        let timeline = SongTimeline(song: song)
+        let backingTrack = AVSongBackingTrack()
+        backingTrack.prepare(songID: song.id)
+        return ReplayViewModel(result: result, pattern: timeline.sessionPattern, repetitions: 1,
+            guitar: guitarSound, metronome: metronomeSound,
+            stepChords: timeline.stepChords, chordLabels: timeline.chordLabels,
+            backingTrack: backingTrack)
     }
 
     func makeListenViewModel(pattern: StrumPattern, bpm: Int) -> ListenViewModel {
@@ -366,7 +379,8 @@ final class AppContainer {
                 if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
             })
         return ShowtimeViewModel(song: song,
-            demo: PatternStrumDemoPlayer(clock: AudioBeatClock(), sound: sound, now: HostClock.now), gameplay: gameplay, onBack: {})
+            demo: PatternStrumDemoPlayer(clock: AudioBeatClock(), sound: sound, now: HostClock.now), gameplay: gameplay,
+            repository: UnavailableSessionRepository(), onBack: {})
     }
 #endif
 

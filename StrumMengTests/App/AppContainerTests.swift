@@ -313,4 +313,20 @@ final class AppContainerTests: XCTestCase {
         XCTAssertNil(container.makeShowtimeViewModel(songID: "unknown-song"))
     }
 
+    func test_showtimeReplay_isBuiltForTheSongOfTheResult() throws {
+        let container = AppContainer(router: AppRouter(), inMemory: true,
+            menuSounds: MockMenuSoundService(), controllerLink: MockControllerLink())
+        let song = try XCTUnwrap(container.makeSongListViewModel().songs.first)
+        func result(songID: String?) -> SessionResult {
+            SessionResult(id: UUID(), patternID: song.patternID, songID: songID, bpm: song.bpm, accuracy: 1,
+                          perfectCount: 0, tooEarlyCount: 0, missCount: 0, createdAt: Date(), beatEvents: [])
+        }
+        let replay = try XCTUnwrap(container.makeShowtimeReplayViewModel(result: result(songID: song.id)))
+        XCTAssertEqual(replay.totalSteps, SongTimeline(song: song).totalSlots)
+        XCTAssertEqual(replay.screenModel().chordLabels, SongTimeline(song: song).chordLabels)
+        XCTAssertEqual(replay.screenModel().title, song.title)
+        XCTAssertNil(container.makeShowtimeReplayViewModel(result: result(songID: "unknown-song")))
+        XCTAssertNil(container.makeShowtimeReplayViewModel(result: result(songID: nil)))
+    }
+
 }

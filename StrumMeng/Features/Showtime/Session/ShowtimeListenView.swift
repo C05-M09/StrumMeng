@@ -52,7 +52,8 @@ struct ShowtimeListenView: View {
         }
         .font(AppTypography.dmMono(size: 26))
         .foregroundStyle(AppColors.brownInk)
-        .buttonStyle(.plain)
+        // Shared style, so the arrows click and sink like every other button.
+        .buttonStyle(PressableButtonStyle())
     }
     private func slotView(_ slot: Int) -> some View {
         let spacing = 1140 / CGFloat(max(1, pattern.strokes.count))

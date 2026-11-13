@@ -33,3 +33,12 @@ struct ShowtimeSongInfo: Equatable, Sendable {
     }
 }
 
+// In an extension so the memberwise initialiser stays available.
+extension ShowtimeSongInfo {
+    /// The played song's title, chart length and chords in order of first appearance.
+    init(song: Song) {
+        self.init(title: song.title,
+                  durationLabel: PracticeSessionConfig.durationLabel(seconds: song.durationSeconds),
+                  chords: song.distinctChords)
+    }
+}

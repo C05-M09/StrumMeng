@@ -9,11 +9,14 @@ import SwiftUI
         .frame(width: ShowtimeLayout.size.width, height: ShowtimeLayout.size.height)
 }
 #Preview("Showtime • Finished", traits: .landscapeLeft) {
-    ShowtimeFinishedView(title: "Twinkle Twinkle Little Star",
-        result: SessionResult(id: UUID(), patternID: "foundation", songID: "dummy-twinkle", bpm: 80,
-            accuracy: 0.8, perfectCount: 56, tooEarlyCount: 16, missCount: 8,
-            createdAt: Date(), beatEvents: []), onRestart: {}, onBack: {})
-        .frame(width: ShowtimeLayout.size.width, height: ShowtimeLayout.size.height)
+    ShowtimeSummaryView(
+        viewModel: ShowtimeSummaryViewModel(
+            result: SessionResult(id: UUID(), patternID: "foundation", songID: "dummy-twinkle", bpm: 80,
+                accuracy: 0.8, perfectCount: 56, tooEarlyCount: 16, missCount: 8,
+                createdAt: Date(), beatEvents: []),
+            repository: UnavailableSessionRepository()),
+        songInfo: ShowtimeSongInfo(song: DummySongCatalog().songs[0]),
+        showIntroOverlay: false)
 }
 #Preview("Showtime • Song cards", traits: .landscapeLeft) {
     SongListView(viewModel: SongListViewModel(catalog: DummySongCatalog(), onSelect: { _ in }, onBack: {}))

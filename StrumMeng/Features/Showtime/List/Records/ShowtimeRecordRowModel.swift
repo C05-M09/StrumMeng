@@ -10,7 +10,7 @@ struct ShowtimeRecordRowModel: Identifiable, Equatable, Sendable {
     let perfectCount: Int
     let tooEarlyCount: Int
     let missCount: Int
-    /// 0...3, from the accuracy: 0-50 -> 0, 51-65 -> 1, 66-85 -> 2, 86-100 -> 3.
+    /// 0...3, from `StarRating`, the same rule as the summary.
     let stars: Int
 
     /// `rank` is 1-based and is decided by the order the repository returns.
@@ -22,6 +22,6 @@ struct ShowtimeRecordRowModel: Identifiable, Equatable, Sendable {
         self.perfectCount = result.perfectCount
         self.tooEarlyCount = result.tooEarlyCount
         self.missCount = result.missCount
-        self.stars = ShowtimeStars.count(forAccuracyPercent: Double(accuracyPercent))
+        self.stars = StarRating.stars(for: result.accuracy)
     }
 }
