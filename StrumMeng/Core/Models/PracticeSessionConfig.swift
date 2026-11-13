@@ -11,7 +11,12 @@ enum PracticeSessionConfig {
     }
 
     static func durationLabel(for pattern: StrumPattern, bpm: Int) -> String {
-        let totalSeconds = Int(durationSeconds(for: pattern, bpm: bpm).rounded())
+        durationLabel(seconds: durationSeconds(for: pattern, bpm: bpm))
+    }
+
+    /// "45 sec", "1 min", "1 min 20 sec". Shared with the Showtime summary's song length.
+    static func durationLabel(seconds: TimeInterval) -> String {
+        let totalSeconds = Int(seconds.rounded())
 
         guard totalSeconds >= 60 else {
             return "\(totalSeconds) sec"

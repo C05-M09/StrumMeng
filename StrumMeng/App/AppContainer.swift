@@ -167,7 +167,7 @@ final class AppContainer {
             song: song,
             demo: PatternStrumDemoPlayer(clock: AudioBeatClock(), sound: guitarSound, now: HostClock.now),
             gameplay: gameplay,
-            repository: repository,
+            repository: repository ?? UnavailableSessionRepository(),
             onBack: { [weak router, weak self] in
                 Task { [weak self] in
                     await self?.songListViewModel?.reloadRecords()
@@ -366,7 +366,8 @@ final class AppContainer {
                 if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
             })
         return ShowtimeViewModel(song: song,
-            demo: PatternStrumDemoPlayer(clock: AudioBeatClock(), sound: sound, now: HostClock.now), gameplay: gameplay, onBack: {})
+            demo: PatternStrumDemoPlayer(clock: AudioBeatClock(), sound: sound, now: HostClock.now), gameplay: gameplay,
+            repository: UnavailableSessionRepository(), onBack: {})
     }
 #endif
 

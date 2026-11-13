@@ -76,4 +76,10 @@ final class PracticeSessionConfigTests: XCTestCase {
             "1 min 20 sec"
         )
     }
+
+    func test_durationLabelForSeconds_roundsToWholeSeconds() {
+        XCTAssertEqual(PracticeSessionConfig.durationLabel(seconds: 28.8), "29 sec")
+        XCTAssertEqual(PracticeSessionConfig.durationLabel(seconds: 60), "1 min")
+        XCTAssertEqual(PracticeSessionConfig.durationLabel(seconds: 154.5), "2 min 35 sec")
+    }
 }

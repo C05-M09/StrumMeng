@@ -66,7 +66,7 @@ final class SongEngineIntegrationTests: XCTestCase {
         let engine = make(song: song, link: MockControllerLink())
         await engine.handle(.connected(latencyMs: 5))
         let coordinator = ShowtimeViewModel(song: song, demo: IntegrationSongPreview(),
-                                             gameplay: engine, onBack: {})
+                                             gameplay: engine, repository: MockSessionRepository(), onBack: {})
         coordinator.appear()
         await coordinator.send(.next)
         await coordinator.send(.previewFinished)

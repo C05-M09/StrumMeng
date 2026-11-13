@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Full-screen arcade transition banner shown immediately after a Practice Play session finishes:
+/// Full-screen arcade transition banner shown immediately after a Practice or Showtime session
+/// finishes (in Core because both features show it):
 /// - "PURRFECT!" (`Showtime_Box`) + full celebratory confetti & star explosion for accuracy >= 85%
 /// - "GETTING THERE!" (`Replay_Box`) + warm sparkle & confetti burst for accuracy >= 65%
 /// - "NICE TRY" (`Retry_Box`) + comic impact shake & puff particles for accuracy < 65%

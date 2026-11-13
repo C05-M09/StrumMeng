@@ -73,5 +73,11 @@ final class StarRatingTests: XCTestCase {
         XCTAssertEqual(StarRating.stars(for: 0.80, config: custom), 2)
         XCTAssertEqual(StarRating.stars(for: 0.81, config: custom), 3)
     }
-}
 
+    func test_stars_roundToTheWholePercentShownOnScreen() {
+        XCTAssertEqual(StarRating.stars(for: 0.504), 0, "Shown as 50%")
+        XCTAssertEqual(StarRating.stars(for: 0.505), 1, "Shown as 51%")
+        XCTAssertEqual(StarRating.stars(for: 0.854), 2, "Shown as 85%")
+        XCTAssertEqual(StarRating.stars(for: 0.855), 3, "Shown as 86%")
+    }
+}

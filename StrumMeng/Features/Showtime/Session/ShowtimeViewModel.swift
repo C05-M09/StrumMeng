@@ -11,10 +11,14 @@ final class ShowtimeViewModel {
     private(set) var completedPatternIndices: Set<Int> = []
     private(set) var state: ShowtimeState = .intro
     private(set) var isControllerConnected: Bool
+    /// The results screen of the finished run, created once when the song ends so the session is
+    /// saved exactly once (by the summary, when it first appears). Cleared by Retry and Back.
+    private(set) var summary: ShowtimeSummaryViewModel?
+    let songInfo: ShowtimeSongInfo
     @ObservationIgnored private let chordLabels: [Int: String]
     @ObservationIgnored private let demo: any SongDemoPlayer
     @ObservationIgnored private let gameplay: any SongGameplay
-    @ObservationIgnored private let repository: (any SessionRepository)?
+    @ObservationIgnored private let repository: any SessionRepository
     @ObservationIgnored private let onBack: () -> Void
     @ObservationIgnored private var connectionPauseTask: Task<Void, Never>?
     @ObservationIgnored private var demoTask: Task<Void, Never>?
@@ -22,9 +26,10 @@ final class ShowtimeViewModel {
     @ObservationIgnored private var started = false
 
     init(song: Song, demo: any SongDemoPlayer, gameplay: any SongGameplay,
-         repository: (any SessionRepository)? = nil,
+         repository: any SessionRepository,
          onBack: @escaping () -> Void) {
         timeline = SongTimeline(song: song)
+        songInfo = ShowtimeSongInfo(song: song)
         previewPatterns = SongTimeline(song: song).previewPatterns
         chordLabels = SongTimeline(song: song).chordLabels
         self.demo = demo; self.gameplay = gameplay; self.repository = repository; self.onBack = onBack
@@ -58,7 +63,7 @@ final class ShowtimeViewModel {
         default: false
         }
     }
-    /// The break after the last node, as in Practice: the session is finished and saved, but the
+    /// The break after the last node, as in Practice: the session is finished, but the
     /// lane keeps sliding until the gameplay's break is over; the results show after it.
     var isWrappingUp: Bool {
         guard case .finished = state else { return false }
@@ -148,6 +153,8 @@ final class ShowtimeViewModel {
         let next = reduce(previous, event)
         guard next != previous else { return }
         state = next
+        if case .restart = event { summary = nil }
+        if case .back = event { summary = nil }
         generation += 1
         let run = generation
         switch event {
@@ -196,13 +203,22 @@ final class ShowtimeViewModel {
         case .paused: state = reduce(state, .pause(.user))
         case .disconnected: state = reduce(state, .pause(.connection))
         case .finished(let result):
+            let previous = state
             state = reduce(state, .completed(result))
-            if let repository {
-                Task {
-                    try? await repository.save(result)
-                }
-            }
+            guard state != previous else { return }
+            summary = ShowtimeSummaryViewModel(result: result, repository: repository,
+                onNavigate: { [weak self] destination in self?.leaveSummary(destination) })
         default: break
+        }
+    }
+    /// Retry plays the song again from Listen, like the old Restart; Back to Main leaves for the
+    /// song list. The summary calls this only after its save finished, so the list's records
+    /// already include this run.
+    private func leaveSummary(_ destination: ShowtimeSummaryDestination) {
+        switch destination {
+        case .retry: Task { await send(.restart) }
+        case .backToMain: Task { await send(.back) }
+        case .replay: break
         }
     }
     func playFrame() -> PlayScreenModel {

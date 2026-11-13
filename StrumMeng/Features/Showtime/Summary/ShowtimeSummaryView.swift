@@ -237,7 +237,7 @@ struct ShowtimeSummaryView: View {
         .position(x: 212, y: 120)
 
         // 2. Bintang (0 - 3) di atas pill ACCURACY
-        Image("Showtime_\(max(0, min(3, viewModel.stars))) star")
+        Image(ShowtimeAssets.star(viewModel.stars))
             .resizable()
             .scaledToFit()
             .frame(width: 266)
