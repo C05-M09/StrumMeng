@@ -245,7 +245,7 @@ struct ShowtimeSummaryView: View {
             .resizable()
             .scaledToFit()
             .frame(width: 266)
-            .position(x: 477, y: 330)
+            .position(x: 477, y: 315)
 
         // 3. Banner Background Chatbox (hijau teal di belakang headline, sama seperti overlay)
         Image("Summary_Title chatbox")
