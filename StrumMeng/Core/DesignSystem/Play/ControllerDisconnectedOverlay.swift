@@ -2,12 +2,12 @@ import SwiftUI
 
 /// Modal shown when the iPhone controller drops during a session. It uses the same Option_Card as
 /// the pause modal, so it feels like part of the same family, but its title says why the session
-/// stopped. Resume stays disabled until the iPhone is connected again; Back to Menu always works.
+/// stopped. Resume stays disabled until the iPhone is connected again; Set Up Device opens pairing while preserving the paused session.
 struct ControllerDisconnectedOverlay: View {
     let unit: CGFloat
     let isReconnected: Bool
     let onResume: () -> Void
-    let onBackToMenu: () -> Void
+    let onSetUpDevice: () -> Void
 
     /// Disabled Resume is greyed and tinted rather than faded: a faded button lets what is behind
     /// it show through. (`brightness` would also darken the artwork's transparent edge.)
@@ -77,8 +77,9 @@ struct ControllerDisconnectedOverlay: View {
                     .disabled(!isReconnected)
                     .saturation(isReconnected ? 1 : Self.disabledSaturation)
                     .colorMultiply(isReconnected ? AppColors.white : AppColors.tan)
-                assetButton("Back to Menu", normal: "Button_Back to Menu_Normal",
-                            pressed: "Button_Back to Menu_Pressed", action: onBackToMenu)
+                ChunkyButton(title: "Set Up Device", style: .secondary,
+                             fontSize: 32 * unit, width: Self.buttonSize.width * unit,
+                             height: Self.buttonSize.height * unit, action: onSetUpDevice)
             }
             .multilineTextAlignment(.center)
             .animation(.easeOut(duration: 0.2), value: isReconnected)

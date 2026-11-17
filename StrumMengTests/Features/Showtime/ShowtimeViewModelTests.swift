@@ -4,6 +4,29 @@ import Observation
 
 @MainActor
 final class ShowtimeViewModelTests: XCTestCase {
+    func test_deviceSetupRequestKeepsDisconnectedShowtimePausedAtTheSamePosition() async {
+        let demo = FakeSongDemoPlayer()
+        let game = FakeSongGameplay()
+        var requests = 0
+        let model = ShowtimeViewModel(song: DummySongCatalog().songs[0], demo: demo, gameplay: game,
+            repository: MockSessionRepository(), onSetUpDevice: { requests += 1 }, onBack: {})
+        model.appear()
+        model.requestDeviceSetup()
+        XCTAssertEqual(requests, 0)
+        await model.send(.next)
+        await model.send(.previewFinished)
+        await model.send(.ready)
+        game.change(.playing)
+        game.frameSongTime = 12
+        game.change(.disconnected)
+        model.requestDeviceSetup()
+        XCTAssertEqual(requests, 1)
+        XCTAssertEqual(model.state, .paused(.playing, .connection))
+        XCTAssertEqual(model.playFrame().songTime, 12)
+        XCTAssertEqual(game.disappears, 0)
+        await model.disappear()
+    }
+
     private func make(connected: Bool = true, songIndex: Int = 0) -> (ShowtimeViewModel, FakeSongDemoPlayer, FakeSongGameplay) {
         let demo = FakeSongDemoPlayer()
         let game = FakeSongGameplay()

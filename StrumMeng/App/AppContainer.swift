@@ -168,6 +168,7 @@ final class AppContainer {
             demo: PatternStrumDemoPlayer(clock: AudioBeatClock(), sound: guitarSound, now: HostClock.now),
             gameplay: gameplay,
             repository: repository ?? UnavailableSessionRepository(),
+            onSetUpDevice: { [weak router] in router?.presentSessionDeviceSetup() },
             onBack: { [weak router, weak self] in
                 Task { [weak self] in
                     await self?.songListViewModel?.reloadRecords()
@@ -226,7 +227,8 @@ final class AppContainer {
                 if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
             },
             onFinished: onFinished ?? { [weak self] result in self?.sessionFinished(result) },
-            onExit: { [weak router] in router?.popTo(.practiceList) }
+            onExit: { [weak router] in router?.popTo(.practiceList) },
+            onSetUpDevice: { [weak router] in router?.presentSessionDeviceSetup() }
         )
     }
 
@@ -324,14 +326,18 @@ final class AppContainer {
         )
     }
 
-    func makeDeviceSetupViewModel() -> DeviceSetupViewModel {
+    func makeDeviceSetupViewModel(isSessionRecovery: Bool = false) -> DeviceSetupViewModel {
         let guidanceStore = homeGuidanceStore
         return DeviceSetupViewModel(
             link: sharedControllerLink(),
             onClose: { [weak router] in
-                // Back also hands off to the Home tour, even without a paired device.
-                guidanceStore.scheduleAfterSetup()
-                router?.pop()
+                if isSessionRecovery {
+                    router?.dismissSessionDeviceSetup()
+                } else {
+                    // Home onboarding is separate from recovering a paused session.
+                    guidanceStore.scheduleAfterSetup()
+                    router?.pop()
+                }
             }
         )
     }

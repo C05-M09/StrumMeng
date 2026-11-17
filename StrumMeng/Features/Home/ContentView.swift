@@ -77,6 +77,13 @@ struct ContentView: View {
         }
         .ignoresSafeArea()
         .overlay {
+            if router.isSessionDeviceSetupPresented {
+                DeviceSetupRoute(container: container, isSessionRecovery: true)
+                    .background(AppColors.brownInk)
+                    .ignoresSafeArea()
+            }
+        }
+        .overlay {
             if pairingIntroduction.state == .welcoming {
                 PairingIntroductionView { pairingIntroduction.send(.continueToSetup) }
             }
@@ -154,8 +161,8 @@ private struct PlayRoute: View {
 private struct DeviceSetupRoute: View {
     @State private var viewModel: DeviceSetupViewModel
 
-    init(container: AppContainer) {
-        _viewModel = State(initialValue: container.makeDeviceSetupViewModel())
+    init(container: AppContainer, isSessionRecovery: Bool = false) {
+        _viewModel = State(initialValue: container.makeDeviceSetupViewModel(isSessionRecovery: isSessionRecovery))
     }
 
     var body: some View {

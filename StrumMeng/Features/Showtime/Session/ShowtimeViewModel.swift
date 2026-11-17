@@ -20,6 +20,7 @@ final class ShowtimeViewModel {
     @ObservationIgnored private let gameplay: any SongGameplay
     @ObservationIgnored private let repository: any SessionRepository
     @ObservationIgnored private let onBack: () -> Void
+    @ObservationIgnored private let onSetUpDevice: () -> Void
     @ObservationIgnored private var connectionPauseTask: Task<Void, Never>?
     @ObservationIgnored private var demoTask: Task<Void, Never>?
     @ObservationIgnored private var generation = 0
@@ -27,12 +28,14 @@ final class ShowtimeViewModel {
 
     init(song: Song, demo: any SongDemoPlayer, gameplay: any SongGameplay,
          repository: any SessionRepository,
+         onSetUpDevice: @escaping () -> Void = {},
          onBack: @escaping () -> Void) {
         timeline = SongTimeline(song: song)
         songInfo = ShowtimeSongInfo(song: song)
         previewPatterns = SongTimeline(song: song).previewPatterns
         chordLabels = SongTimeline(song: song).chordLabels
         self.demo = demo; self.gameplay = gameplay; self.repository = repository; self.onBack = onBack
+        self.onSetUpDevice = onSetUpDevice
         isControllerConnected = gameplay.isControllerConnected
         gameplay.onStateChanged = { [weak self] in self?.receiveGameplay($0) }
         gameplay.onConnectionChanged = { [weak self] connected in
@@ -69,6 +72,11 @@ final class ShowtimeViewModel {
         guard case .finished = state else { return false }
         return gameplay.isAnimating
     }
+    func requestDeviceSetup() {
+        guard case .paused(_, .connection) = state else { return }
+        onSetUpDevice()
+    }
+
     func appear() {
         guard !started else { return }
         started = true

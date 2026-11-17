@@ -74,7 +74,7 @@ struct ShowtimeSessionView: View {
                     AppColors.brownInk.opacity(ShowtimeLayout.scrimOpacity)
                     if reason == .connection {
                         ControllerDisconnectedOverlay(unit: 1, isReconnected: viewModel.isControllerConnected,
-                            onResume: { send(.resume) }, onBackToMenu: { send(.back) })
+                            onResume: { send(.resume) }, onSetUpDevice: { viewModel.requestDeviceSetup() })
                     } else {
                         PauseMenuOverlay(unit: 1, onResume: { send(.resume) },
                             onRestart: { send(.restart) }, onBackToMenu: { send(.back) })
@@ -87,7 +87,8 @@ struct ShowtimeSessionView: View {
             PracticePlayView(model: viewModel.playFrame(), backgroundAssetName: "Showtime_Assets/Showtime_BG", titleFontScale: 0.8,
                 titleLineSpacing: ShowtimeLayout.titleLineSpacing, bpmColor: AppColors.white,
                 onPause: { send(.pause(.user)) }, onResume: { send(.resume) },
-                onRestart: { send(.restart) }, onBackToMenu: { send(.back) })
+                onRestart: { send(.restart) }, onBackToMenu: { send(.back) },
+                onSetUpDevice: { viewModel.requestDeviceSetup() })
         }
     }
     private func send(_ event: ShowtimeEvent) { Task { await viewModel.send(event) } }

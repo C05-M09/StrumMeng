@@ -619,3 +619,13 @@ song.id to the shared engine, which passes it directly to SessionResultBuilder; 
 Showtime coordinator no longer copies results to attach identity. Practice retains nil.
 SessionResult and connectivity contracts are unchanged. Showtime results are in memory only; chord synthesis
 and persistent song/visitor-request integration remain owned by parallel work.
+
+
+## Session connection recovery
+
+The disconnected modal offers Resume (disabled until connected) and Set Up Device.
+AppRouter presents the existing device setup view as a full-screen overlay above the current
+navigation stack. This preserves the session ViewModel, paused beat position and preview state;
+it does not trigger session disappearance or stop the shared controller link. Back or Done closes
+only this overlay. Pairing does not resume playback automatically: the player presses Resume.
+Normal Option/onboarding setup continues to use its existing navigation route and Home tour.

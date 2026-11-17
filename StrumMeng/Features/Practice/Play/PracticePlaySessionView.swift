@@ -36,7 +36,8 @@ struct PracticePlaySessionView: View {
                     onPause: { send(.tapPause) },
                     onResume: { send(.tapResume) },
                     onRestart: { send(.tapRestart) },
-                    onBackToMenu: { send(.tapBackToMenu) }
+                    onBackToMenu: { send(.tapBackToMenu) },
+                    onSetUpDevice: { viewModel.requestDeviceSetup() }
                 )
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 0)
