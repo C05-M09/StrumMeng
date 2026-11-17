@@ -130,3 +130,14 @@ Merge compatibility cleanup follows the current dev APIs: GuitarEngine() prepare
 through the GuitarSound default overload, and Home button sound is owned by the View's
 ButtonPressSound rather than the HomeViewModel. Obsolete merge leftovers in Home's
 initializer and tests were removed; Showtime navigation callbacks remain covered.
+
+
+## Row, Row, Row Your Boat: three repetitions
+
+The four-bar phrase at 110 BPM repeats three times (12 bars, about 26.18 seconds).
+The catalogue repeats its chord chart on the same grid, so duration, arrows, feedback,
+records and Replay use the full three-loop timeline. SongLoopConfiguration is the shared
+source of repetition count and phrase duration. AVSongBackingTrack pre-schedules each
+recording segment on host audio time; intermediate tails are trimmed to the bar boundary,
+while the last repetition retains its natural decay. Resume seeks inside the appropriate
+loop and schedules only the remaining loops. Listen still previews its one distinct pattern.

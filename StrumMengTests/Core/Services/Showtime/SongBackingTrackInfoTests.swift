@@ -48,6 +48,39 @@ final class SongBackingTrackInfoTests: XCTestCase {
         }
     }
 
+    func test_rowBoatSchedulesThreeMusicalLoopsAndKeepsOnlyTheFinalDecay() throws {
+        let info = try XCTUnwrap(SongBackingTrackInfo.forSong("row-row-row-your-boat"))
+        let loop = SongLoopConfiguration.rowBoat.durationPerLoop
+        let segments = info.segments(fromSongTime: -1, atHostTime: 100, fileDuration: loop + 0.5)
+        XCTAssertEqual(segments.count, 3)
+        for i in 0..<3 {
+            XCTAssertEqual(segments[i].filePosition, 0, accuracy: 1e-9)
+            XCTAssertEqual(segments[i].hostTime, 101 + Double(i) * loop, accuracy: 1e-9)
+            XCTAssertEqual(segments[i].duration, loop + (i == 2 ? 0.5 : 0), accuracy: 1e-9)
+        }
+    }
+
+    func test_resumingRowBoatMidSecondLoopSchedulesOnlyItsRemainderAndThirdLoop() throws {
+        let info = try XCTUnwrap(SongBackingTrackInfo.forSong("row-row-row-your-boat"))
+        let loop = SongLoopConfiguration.rowBoat.durationPerLoop
+        let segments = info.segments(fromSongTime: loop + 2, atHostTime: 200, fileDuration: loop + 0.5)
+        XCTAssertEqual(segments.count, 2)
+        XCTAssertEqual(segments[0].filePosition, 2, accuracy: 1e-9)
+        XCTAssertEqual(segments[0].duration, loop - 2, accuracy: 1e-9)
+        XCTAssertEqual(segments[0].hostTime, 200, accuracy: 1e-9)
+        XCTAssertEqual(segments[1].filePosition, 0, accuracy: 1e-9)
+        XCTAssertEqual(segments[1].hostTime, 200 + loop - 2, accuracy: 1e-9)
+        XCTAssertTrue(info.segments(fromSongTime: 3 * loop, atHostTime: 300,
+                                    fileDuration: loop + 0.5).isEmpty)
+    }
+
+    func test_nonLoopingRecordingKeepsItsOriginalResumePosition() {
+        let segments = info.segments(fromSongTime: 2, atHostTime: 100, fileDuration: 20)
+        XCTAssertEqual(segments.count, 1)
+        XCTAssertEqual(segments[0].filePosition, 2.5, accuracy: 1e-9)
+        XCTAssertEqual(segments[0].duration, 17.5, accuracy: 1e-9)
+    }
+
     func test_unknownSong_hasNoRecording() {
         XCTAssertNil(SongBackingTrackInfo.forSong("nope"))
     }
