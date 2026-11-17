@@ -350,6 +350,12 @@ final class AppContainer {
         try? await sharedControllerLink().start()
     }
 
+    /// Back in the foreground: iOS may have stopped the link's listener while the app was away.
+    /// Never during a session: the session pauses when the app leaves the foreground.
+    func refreshControllerLink() async {
+        try? await controllerLink?.refreshIfNeeded()
+    }
+
     func stopControllerLink() {
         guard let link = controllerLink else { return }
         controllerLink = nil
