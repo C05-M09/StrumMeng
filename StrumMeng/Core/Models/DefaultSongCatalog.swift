@@ -101,17 +101,20 @@ struct DefaultSongCatalog: SongCatalog {
         Song(
             id: "row-row-row-your-boat",
             title: "Row, Row, Row Your Boat",
-            bpm: 110,
+            bpm: SongLoopConfiguration.rowBoat.bpm,
             patternID: "upbeat",
-            barCount: 4,
-            chords: [
-                SongChordChange(slot: 0, chord: "G"),
-                SongChordChange(slot: 8, chord: "G"),
-                SongChordChange(slot: 16, chord: "C"),
-                SongChordChange(slot: 20, chord: "G"),
-                SongChordChange(slot: 24, chord: "D"),
-                SongChordChange(slot: 28, chord: "G"),
-            ],
+            barCount: SongLoopConfiguration.rowBoat.barsPerLoop * SongLoopConfiguration.rowBoat.count,
+            chords: (0..<SongLoopConfiguration.rowBoat.count).flatMap { repetition in
+                let offset = repetition * SongLoopConfiguration.rowBoat.barsPerLoop * 8
+                return [
+                    SongChordChange(slot: offset, chord: "G"),
+                    SongChordChange(slot: offset + 8, chord: "G"),
+                    SongChordChange(slot: offset + 16, chord: "C"),
+                    SongChordChange(slot: offset + 20, chord: "G"),
+                    SongChordChange(slot: offset + 24, chord: "D"),
+                    SongChordChange(slot: offset + 28, chord: "G"),
+                ]
+            },
             suggestedOrder: 4
         ),
         Song(

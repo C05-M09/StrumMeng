@@ -39,15 +39,22 @@ final class AVSongBackingTrack: SongBackingTrack {
 
     func play(fromSongTime songTime: TimeInterval, atHostTime hostTime: TimeInterval) {
         guard let file, let info else { return }
-        let start = info.start(fromSongTime: songTime, atHostTime: hostTime)
-        let firstFrame = AVAudioFramePosition(start.filePosition * file.processingFormat.sampleRate)
-        guard firstFrame < file.length, ensureRunning() else { return }
-        // Stopping drops anything still scheduled from an earlier start.
+        let sampleRate = file.processingFormat.sampleRate
+        let segments = info.segments(fromSongTime: songTime, atHostTime: hostTime,
+                                     fileDuration: Double(file.length) / sampleRate)
+        guard !segments.isEmpty, ensureRunning() else { return }
+        // Replacing the queue on every start/resume prevents duplicate playback after a pause.
         player.stop()
-        player.scheduleSegment(file, startingFrame: firstFrame,
-                               frameCount: AVAudioFrameCount(file.length - firstFrame),
-                               at: AVAudioTime(hostTime: AVAudioTime.hostTime(forSeconds: start.hostTime)),
-                               completionHandler: nil)
+        for segment in segments {
+            let firstFrame = AVAudioFramePosition((segment.filePosition * sampleRate).rounded())
+            let lastFrame = min(file.length,
+                AVAudioFramePosition(((segment.filePosition + segment.duration) * sampleRate).rounded()))
+            guard lastFrame > firstFrame else { continue }
+            player.scheduleSegment(file, startingFrame: firstFrame,
+                                   frameCount: AVAudioFrameCount(lastFrame - firstFrame),
+                                   at: AVAudioTime(hostTime: AVAudioTime.hostTime(forSeconds: segment.hostTime)),
+                                   completionHandler: nil)
+        }
         player.play()
     }
 

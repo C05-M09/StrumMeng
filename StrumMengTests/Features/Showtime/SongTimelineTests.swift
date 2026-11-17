@@ -3,6 +3,20 @@ import XCTest
 
 @MainActor
 final class SongTimelineTests: XCTestCase {
+    func test_rowBoatRepeatsItsPatternAndChordChartThreeTimes() throws {
+        let song = try XCTUnwrap(DefaultSongCatalog.song(forID: "row-row-row-your-boat"))
+        let timeline = SongTimeline(song: song)
+        XCTAssertEqual(song.barCount, 12)
+        XCTAssertEqual(timeline.totalSlots, 96)
+        XCTAssertEqual(timeline.duration, 3 * 16 * 60.0 / 110, accuracy: 1e-9)
+        for slot in 0..<32 {
+            XCTAssertEqual(timeline.chord(at: slot), timeline.chord(at: slot + 32))
+            XCTAssertEqual(timeline.chord(at: slot), timeline.chord(at: slot + 64))
+            XCTAssertEqual(timeline.stroke(at: slot), timeline.stroke(at: slot + 64))
+        }
+        XCTAssertEqual(timeline.previewPatterns.count, 1, "Listen needs one pattern preview, not three")
+    }
+
     func test_dummySongsLastExactlyOneMinuteAtTheirOwnBPM() {
         for song in DummySongCatalog().songs {
             let timeline = SongTimeline(song: song)
