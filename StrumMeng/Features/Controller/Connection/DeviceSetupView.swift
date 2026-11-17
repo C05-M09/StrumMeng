@@ -22,6 +22,13 @@ struct DeviceSetupView: View {
                 .disabled(!viewModel.canFinish)
                 .opacity(viewModel.canFinish ? 1 : 0.45)
                 .position(x: 1140, y: 884)
+                if viewModel.canRefresh {
+                    ChunkyButton(title: "Refresh", style: .secondary, fontSize: 44, width: 294, height: 96,
+                                 hasDropShadow: true) {
+                        viewModel.send(.tapRefresh)
+                    }
+                    .position(x: 822, y: 884)
+                }
             }
             .frame(width: size.width, height: size.height)
             .scaleEffect(scale)
@@ -62,14 +69,20 @@ struct DeviceSetupView: View {
                 detail("Device latency: \(Int(latencyMs.rounded())) ms")
             }
         case .reconnecting:
+            // The code stays on screen: if the iPhone was unpaired to try again, the player needs
+            // it to pair again, and the iPad cannot reach the iPhone on its own.
             VStack(spacing: AppSpacing.l) {
-                heading("Reconnecting...", color: AppColor.tooEarly, size: 72)
-                detail("Keep StrumMeng open on your iPhone")
+                VStack(spacing: AppSpacing.xs) {
+                    heading("Reconnecting...", color: AppColor.tooEarly, size: 72)
+                    detail("Keep StrumMeng open on your iPhone")
+                    detail("or pair it again with this code")
+                }
+                PairCodeSlotsView(code: viewModel.pairCode, slotSize: CGSize(width: 120, height: 150))
             }
         case .failed:
             VStack(spacing: AppSpacing.l) {
                 heading("Could not start", color: AppColor.miss, size: 72)
-                detail("Allow Local Network in Settings, then open this again")
+                detail("Allow Local Network in Settings, then tap Refresh")
             }
         }
     }

@@ -11,6 +11,8 @@ import Network
 actor BonjourControllerLink: ControllerLink {
     /// Polling interval for the liveness check. Not beat timing, so a sleeping task is fine.
     private static let livenessCheckInterval: Duration = .milliseconds(500)
+    /// Wait before replacing a listener that stopped, so one that keeps failing does not spin.
+    private static let listenerRestartDelay: Duration = .seconds(1)
 
     nonisolated let pairCode: PairCode
 
@@ -25,6 +27,7 @@ actor BonjourControllerLink: ControllerLink {
     private var handler = HostMessageHandler()
     private var hasEverConnected = false
     private var livenessTask: Task<Void, Never>?
+    private var listenerRestartTask: Task<Void, Never>?
 
     nonisolated var unownedExecutor: UnownedSerialExecutor {
         queue.asUnownedSerialExecutor()
@@ -40,6 +43,7 @@ actor BonjourControllerLink: ControllerLink {
     func start() async throws {
         guard listener == nil else { return }
         try startListener()
+        if connection == nil { stateBroadcast.yield(.searching) }
         livenessTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: Self.livenessCheckInterval)
@@ -48,8 +52,13 @@ actor BonjourControllerLink: ControllerLink {
         }
     }
 
-    /// Bonjour has no publish time limit, so there is nothing to refresh.
-    func refreshIfNeeded() async throws {}
+    /// Bonjour has no publish time limit, but iOS can stop the listener or its advertisement while
+    /// the app is away, and nothing reports it. So while no iPhone is connected, open a fresh
+    /// listener. A connected iPhone is left alone (its connection does not depend on the listener).
+    func refreshIfNeeded() async throws {
+        guard livenessTask != nil, connection == nil else { return }
+        restartListener()
+    }
 
     func setSessionActive(_ active: Bool) async {
         handler.sessionActive = active
@@ -59,6 +68,8 @@ actor BonjourControllerLink: ControllerLink {
     func stop() async {
         livenessTask?.cancel()
         livenessTask = nil
+        listenerRestartTask?.cancel()
+        listenerRestartTask = nil
         listener?.cancel()
         listener = nil
         connection?.cancel()
@@ -76,19 +87,42 @@ actor BonjourControllerLink: ControllerLink {
         listener.newConnectionHandler = { [weak self] connection in
             self?.assumeIsolated { $0.accept(connection) }
         }
-        listener.stateUpdateHandler = { [weak self] state in
-            self?.assumeIsolated { $0.listenerChanged(state) }
+        listener.stateUpdateHandler = { [weak self, weak listener] state in
+            guard let listener else { return }
+            self?.assumeIsolated { $0.listenerChanged(listener, state) }
         }
         listener.start(queue: queue)
         self.listener = listener
-        if connection == nil { stateBroadcast.yield(.searching) }
     }
 
-    private func listenerChanged(_ state: NWListener.State) {
-        guard case .failed = state else { return }
-        // Usually a network change. Open a fresh listener; the current connection may survive.
-        listener?.cancel()
+    private func listenerChanged(_ changed: NWListener, _ state: NWListener.State) {
+        // A listener this link replaced reports .cancelled too; only the current one matters.
+        guard changed === listener else { return }
+        switch state {
+        case .failed, .cancelled:
+            // A network change, or iOS stopping it while the app was away. Without a listener the
+            // iPhone can never reconnect, so open a fresh one; the current connection may survive.
+            listener = nil
+            changed.cancel()
+            listenerRestartTask?.cancel()
+            listenerRestartTask = Task { [weak self] in
+                try? await Task.sleep(for: Self.listenerRestartDelay)
+                guard !Task.isCancelled else { return }
+                await self?.restartListener()
+            }
+        default:
+            break
+        }
+    }
+
+    /// Replaces the listener with a fresh one (new Bonjour advertisement). The state is unchanged:
+    /// the iPad still waits for the same iPhone. If it cannot start, the next refresh tries again.
+    private func restartListener() {
+        listenerRestartTask?.cancel()
+        listenerRestartTask = nil
+        let old = listener
         listener = nil
+        old?.cancel()
         try? startListener()
     }
 
@@ -127,6 +161,15 @@ actor BonjourControllerLink: ControllerLink {
         stateBroadcast.yield(hasEverConnected ? .reconnecting : .searching)
     }
 
+    /// The iPhone unpaired on purpose, so this is not a reconnect: back to waiting for a pairing,
+    /// which shows the pair code. The listener stays up for the next iPhone.
+    private func controllerLeft() {
+        connection?.cancel()
+        connection = nil
+        hasEverConnected = false
+        stateBroadcast.yield(.searching)
+    }
+
     private func checkLiveness() {
         guard connection != nil, !handler.isAlive(now: HostClock.now()) else { return }
         connectionLost()
@@ -153,6 +196,8 @@ actor BonjourControllerLink: ControllerLink {
             send(reply)
         case let .strum(strum):
             strumBroadcast.yield(strum)
+        case .controllerLeft:
+            controllerLeft()
         case .ignore:
             break
         }

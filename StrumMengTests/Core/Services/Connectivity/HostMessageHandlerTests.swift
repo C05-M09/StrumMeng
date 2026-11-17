@@ -63,6 +63,11 @@ final class HostMessageHandlerTests: XCTestCase {
         XCTAssertEqual(handler.controllerName, "Axel's iPhone")
     }
 
+    func test_goodbye_meansTheControllerLeft() {
+        var handler = playingHandler()
+        XCTAssertEqual(handler.receive(.goodbye, arrivedAt: 1), .controllerLeft)
+    }
+
     func test_iPadOnlyMessages_areIgnored() {
         var handler = playingHandler()
         XCTAssertEqual(handler.receive(.startSession, arrivedAt: 1), .ignore)

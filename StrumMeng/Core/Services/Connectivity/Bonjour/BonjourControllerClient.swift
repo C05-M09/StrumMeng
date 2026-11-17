@@ -11,6 +11,7 @@ actor BonjourControllerClient: ControllerClient {
     /// after this long and try the next one.
     private static let handshakeTimeout: Duration = .seconds(4)
     private static let retryDelay: Duration = .milliseconds(500)
+    private static let goodbyeFlushDelay: Duration = .milliseconds(30)
 
     private let deviceName: String
     private nonisolated let queue = DispatchSerialQueue(label: "StrumMeng.BonjourControllerClient", qos: .userInteractive)
@@ -60,6 +61,19 @@ actor BonjourControllerClient: ControllerClient {
                 connection.send(content: data, completion: .idempotent)
             }
         }
+    }
+
+    func unpair() async {
+        if isReady, let connection, let data = try? ControllerMessage.goodbye.encoded() {
+            // Several copies, as UDP may lose one. If all are lost the iPad still notices when
+            // the pings stop.
+            for _ in 0..<ClientMessageHandler.strumCopies {
+                connection.send(content: data, completion: .idempotent)
+            }
+            // Give the sends a moment to leave before the connection is cancelled.
+            try? await Task.sleep(for: Self.goodbyeFlushDelay)
+        }
+        await disconnect()
     }
 
     func disconnect() async {

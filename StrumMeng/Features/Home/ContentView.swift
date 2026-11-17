@@ -96,6 +96,9 @@ struct ContentView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             container.updateMenuMusic(for: router.path, isAppActive: phase == .active)
+            if phase == .active {
+                Task { await container.refreshControllerLink() }
+            }
         }
         // The DEBUG controller screens replace this view and bring their own link.
         .onDisappear {

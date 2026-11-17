@@ -351,7 +351,7 @@ final class CompanionViewModelTests: XCTestCase {
         viewModel.appear()
 
         viewModel.send(.disconnect)
-        await waitUntil { client.disconnectCount == 1 }
+        await waitUntil { client.unpairCount == 1 }
 
         XCTAssertEqual(viewModel.state, .enteringCode(""))
         XCTAssertNil(store.enteredPairCode)
@@ -360,14 +360,14 @@ final class CompanionViewModelTests: XCTestCase {
 
     // MARK: Leaving
 
-    func test_unpair_disconnects_andForgetsTheCode() async throws {
+    func test_unpair_tellsTheIPad_andForgetsTheCode() async throws {
         let (viewModel, client, store) = makeViewModel(saved: try XCTUnwrap(PairCode("482913")))
         viewModel.swipe(dx: CompanionViewModel.swipeThreshold)
 
         viewModel.send(.disconnect)
-        await waitUntil { client.disconnectCount == 1 }
+        await waitUntil { client.unpairCount == 1 }
 
-        XCTAssertEqual(client.disconnectCount, 1)
+        XCTAssertEqual(client.unpairCount, 1)
         XCTAssertNil(store.enteredPairCode)
         XCTAssertNil(viewModel.lastStrum)
         XCTAssertEqual(viewModel.state, .enteringCode(""))
@@ -381,6 +381,8 @@ final class CompanionViewModelTests: XCTestCase {
         await waitUntil { client.disconnectCount == 1 }
 
         XCTAssertEqual(client.disconnectCount, 1)
+        // Leaving the screen is not Unpair: the iPad keeps waiting for this iPhone.
+        XCTAssertEqual(client.unpairCount, 0)
         XCTAssertEqual(store.enteredPairCode, saved)
     }
 }

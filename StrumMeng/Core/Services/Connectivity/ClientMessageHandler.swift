@@ -25,7 +25,7 @@ nonisolated struct ClientMessageHandler: Sendable {
             sessionActive = true
         case .stopSession:
             sessionActive = false
-        case .hello, .ping, .strum:
+        case .hello, .goodbye, .ping, .strum:
             // iPhone → iPad messages; never expected here.
             break
         }

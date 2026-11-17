@@ -13,4 +13,7 @@ protocol ControllerClient: Sendable {
     /// - Parameter touchTime: when the finger crossed the threshold, on this iPhone's host clock.
     func send(_ direction: StrumDirection, touchTime: TimeInterval) async
     func disconnect() async
+    /// Tells the iPad this iPhone is leaving (the player tapped Unpair), then disconnects. Unlike
+    /// disconnect(), the iPad goes straight back to showing the pair code.
+    func unpair() async
 }

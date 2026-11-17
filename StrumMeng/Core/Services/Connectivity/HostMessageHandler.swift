@@ -6,6 +6,8 @@ nonisolated struct HostMessageHandler: Sendable {
     enum Output: Equatable, Sendable {
         case reply(ControllerMessage)
         case strum(StrumEvent)
+        /// The iPhone unpaired: drop the connection and wait for a new pairing.
+        case controllerLeft
         case ignore
     }
 
@@ -26,6 +28,8 @@ nonisolated struct HostMessageHandler: Sendable {
         case let .hello(deviceName):
             controllerName = deviceName
             return .ignore
+        case .goodbye:
+            return .controllerLeft
         case let .ping(sentAt, latencyMs):
             if let latencyMs { self.latencyMs = latencyMs }
             return .reply(.pong(sentAt: sentAt, receivedAt: arrival, sessionActive: sessionActive))
