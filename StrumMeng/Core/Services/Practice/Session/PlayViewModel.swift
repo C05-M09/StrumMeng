@@ -222,7 +222,12 @@ final class PlayViewModel {
             prepareTask?.cancel()
             prepareTask = Task { await guitar.prepare(chords: chords) }
         }
-        if let songID { backingTrack?.prepare(songID: songID) }
+        if let songID {
+            let strokes = (0..<totalSteps).map { pattern.strokes[$0 % pattern.strokes.count] }
+            backingTrack?.prepare(songID: songID,
+                                  ending: SongBackingTrackEnding.forChart(strokes: strokes,
+                                                                          stepInterval: stepInterval))
+        }
         controllerTask?.cancel()
         if let states = controller?.connectionStates {
             controllerTask = Task { [weak self] in

@@ -7,6 +7,9 @@ nonisolated struct SongBackingTrackInfo: Sendable, Equatable {
     /// Seconds into the file where bar 1 starts: the first node lands here.
     let firstBeat: TimeInterval
     var loop: SongLoopConfiguration? = nil
+    /// The recording is much longer than the chart, so it fades out over the last bar and stops
+    /// on the last node instead of playing on after the gameplay ends. Not for a looped song.
+    var fadesOutAtChartEnd = false
 
     struct Segment: Sendable, Equatable {
         let filePosition: TimeInterval
@@ -46,8 +49,15 @@ nonisolated struct SongBackingTrackInfo: Sendable, Equatable {
         "jingle-bells": .init(resource: "2_subdivision_jingle_bells", firstBeat: 0),
         "abc-song": .init(resource: "3_syncopation_abc_song", firstBeat: 0),
         "row-row-row-your-boat": .init(resource: "4_upbeat_row_row_row_your_boat", firstBeat: 0, loop: .rowBoat),
-        "down-by-the-riverside": .init(resource: "5_driving_pop_down_by_the_riverside", firstBeat: 2.38),
+        // 157 s of recording for a 16-bar (38 s) chart.
+        "down-by-the-riverside": .init(resource: "5_driving_pop_down_by_the_riverside", firstBeat: 2.38,
+                                       fadesOutAtChartEnd: true),
     ]
+
+    /// Seconds into the file at a session time.
+    func filePosition(atSongTime songTime: TimeInterval) -> TimeInterval {
+        firstBeat + songTime
+    }
 
     static func forSong(_ songID: String) -> SongBackingTrackInfo? {
         all[songID]

@@ -84,4 +84,15 @@ final class SongBackingTrackInfoTests: XCTestCase {
     func test_unknownSong_hasNoRecording() {
         XCTAssertNil(SongBackingTrackInfo.forSong("nope"))
     }
+
+    func test_onlyRiverside_fadesOutAtTheEndOfItsChart() {
+        XCTAssertEqual(SongBackingTrackInfo.forSong("down-by-the-riverside")?.fadesOutAtChartEnd, true)
+        for id in ["twinkle-twinkle", "jingle-bells", "abc-song", "row-row-row-your-boat"] {
+            XCTAssertEqual(SongBackingTrackInfo.forSong(id)?.fadesOutAtChartEnd, false, id)
+        }
+    }
+
+    func test_filePosition_isTheSessionTimeAfterTheFirstBeat() {
+        XCTAssertEqual(info.filePosition(atSongTime: 3), 3.5, accuracy: 1e-9)
+    }
 }
