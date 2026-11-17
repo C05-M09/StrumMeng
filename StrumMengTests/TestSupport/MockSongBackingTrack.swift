@@ -9,10 +9,14 @@ final class MockSongBackingTrack: SongBackingTrack {
     }
 
     private(set) var preparedSongIDs: [String] = []
+    private(set) var preparedEndings: [SongBackingTrackEnding?] = []
     private(set) var plays: [Play] = []
     private(set) var stopCount = 0
 
-    func prepare(songID: String) { preparedSongIDs.append(songID) }
+    func prepare(songID: String, ending: SongBackingTrackEnding?) {
+        preparedSongIDs.append(songID)
+        preparedEndings.append(ending)
+    }
 
     func play(fromSongTime songTime: TimeInterval, atHostTime hostTime: TimeInterval) {
         plays.append(Play(songTime: songTime, hostTime: hostTime))

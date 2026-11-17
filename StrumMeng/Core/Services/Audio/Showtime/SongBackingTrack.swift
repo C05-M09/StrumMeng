@@ -5,7 +5,9 @@ import Foundation
 @MainActor
 protocol SongBackingTrack: AnyObject {
     /// Loads the recording of a song ahead of time, so starting it does not wait for the file.
-    func prepare(songID: String)
+    /// - Parameter ending: where the chart ends. A song whose recording runs past it
+    ///   (SongBackingTrackInfo.fadesOutAtChartEnd) fades out there and stops on the last node.
+    func prepare(songID: String, ending: SongBackingTrackEnding?)
 
     /// Plays the recording so that the given session time sounds at the given host time.
     /// Session time 0 is the first node; negative times are the lead-in before it.

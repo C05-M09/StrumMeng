@@ -6,6 +6,9 @@ nonisolated struct SongBackingTrackInfo: Sendable, Equatable {
     let resource: String
     /// Seconds into the file where bar 1 starts: the first node lands here.
     let firstBeat: TimeInterval
+    /// The recording is much longer than the chart, so it fades out over the last bar and stops
+    /// on the last node instead of playing on after the gameplay ends.
+    var fadesOutAtChartEnd = false
 
     /// The bundled recordings, measured with a beat-grid fit of each file (2026-11-12: 100, 120,
     /// 100, 110 and 100 BPM; Twinkle is the re-recorded file of PR #62). Four start on bar 1 at the top of the file; Riverside opens with
@@ -15,8 +18,15 @@ nonisolated struct SongBackingTrackInfo: Sendable, Equatable {
         "jingle-bells": .init(resource: "2_subdivision_jingle_bells", firstBeat: 0),
         "abc-song": .init(resource: "3_syncopation_abc_song", firstBeat: 0),
         "row-row-row-your-boat": .init(resource: "4_upbeat_row_row_row_your_boat", firstBeat: 0),
-        "down-by-the-riverside": .init(resource: "5_driving_pop_down_by_the_riverside", firstBeat: 2.38),
+        // 157 s of recording for a 16-bar (38 s) chart.
+        "down-by-the-riverside": .init(resource: "5_driving_pop_down_by_the_riverside", firstBeat: 2.38,
+                                       fadesOutAtChartEnd: true),
     ]
+
+    /// Seconds into the file at a session time.
+    func filePosition(atSongTime songTime: TimeInterval) -> TimeInterval {
+        firstBeat + songTime
+    }
 
     static func forSong(_ songID: String) -> SongBackingTrackInfo? {
         all[songID]

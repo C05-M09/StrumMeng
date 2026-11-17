@@ -98,6 +98,8 @@ final class PlayViewModelSongTests: XCTestCase {
         for _ in 0..<20 where sound.preparedChords.isEmpty { await Task.yield() }
         XCTAssertEqual(sound.preparedChords, [[.c, .g]])
         XCTAssertEqual(backing.preparedSongIDs, ["twinkle-twinkle"])
+        // 16 down strokes: the fade covers the second bar and ends on its last step.
+        XCTAssertEqual(backing.preparedEndings, [SongBackingTrackEnding(fadeStart: 8 * step, end: 15 * step)])
         await viewModel.onDisappear()
     }
 

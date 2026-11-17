@@ -183,7 +183,11 @@ final class AppContainer {
         guard let song = songCatalog.songs.first(where: { $0.id == result.songID }) else { return nil }
         let timeline = SongTimeline(song: song)
         let backingTrack = AVSongBackingTrack()
-        backingTrack.prepare(songID: song.id)
+        // The same ending as the game, so Replay fades and stops the song on the last node too.
+        backingTrack.prepare(songID: song.id,
+                             ending: SongBackingTrackEnding.forChart(
+                                 strokes: timeline.sessionPattern.strokes,
+                                 stepInterval: AudioBeatClock.stepInterval(bpm: song.bpm)))
         return ReplayViewModel(result: result, pattern: timeline.sessionPattern, repetitions: 1,
             guitar: guitarSound, metronome: metronomeSound,
             stepChords: timeline.stepChords, chordLabels: timeline.chordLabels,
