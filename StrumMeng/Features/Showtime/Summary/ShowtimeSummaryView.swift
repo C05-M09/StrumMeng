@@ -192,19 +192,6 @@ struct ShowtimeSummaryView: View {
         // 4. Tombol REPLAY & RETRY
         VStack(spacing: 8) {
             Button {
-                viewModel.send(.tapReplay)
-            } label: {
-                EmptyView()
-            }
-            .buttonStyle(
-                AssetButtonStyle(
-                    normalAssetName: "Button_Replay_Normal",
-                    pressedAssetName: "Button_Replay_Pressed",
-                    size: CGSize(width: 360, height: 104)
-                )
-            )
-
-            Button {
                 viewModel.send(.tapRetry)
             } label: {
                 EmptyView()
@@ -213,6 +200,19 @@ struct ShowtimeSummaryView: View {
                 AssetButtonStyle(
                     normalAssetName: "Button_Retry_Normal",
                     pressedAssetName: "Button_Retry_Pressed",
+                    size: CGSize(width: 360, height: 104)
+                )
+            )
+
+            Button {
+                viewModel.send(.tapReplay)
+            } label: {
+                EmptyView()
+            }
+            .buttonStyle(
+                AssetButtonStyle(
+                    normalAssetName: "Button_Replay_Normal",
+                    pressedAssetName: "Button_Replay_Pressed",
                     size: CGSize(width: 360, height: 104)
                 )
             )
