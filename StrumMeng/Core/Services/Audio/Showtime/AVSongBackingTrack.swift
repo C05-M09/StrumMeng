@@ -7,8 +7,9 @@ import AVFoundation
 /// The file plays untouched, at full level, exactly as the song-list preview plays it: no gain or
 /// limiter, which squashed the plucks of the recordings. The one exception is the ending of a
 /// recording longer than its chart: its last bar is faded into silence ahead of time and scheduled
-/// right after the rest, so the fade and the stop land exactly on the nodes, with no timer. Its level does not follow the app's music
-/// or sound settings: the player sets it with the device's volume buttons, like any song.
+/// right after the rest, so the fade and the stop land exactly on the nodes, with no timer.
+/// Its level does not follow the app's music or sound settings: the player sets it with the
+/// device's volume buttons, like any song.
 @MainActor
 final class AVSongBackingTrack: SongBackingTrack {
     private let bundle: Bundle
@@ -16,8 +17,6 @@ final class AVSongBackingTrack: SongBackingTrack {
     private let player = AVAudioPlayerNode()
     private var file: AVAudioFile?
     private var info: SongBackingTrackInfo?
-    /// Set only for a song that fades out at the end of its chart.
-    private var ending: SongBackingTrackEnding?
     /// The fading part of the recording, from the start of the fade to the last node, already faded.
     private var fade: (buffer: AVAudioPCMBuffer, firstFrame: AVAudioFramePosition)?
 
@@ -28,7 +27,6 @@ final class AVSongBackingTrack: SongBackingTrack {
 
     func prepare(songID: String, ending: SongBackingTrackEnding?) {
         stop()
-        self.ending = nil
         fade = nil
         guard let info = SongBackingTrackInfo.forSong(songID),
               let url = bundle.url(forResource: info.resource, withExtension: "mp3"),
@@ -43,32 +41,50 @@ final class AVSongBackingTrack: SongBackingTrack {
         engine.prepare()
         self.file = file
         self.info = info
-        if info.fadesOutAtChartEnd, let ending {
-            self.ending = ending
+        // A looped song keeps its natural decay at the end of the last loop instead.
+        if info.fadesOutAtChartEnd, info.loop == nil, let ending {
             fade = Self.fadedEnding(of: file, info: info, ending: ending)
         }
     }
 
     func play(fromSongTime songTime: TimeInterval, atHostTime hostTime: TimeInterval) {
         guard let file, let info else { return }
+        if let fade {
+            playFading(file, info: info, fade: fade, fromSongTime: songTime, atHostTime: hostTime)
+            return
+        }
+        let sampleRate = file.processingFormat.sampleRate
+        let segments = info.segments(fromSongTime: songTime, atHostTime: hostTime,
+                                     fileDuration: Double(file.length) / sampleRate)
+        guard !segments.isEmpty, ensureRunning() else { return }
+        // Replacing the queue on every start/resume prevents duplicate playback after a pause.
+        player.stop()
+        for segment in segments {
+            let firstFrame = AVAudioFramePosition((segment.filePosition * sampleRate).rounded())
+            let lastFrame = min(file.length,
+                AVAudioFramePosition(((segment.filePosition + segment.duration) * sampleRate).rounded()))
+            guard lastFrame > firstFrame else { continue }
+            player.scheduleSegment(file, startingFrame: firstFrame,
+                                   frameCount: AVAudioFrameCount(lastFrame - firstFrame),
+                                   at: AVAudioTime(hostTime: AVAudioTime.hostTime(forSeconds: segment.hostTime)),
+                                   completionHandler: nil)
+        }
+        player.play()
+    }
+
+    /// A song that fades out at the end of its chart (never a looped one): full level up to the
+    /// fade, then the faded bar straight after it (at: nil) on the same timeline, silent on the last
+    /// node. Resuming inside the fade plays only the rest of it.
+    private func playFading(_ file: AVAudioFile, info: SongBackingTrackInfo,
+                            fade: (buffer: AVAudioPCMBuffer, firstFrame: AVAudioFramePosition),
+                            fromSongTime songTime: TimeInterval, atHostTime hostTime: TimeInterval) {
         let start = info.start(fromSongTime: songTime, atHostTime: hostTime)
-        let rate = file.processingFormat.sampleRate
-        let firstFrame = AVAudioFramePosition(start.filePosition * rate)
-        let lastFrame = ending.map { min(file.length, Self.frame(info.filePosition(atSongTime: $0.end), rate)) }
-            ?? file.length
+        let firstFrame = Self.frame(start.filePosition, file.processingFormat.sampleRate)
+        let lastFrame = fade.firstFrame + AVAudioFramePosition(fade.buffer.frameLength)
         guard firstFrame < lastFrame, ensureRunning() else { return }
         // Stopping drops anything still scheduled from an earlier start.
         player.stop()
         let when = AVAudioTime(hostTime: AVAudioTime.hostTime(forSeconds: start.hostTime))
-        guard let fade else {
-            player.scheduleSegment(file, startingFrame: firstFrame,
-                                   frameCount: AVAudioFrameCount(lastFrame - firstFrame),
-                                   at: when, completionHandler: nil)
-            player.play()
-            return
-        }
-        // Full level up to the fade, then the faded bar straight after it (at: nil) on the same
-        // timeline. Resuming inside the fade plays only the rest of it.
         var fadeTime: AVAudioTime? = when
         if firstFrame < fade.firstFrame {
             player.scheduleSegment(file, startingFrame: firstFrame,
