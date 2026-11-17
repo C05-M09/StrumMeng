@@ -62,9 +62,15 @@ struct DeviceSetupView: View {
                 detail("Device latency: \(Int(latencyMs.rounded())) ms")
             }
         case .reconnecting:
+            // The code stays on screen: if the iPhone was unpaired to try again, the player needs
+            // it to pair again, and the iPad cannot reach the iPhone on its own.
             VStack(spacing: AppSpacing.l) {
-                heading("Reconnecting...", color: AppColor.tooEarly, size: 72)
-                detail("Keep StrumMeng open on your iPhone")
+                VStack(spacing: AppSpacing.xs) {
+                    heading("Reconnecting...", color: AppColor.tooEarly, size: 72)
+                    detail("Keep StrumMeng open on your iPhone")
+                    detail("or pair it again with this code")
+                }
+                PairCodeSlotsView(code: viewModel.pairCode, slotSize: CGSize(width: 120, height: 150))
             }
         case .failed:
             VStack(spacing: AppSpacing.l) {
