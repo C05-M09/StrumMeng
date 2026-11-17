@@ -41,7 +41,20 @@ enum ShowtimeAssets {
         }
     }
 
+    static func chordArtwork(forSongID id: String) -> String {
+        switch id {
+        case "jingle-bells": return "subdivision strum chord"
+        case "abc-song": return "syncopation strum chord"
+        case "row-row-row-your-boat": return "Upbeat strum chord"
+        case "down-by-the-riverside": return "driving pop strum chord"
+        default: return "Foundation strum chord"
+        }
+    }
+
     static func patternArtwork(forPatternID id: String) -> String? {
+        if let info = ShowtimePatternCatalog.patternInfo(forID: id) {
+            return info.assetName
+        }
         let name: String
         switch id {
         case "foundation": name = "Showtime_foundation pattern"

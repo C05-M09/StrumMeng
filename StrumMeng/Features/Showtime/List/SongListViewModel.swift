@@ -68,9 +68,36 @@ final class SongListViewModel {
         state.selectedSong?.bpm
     }
 
+    /// Tracks the chosen pattern ID for each song.
+    private var selectedPatternIDs: [String: String] = [:]
+
+    /// Called when selecting a song, passing both the songID and the selected patternID.
+    var onSongWithPatternSelected: ((String, String) -> Void)?
+
+    func activePatternID(for songID: String) -> String {
+        selectedPatternIDs[songID] ?? ShowtimePatternCatalog.defaultPatternID(for: songID)
+    }
+
+    func setActivePatternID(_ patternID: String, for songID: String) {
+        selectedPatternIDs[songID] = patternID
+    }
+
+    static func recordsKey(songID: String, patternID: String) -> String {
+        "\(songID)_\(patternID)"
+    }
+
+    func recordsViewModel(forSong song: Song, patternID: String) -> ShowtimeRecordsViewModel? {
+        recordsViewModels[Self.recordsKey(songID: song.id, patternID: patternID)] ?? recordsViewModels[song.id]
+    }
+
     /// Stars of the best record of a song, for the top of the detail card.
     func bestStars(for song: Song) -> Int? {
-        recordsViewModels[song.id]?.bestStars
+        let patternID = activePatternID(for: song.id)
+        return bestStars(for: song, patternID: patternID)
+    }
+
+    func bestStars(for song: Song, patternID: String) -> Int? {
+        recordsViewModel(forSong: song, patternID: patternID)?.bestStars ?? recordsViewModels[song.id]?.bestStars
     }
 
     /// Starts playing the character song for the currently selected song.
@@ -123,8 +150,13 @@ final class SongListViewModel {
 
         case .selectSong:
             guard let song = state.selectedSong else { return }
+            let patternID = activePatternID(for: song.id)
             player?.stop()
-            onSongSelected(song.id)
+            if let onSongWithPatternSelected {
+                onSongWithPatternSelected(song.id, patternID)
+            } else {
+                onSongSelected(song.id)
+            }
 
         case .tapBack:
             player?.stop()

@@ -4,10 +4,17 @@ import SwiftUI
 /// closes.
 struct ShowtimeRecordsView: View {
     let viewModel: ShowtimeRecordsViewModel
+    var patternID: String? = nil
 
     var body: some View {
         ShowtimeRecordsContentView(state: viewModel.state)
-            .task { await viewModel.load() }
+            .task(id: "\(viewModel.songID)_\(patternID ?? viewModel.patternID ?? "")") {
+                if let patternID {
+                    await viewModel.updatePatternID(patternID)
+                } else {
+                    await viewModel.load()
+                }
+            }
     }
 }
 
@@ -76,8 +83,7 @@ struct ShowtimeRecordsContentView: View {
                 .tint(AppColors.brownInk)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .empty:
-            // Same text as Practice.
-            message("No records history yet")
+            message("No playing record yet")
         case .failed:
             message("Records couldn't be loaded")
         case .loaded(let rows):
