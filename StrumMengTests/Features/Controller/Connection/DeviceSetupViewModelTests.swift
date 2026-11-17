@@ -40,6 +40,44 @@ final class DeviceSetupViewModelTests: XCTestCase {
         viewModel.disappear()
     }
 
+    func test_refresh_whileReconnecting_restartsTheLink() async {
+        let link = MockControllerLink()
+        let viewModel = DeviceSetupViewModel(link: link, state: .reconnecting, onClose: {})
+        XCTAssertTrue(viewModel.canRefresh)
+
+        viewModel.send(.tapRefresh)
+        await waitUntil { link.stopCount == 1 && link.startCount == 1 }
+
+        XCTAssertEqual(viewModel.state, .searching)
+        XCTAssertEqual(link.stopCount, 1)
+        XCTAssertEqual(link.startCount, 1)
+        XCTAssertFalse(viewModel.canRefresh)
+    }
+
+    func test_refresh_afterAFailedStart_triesAgain() async {
+        let link = MockControllerLink()
+        link.startError = StartFailure()
+        let viewModel = DeviceSetupViewModel(link: link, state: .failed, onClose: {})
+
+        viewModel.send(.tapRefresh)
+        await waitUntil { link.startCount == 1 && viewModel.state == .failed }
+
+        XCTAssertEqual(link.startCount, 1)
+        XCTAssertEqual(viewModel.state, .failed)
+    }
+
+    func test_refresh_whileConnected_leavesTheLinkAlone() async {
+        let link = MockControllerLink()
+        let viewModel = DeviceSetupViewModel(link: link, state: .connected(latencyMs: 12), onClose: {})
+        XCTAssertFalse(viewModel.canRefresh)
+
+        viewModel.send(.tapRefresh)
+        for _ in 0..<50 { await Task.yield() }
+
+        XCTAssertEqual(link.stopCount, 0)
+        XCTAssertEqual(link.startCount, 0)
+    }
+
     func test_disappear_leavesTheLinkRunning_andStopsFollowingIt() async {
         let link = MockControllerLink()
         let viewModel = DeviceSetupViewModel(link: link, onClose: {})

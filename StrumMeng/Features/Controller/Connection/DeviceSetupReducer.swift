@@ -18,6 +18,13 @@ func reduce(_ state: DeviceSetupState, _ event: DeviceSetupEvent) -> DeviceSetup
     case .linkFailed:
         return .failed
 
+    case .tapRefresh:
+        // The link starts over, so the iPad waits for an iPhone with the code again.
+        switch state {
+        case .reconnecting, .failed: return .searching
+        case .searching, .connected: return state
+        }
+
     case .tapDone, .tapBack:
         return state
     }

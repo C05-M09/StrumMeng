@@ -22,6 +22,13 @@ struct DeviceSetupView: View {
                 .disabled(!viewModel.canFinish)
                 .opacity(viewModel.canFinish ? 1 : 0.45)
                 .position(x: 1140, y: 884)
+                if viewModel.canRefresh {
+                    ChunkyButton(title: "Refresh", style: .secondary, fontSize: 44, width: 294, height: 96,
+                                 hasDropShadow: true) {
+                        viewModel.send(.tapRefresh)
+                    }
+                    .position(x: 822, y: 884)
+                }
             }
             .frame(width: size.width, height: size.height)
             .scaleEffect(scale)
@@ -75,7 +82,7 @@ struct DeviceSetupView: View {
         case .failed:
             VStack(spacing: AppSpacing.l) {
                 heading("Could not start", color: AppColor.miss, size: 72)
-                detail("Allow Local Network in Settings, then open this again")
+                detail("Allow Local Network in Settings, then tap Refresh")
             }
         }
     }

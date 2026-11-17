@@ -29,6 +29,16 @@ final class DeviceSetupReducerTests: XCTestCase {
         XCTAssertEqual(reduce(.failed, .linkStateChanged(.searching)), .searching)
     }
 
+    func test_refresh_whileReconnectingOrFailed_goesBackToSearching() {
+        XCTAssertEqual(reduce(.reconnecting, .tapRefresh), .searching)
+        XCTAssertEqual(reduce(.failed, .tapRefresh), .searching)
+    }
+
+    func test_refresh_whileSearchingOrConnected_isIgnored() {
+        XCTAssertEqual(reduce(.searching, .tapRefresh), .searching)
+        XCTAssertEqual(reduce(.connected(latencyMs: 5), .tapRefresh), .connected(latencyMs: 5))
+    }
+
     func test_doneAndBack_leaveTheStateAlone() {
         XCTAssertEqual(reduce(.connected(latencyMs: 5), .tapDone), .connected(latencyMs: 5))
         XCTAssertEqual(reduce(.searching, .tapBack), .searching)
