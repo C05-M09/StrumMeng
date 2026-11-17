@@ -33,12 +33,12 @@ struct ShowtimeSongSelectView: View {
         /// below the floor's edge (y 842) and are hidden behind it. Lower number = more visible.
         static let centerSize: CGFloat = 1800
         static let centerFeet: CGFloat = 900
-        static let centerX: CGFloat = 941
+        static let centerX: CGFloat = 785
         /// The previous and next characters, beside the middle one (smaller than before).
         static let sideSize: CGFloat = 1100
         static let sideFeet: CGFloat = 820
         /// Distance between the middle character and each neighbour.
-        static let sideSpacing: CGFloat = 310
+        static let sideSpacing: CGFloat = 350
         /// Darkening for side characters (negative brightness and reduced exposure) instead of reducing opacity.
         static let sideBrightness: Double = -0.38
         static let sideExposure: Color = Color(white: 0.62)
@@ -57,24 +57,19 @@ struct ShowtimeSongSelectView: View {
         static let playButtonCenter = CGPoint(x: 1260, y: 925)
     }
     
-    /// Drawing order, back to front. The vinyl changes layer: on the stage it is in front of the
-        /// characters (a neighbour peeks out from behind it); with the card open it is behind the
-        /// character, so the character stands in front of it.
-        private enum Layer {
-            static let background: Double = 0
-            static let swipeArea: Double = 0.5
-            /// Side characters stay behind vinyl and center character in both stage and detail view.
-            static let sideCharacter: Double = 1
-            static let vinylBehind: Double = 2
-            static let centerCharacter: Double = 5
-            /// Behind floor and title box so floor covers bottom of vinyl and feet
-            static let vinylInFront: Double = 5.2
-            /// In front of the characters and vinyl, so the floor hides their feet and bottom of vinyl.
-            static let floor: Double = 6
-            static let wall: Double = 7
-            /// Plaque, hint, card panels, Play and Back. Ties keep the order they are written in.
-            static let foreground: Double = 10
-        }
+    /// Drawing order, back to front.
+    private enum Layer {
+        static let background: Double = 0
+        static let swipeArea: Double = 0.5
+        /// Side characters stay behind center character in both stage and detail view.
+        static let sideCharacter: Double = 1
+        static let centerCharacter: Double = 5
+        /// In front of the characters, so the floor hides their feet.
+        static let floor: Double = 6
+        static let wall: Double = 7
+        /// Plaque, hint, card panels, Play and Back. Ties keep the order they are written in.
+        static let foreground: Double = 10
+    }
 
     var body: some View {
         ShowtimeCanvas {
@@ -92,14 +87,6 @@ struct ShowtimeSongSelectView: View {
                     .frame(width: reference.width, height: 190)
                     .position(x: reference.width / 2, y: 937)
                     .zIndex(Layer.floor)
-                    .allowsHitTesting(false)
-
-                Image(ShowtimeAssets.vinyl)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 1100, height: 1100)
-                    .position(x: isDetailShown ? 716 : 55, y: isDetailShown ? 498 : 516)
-                    .zIndex(isDetailShown ? Layer.vinylBehind : Layer.vinylInFront)
                     .allowsHitTesting(false)
 
                 Image(ShowtimeAssets.woodWall)
@@ -146,7 +133,7 @@ struct ShowtimeSongSelectView: View {
                             .foregroundStyle(.white)
                             .multilineTextAlignment(.center)
                             .frame(width: 520)
-                            .position(x: 941, y: 916)
+                            .position(x: 980, y: 916)
                             .transition(.opacity)
                             .zIndex(Layer.foreground)
                     }
