@@ -9,6 +9,7 @@ final class ControllerMessageTests: XCTestCase {
     func test_everyMessage_survivesEncodingAndDecoding() throws {
         let messages: [ControllerMessage] = [
             .hello(deviceName: "Axel's iPhone"),
+            .goodbye,
             .startSession,
             .stopSession,
             .strum(id: UUID(), direction: .down, hostTime: 1234.5678),

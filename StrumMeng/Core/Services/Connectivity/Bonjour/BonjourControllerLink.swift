@@ -161,6 +161,15 @@ actor BonjourControllerLink: ControllerLink {
         stateBroadcast.yield(hasEverConnected ? .reconnecting : .searching)
     }
 
+    /// The iPhone unpaired on purpose, so this is not a reconnect: back to waiting for a pairing,
+    /// which shows the pair code. The listener stays up for the next iPhone.
+    private func controllerLeft() {
+        connection?.cancel()
+        connection = nil
+        hasEverConnected = false
+        stateBroadcast.yield(.searching)
+    }
+
     private func checkLiveness() {
         guard connection != nil, !handler.isAlive(now: HostClock.now()) else { return }
         connectionLost()
@@ -187,6 +196,8 @@ actor BonjourControllerLink: ControllerLink {
             send(reply)
         case let .strum(strum):
             strumBroadcast.yield(strum)
+        case .controllerLeft:
+            controllerLeft()
         case .ignore:
             break
         }

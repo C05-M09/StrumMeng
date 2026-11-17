@@ -117,7 +117,8 @@ final class CompanionViewModel {
         if event == .disconnect {
             lastStrum = nil
             pairCodes.setEnteredPairCode(nil)
-            Task { [client] in await client.disconnect() }
+            // Unpair tells the iPad, so it shows its code again right away.
+            Task { [client] in await client.unpair() }
         }
     }
 

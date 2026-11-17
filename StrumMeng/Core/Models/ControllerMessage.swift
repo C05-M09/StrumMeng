@@ -6,6 +6,9 @@ import Foundation
 nonisolated enum ControllerMessage: Codable, Sendable, Equatable {
     /// iPhone → iPad, once per connection, so the iPad can name the controller that joined.
     case hello(deviceName: String)
+    /// iPhone → iPad: the player tapped Unpair. The iPad stops waiting for this iPhone and shows
+    /// the pair code again, instead of noticing only when the pings stop.
+    case goodbye
     /// iPad → iPhone. The iPhone sends strums only between startSession and stopSession.
     case startSession
     case stopSession
