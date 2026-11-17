@@ -25,7 +25,6 @@ struct PracticePlaySessionView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let pauseRect = PlayScreenLayout(size: geo.size).pauseRect
             ZStack {
                 // PracticePlayView redraws only its moving parts each frame; positions come from the
                 // clock's tick times, never from the frame timer.
@@ -37,15 +36,6 @@ struct PracticePlaySessionView: View {
                     onResume: { send(.tapResume) },
                     onRestart: { send(.tapRestart) },
                     onBackToMenu: { send(.tapBackToMenu) }
-                )
-                .simultaneousGesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { value in
-                            // A press on the pause button (even one dragged off to cancel) is never a strum.
-                            guard !pauseRect.contains(value.startLocation) else { return }
-                            viewModel.dragChanged(translation: value.translation.height, eventDate: value.time)
-                        }
-                        .onEnded { _ in viewModel.dragEnded() }
                 )
 
                 // 1. Outcome Transition Banner ("PURRFECT!", "GETTING THERE!", "NICE TRY")
