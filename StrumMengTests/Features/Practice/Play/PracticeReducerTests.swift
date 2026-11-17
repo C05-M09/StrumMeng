@@ -44,6 +44,16 @@ final class PracticeReducerTests: XCTestCase {
         }
     }
 
+    func test_readyWithoutController_waitsAsDisconnected() {
+        XCTAssertEqual(reduce(.ready, .readyWithoutController), .disconnected)
+    }
+
+    func test_readyWithoutController_outsideReady_isIgnored() {
+        for state in [PracticeState.idle, .listening, .countIn(2), .playing, .paused, .disconnected] {
+            XCTAssertEqual(reduce(state, .readyWithoutController), state)
+        }
+    }
+
     func test_resume_fromDisconnected_countsInAgain() {
         XCTAssertEqual(reduce(.disconnected, .tapResume), .countIn(3))
     }

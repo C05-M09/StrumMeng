@@ -12,6 +12,9 @@ func reduce(_ state: PracticeState, _ event: PracticeEvent) -> PracticeState {
         return .ready
     case (.ready, .tapReady):
         return .countIn(3)
+    // Nothing to strum with yet: wait for the iPhone on the same screen as a dropped session.
+    case (.ready, .readyWithoutController):
+        return .disconnected
 
     case (.countIn(let n), .countInTick):
         return .countIn(max(1, n - 1))

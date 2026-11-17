@@ -483,14 +483,41 @@ final class PlayViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.state, .countIn(3))
     }
 
-    func test_tapReady_whileTheControllerIsNotConnected_isIgnored() async throws {
+    func test_tapReady_whileTheControllerIsNotConnected_waitsForItAsDisconnected() async throws {
         let controller = MockControllerLink()
         let viewModel = try makeViewModel(controller: controller)
         await viewModel.handle(.searching)
         await viewModel.send(.tapReady)
-        XCTAssertEqual(viewModel.state, .ready)
+        XCTAssertEqual(viewModel.state, .disconnected)
         XCTAssertTrue(clock.startedBPMs.isEmpty)
         XCTAssertTrue(controller.sessionActiveCalls.isEmpty)
+    }
+
+    func test_resumeAfterReadyWithoutTheController_startsAFreshSessionOnceItConnects() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try makeViewModel(controller: controller)
+        await viewModel.handle(.searching)
+        await viewModel.send(.tapReady)
+        await viewModel.send(.tapResume)
+        XCTAssertEqual(viewModel.state, .disconnected)
+        XCTAssertTrue(clock.startedBPMs.isEmpty)
+
+        await viewModel.handle(.connected(latencyMs: 8))
+        await viewModel.send(.tapResume)
+        XCTAssertEqual(viewModel.state, .countIn(3))
+        XCTAssertEqual(clock.startedBPMs, [80])
+        XCTAssertEqual(clock.resumeCount, 0)
+        XCTAssertEqual(controller.sessionActiveCalls, [true])
+    }
+
+    func test_backToMenuAfterReadyWithoutTheController_leaves() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try makeViewModel(controller: controller)
+        await viewModel.handle(.searching)
+        await viewModel.send(.tapReady)
+        await viewModel.send(.tapBackToMenu)
+        XCTAssertEqual(viewModel.state, .idle)
+        XCTAssertEqual(exitCount, 1)
     }
 
     func test_tapReady_withAConnectedController_tellsTheIPhoneTheSessionStarted() async throws {

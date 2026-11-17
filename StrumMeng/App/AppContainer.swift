@@ -206,17 +206,16 @@ final class AppContainer {
         bpm: Int,
         onFinished: ((SessionResult) -> Void)? = nil
     ) -> PlayViewModel {
-        // Swipes on the iPad screen keep working next to the iPhone, so the iPhone is optional.
-        let touch = TouchStrumInputService()
+        // The iPhone is the only input, as in Showtime: swipes on the iPad screen are not strums.
         let link = sharedControllerLink()
         return PlayViewModel(
             pattern: pattern,
             bpm: bpm,
             clock: AudioBeatClock(),
-            input: MergedStrumInputService(sources: [link, touch]),
-            touchInput: touch,
+            input: link,
+            touchInput: nil,
             controller: link,
-            requiresController: false,
+            requiresController: true,
             guitar: guitarSound,
             metronome: metronomeSound,
             strumArrivalGrace: PlayViewModel.controllerStrumArrivalGrace,

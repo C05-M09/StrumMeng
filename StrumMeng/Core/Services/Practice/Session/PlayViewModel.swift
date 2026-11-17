@@ -59,6 +59,9 @@ final class PlayViewModel {
     /// Whether the current session started with the controller connected; only such a session
     /// pauses when the controller drops.
     @ObservationIgnored private var sessionUsesController = false
+    /// Whether the clock has started for the current session. Ready tapped before the iPhone
+    /// connected waits as disconnected without starting it, so Resume must start it fresh.
+    @ObservationIgnored private var hasStartedClock = false
     @ObservationIgnored private let tolerance: ToleranceConfig
     @ObservationIgnored private let latencyOffset: TimeInterval
     @ObservationIgnored private let strumArrivalGrace: TimeInterval
@@ -247,7 +250,11 @@ final class PlayViewModel {
         // Counting in without the only input connected would only collect Misses. A session the
         // iPhone dropped out of waits for it, even when on-screen swipes could carry on.
         if case .countIn = next, requiresController || previous == .disconnected,
-           !isControllerConnected { return }
+           !isControllerConnected {
+            // Ready without the iPhone shows why nothing starts, and Resume once it connects.
+            if previous == .ready { state = reduce(previous, .readyWithoutController) }
+            return
+        }
         state = next
         if case .countIn = state {
             sessionUsesController = controller != nil && isControllerConnected
@@ -255,9 +262,10 @@ final class PlayViewModel {
 
         switch (event, state) {
         case (.tapReady, .countIn), (.tapRestart, .countIn):
-            resetSession()
-            await controller?.setSessionActive(true)
-            await clock.start(bpm: bpm)
+            await startSession()
+        case (.tapResume, .countIn) where !hasStartedClock:
+            // Ready was tapped before the iPhone connected: nothing has run yet.
+            await startSession()
         case (.tapResume, .countIn):
             countInFirstIndex = nil
             await controller?.setSessionActive(true)
@@ -580,7 +588,15 @@ final class PlayViewModel {
         countInStartTime = nil
     }
 
+    private func startSession() async {
+        resetSession()
+        hasStartedClock = true
+        await controller?.setSessionActive(true)
+        await clock.start(bpm: bpm)
+    }
+
     private func resetSession() {
+        hasStartedClock = false
         windowTask?.cancel()
         backingTrack?.stop()
         engine = FeedbackEngine(config: tolerance, latencyOffset: latencyOffset, stepInterval: stepInterval)
