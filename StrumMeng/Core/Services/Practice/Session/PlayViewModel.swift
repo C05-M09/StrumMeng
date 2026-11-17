@@ -71,6 +71,7 @@ final class PlayViewModel {
     @ObservationIgnored private let currentDate: () -> Date
     @ObservationIgnored private let onFinished: (SessionResult) -> Void
     @ObservationIgnored private let onExit: () -> Void
+    @ObservationIgnored private let onSetUpDevice: () -> Void
     @ObservationIgnored private let finishesAtDurationBoundary: Bool
     @ObservationIgnored private var endBoundaryReached = false
     @ObservationIgnored private let finishBreak: TimeInterval
@@ -164,7 +165,8 @@ final class PlayViewModel {
          makeID: @escaping () -> UUID = UUID.init,
          currentDate: @escaping () -> Date = Date.init,
          onFinished: @escaping (SessionResult) -> Void = { _ in },
-         onExit: @escaping () -> Void = {}) {
+         onExit: @escaping () -> Void = {},
+         onSetUpDevice: @escaping () -> Void = {}) {
         self.pattern = pattern
         self.bpm = bpm
         self.songID = songID
@@ -185,6 +187,7 @@ final class PlayViewModel {
         self.currentDate = currentDate
         self.onFinished = onFinished
         self.onExit = onExit
+        self.onSetUpDevice = onSetUpDevice
         self.finishBreak = finishBreak
         self.finishesAtDurationBoundary = finishesAtDurationBoundary
         self.stepChords = stepChords
@@ -200,6 +203,12 @@ final class PlayViewModel {
         laneNodes = PlayTimeline.makeNodes(pattern: pattern.strokes.map(Self.arrow(for:)),
                                            slotInterval: stepInterval, duration: duration)
         engine = FeedbackEngine(config: tolerance, latencyOffset: latencyOffset, stepInterval: stepInterval)
+    }
+
+    /// Recovery keeps the clock, feedback and lane paused until the player explicitly resumes.
+    func requestDeviceSetup() {
+        guard state == .disconnected else { return }
+        onSetUpDevice()
     }
 
     // MARK: Lifecycle

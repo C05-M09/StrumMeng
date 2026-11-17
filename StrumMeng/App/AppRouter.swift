@@ -5,6 +5,16 @@ import Observation
 @Observable
 final class AppRouter {
     var path: [AppRoute] = []
+    private(set) var isSessionDeviceSetupPresented = false
+
+    /// Cover the paused session without removing its route or triggering its disappearance cleanup.
+    func presentSessionDeviceSetup() {
+        isSessionDeviceSetupPresented = true
+    }
+
+    func dismissSessionDeviceSetup() {
+        isSessionDeviceSetupPresented = false
+    }
 
     func push(_ route: AppRoute) {
         path.append(route)
@@ -16,6 +26,7 @@ final class AppRouter {
     }
 
     func popToRoot() {
+        isSessionDeviceSetupPresented = false
         path.removeAll()
     }
 
