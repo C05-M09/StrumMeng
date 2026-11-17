@@ -33,12 +33,12 @@ struct ShowtimeSongSelectView: View {
         /// below the floor's edge (y 842) and are hidden behind it. Lower number = more visible.
         static let centerSize: CGFloat = 1800
         static let centerFeet: CGFloat = 900
-        static let centerX: CGFloat = 780
+        static let centerX: CGFloat = 785
         /// The previous and next characters, beside the middle one (smaller than before).
         static let sideSize: CGFloat = 1100
         static let sideFeet: CGFloat = 820
         /// Distance between the middle character and each neighbour.
-        static let sideSpacing: CGFloat = 310
+        static let sideSpacing: CGFloat = 350
         /// Darkening for side characters (negative brightness and reduced exposure) instead of reducing opacity.
         static let sideBrightness: Double = -0.38
         static let sideExposure: Color = Color(white: 0.62)
