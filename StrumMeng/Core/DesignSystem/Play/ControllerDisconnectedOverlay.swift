@@ -77,9 +77,8 @@ struct ControllerDisconnectedOverlay: View {
                     .disabled(!isReconnected)
                     .saturation(isReconnected ? 1 : Self.disabledSaturation)
                     .colorMultiply(isReconnected ? AppColors.white : AppColors.tan)
-                ChunkyButton(title: "Set Up Device", style: .secondary,
-                             fontSize: 32 * unit, width: Self.buttonSize.width * unit,
-                             height: Self.buttonSize.height * unit, action: onSetUpDevice)
+                assetButton("Set Up Device", normal: "Button_Set Up Device_Normal",
+                            pressed: "Button_Set Up Device_Pressed", action: onSetUpDevice)
             }
             .multilineTextAlignment(.center)
             .animation(.easeOut(duration: 0.2), value: isReconnected)
