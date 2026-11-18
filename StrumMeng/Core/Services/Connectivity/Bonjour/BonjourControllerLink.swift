@@ -56,7 +56,14 @@ actor BonjourControllerLink: ControllerLink {
     /// the app is away, and nothing reports it. So while no iPhone is connected, open a fresh
     /// listener. A connected iPhone is left alone (its connection does not depend on the listener).
     func refreshIfNeeded() async throws {
-        guard livenessTask != nil, connection == nil else { return }
+        guard livenessTask != nil else { return }
+        // Back from the background, the liveness check has not run yet (it was suspended too), so a
+        // gone iPhone's connection can still be held here. Drop it first, or the listener is never
+        // refreshed and the iPhone cannot find the iPad again.
+        if connection != nil, !handler.isAlive(now: HostClock.now()) {
+            connectionLost()
+        }
+        guard connection == nil else { return }
         restartListener()
     }
 
