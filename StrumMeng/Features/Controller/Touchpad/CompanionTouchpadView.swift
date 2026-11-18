@@ -4,7 +4,13 @@ import SwiftUI
 struct CompanionTouchpadView: View {
     let viewModel: CompanionViewModel
 
+    /// How long the last strum's node stays fully visible, then how long it takes to fade out.
+    /// Purely cosmetic, so a sleeping task is fine (this is not beat timing).
+    private static let nodeHold: Duration = .milliseconds(600)
+    private static let nodeFade: TimeInterval = 0.4
+
     @State private var pulse = false
+    @State private var nodeOpacity: Double = 1
 
     var body: some View {
         ZStack {
@@ -38,6 +44,14 @@ struct CompanionTouchpadView: View {
             pulse = true
             withAnimation(.easeOut(duration: 0.2)) { pulse = false }
         }
+        // Each strum shows its node again and restarts the fade; the previous wait is cancelled.
+        .task(id: viewModel.strumCount) {
+            guard viewModel.lastStrum != nil else { return }
+            nodeOpacity = 1
+            try? await Task.sleep(for: Self.nodeHold)
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: Self.nodeFade)) { nodeOpacity = 0 }
+        }
         // The player's eyes are on the iPad, so the phone confirms each strum by feel.
         .sensoryFeedback(.impact(weight: .light), trigger: viewModel.strumCount)
     }
@@ -61,6 +75,7 @@ struct CompanionTouchpadView: View {
                 BeatNodeView(arrow: strum == .down ? .down : .up, size: 96)
                     .scaleEffect(pulse ? 1.25 : 1)
                     .rotationEffect(.degrees(-90))
+                    .opacity(nodeOpacity)
             } else {
                 Text("SWIPE LEFT OR RIGHT\nTO STRUM")
                     .font(AppFont.display(20))
