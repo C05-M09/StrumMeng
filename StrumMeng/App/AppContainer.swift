@@ -40,6 +40,10 @@ final class AppContainer {
     private var metronomeSound: any MetronomeSound { guitar ?? SilentGuitarSound() }
     /// One link for the whole app session: reconnecting takes seconds, so sessions never restart it.
     private var controllerLink: (any ControllerLink)?
+    /// What the link last said about the iPhone (nil until it says anything). Handed to each new
+    /// Play, so it does not have to wait for the link's first state before counting in.
+    private var isControllerLinkConnected: Bool?
+    private var controllerStateTask: Task<Void, Never>?
 
     init(
         router: AppRouter,
@@ -220,6 +224,8 @@ final class AppContainer {
             bpm: bpm,
             player: SynthListenPlayer(sound: guitarSound),
             history: sessionHistory ?? UnavailableSessionRepository(),
+            controller: sharedControllerLink(),
+            onSetUpDevice: { [weak router] in router?.presentSessionDeviceSetup() },
             onReady: { [weak router] in router?.push(.play(patternID: pattern.id, bpm: bpm)) },
             onBack: { [weak router] in router?.popTo(.practiceList) }
         )
@@ -239,6 +245,7 @@ final class AppContainer {
             input: link,
             touchInput: nil,
             controller: link,
+            knownControllerConnection: isControllerLinkConnected,
             requiresController: true,
             guitar: guitarSound,
             metronome: metronomeSound,
@@ -375,7 +382,16 @@ final class AppContainer {
     /// Up from launch, so a paired iPhone reconnects before the player reaches Play. A failure stays
     /// quiet here: on-screen swipes still work, and Set Up Device tries again and explains it.
     func startControllerLink() async {
-        try? await sharedControllerLink().start()
+        let link = sharedControllerLink()
+        if controllerStateTask == nil {
+            controllerStateTask = Task { [weak self, states = link.connectionStates] in
+                for await state in states {
+                    if case .connected = state { self?.isControllerLinkConnected = true }
+                    else { self?.isControllerLinkConnected = false }
+                }
+            }
+        }
+        try? await link.start()
     }
 
     /// Back in the foreground: iOS may have stopped the link's listener while the app was away.
@@ -386,6 +402,9 @@ final class AppContainer {
 
     func stopControllerLink() {
         guard let link = controllerLink else { return }
+        controllerStateTask?.cancel()
+        controllerStateTask = nil
+        isControllerLinkConnected = nil
         controllerLink = nil
         Task { await link.stop() }
     }

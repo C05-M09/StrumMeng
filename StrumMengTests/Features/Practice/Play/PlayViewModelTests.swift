@@ -21,12 +21,14 @@ final class PlayViewModelTests: XCTestCase {
                                strumArrivalGrace: TimeInterval = 0,
                                touchInput: TouchStrumInput? = nil,
                                controller: ControllerLink? = nil,
+                               knownControllerConnection: Bool? = nil,
                                requiresController: Bool = true,
                                sound: MockGuitarSound? = nil) throws -> PlayViewModel {
         let pattern = try XCTUnwrap(PatternCatalog.all.first { $0.id == patternID })
         return PlayViewModel(
             pattern: pattern, bpm: 80, clock: clock, input: MockStrumInputService(), touchInput: touchInput,
-            controller: controller, requiresController: requiresController,
+            controller: controller, knownControllerConnection: knownControllerConnection,
+            requiresController: requiresController,
             guitar: sound, metronome: sound, latencyOffset: latencyOffset, strumArrivalGrace: strumArrivalGrace,
             leadInSteps: leadInSteps, repetitions: repetitions, finishBreak: finishBreak,
             now: { [unowned self] in self.currentTime },
@@ -481,6 +483,66 @@ final class PlayViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.isControllerConnected)
         await viewModel.send(.tapReady)
         XCTAssertEqual(viewModel.state, .countIn(3))
+    }
+
+    // MARK: Ready before the first connection state
+
+    func test_readyBeforeTheFirstConnectionState_waits_andCountsInOnceConnected() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try makeViewModel(controller: controller)
+        var states: [PracticeState] = []
+        viewModel.onStateChanged = { states.append($0) }
+
+        await viewModel.send(.tapReady)
+        XCTAssertEqual(viewModel.state, .ready)
+        await viewModel.handle(.connected(latencyMs: 5))
+
+        XCTAssertEqual(viewModel.state, .countIn(3))
+        // Never flashed the disconnected popup on the way.
+        XCTAssertFalse(states.contains(.disconnected))
+        XCTAssertEqual(clock.startedBPMs, [80])
+    }
+
+    func test_readyBeforeTheFirstConnectionState_waitsAsDisconnected_whenTheIPhoneIsMissing() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try makeViewModel(controller: controller)
+
+        await viewModel.send(.tapReady)
+        await viewModel.handle(.reconnecting)
+
+        XCTAssertEqual(viewModel.state, .disconnected)
+        XCTAssertTrue(clock.startedBPMs.isEmpty)
+    }
+
+    func test_aKnownConnectedIPhone_readyCountsInAtOnce() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try makeViewModel(controller: controller, knownControllerConnection: true)
+
+        await viewModel.send(.tapReady)
+
+        XCTAssertEqual(viewModel.state, .countIn(3))
+        XCTAssertEqual(clock.startedBPMs, [80])
+    }
+
+    func test_aKnownMissingIPhone_readyWaitsAsDisconnectedAtOnce() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try makeViewModel(controller: controller, knownControllerConnection: false)
+
+        await viewModel.send(.tapReady)
+
+        XCTAssertEqual(viewModel.state, .disconnected)
+        XCTAssertTrue(clock.startedBPMs.isEmpty)
+    }
+
+    func test_aWaitingReady_isUsedOnlyOnce() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try makeViewModel(controller: controller)
+
+        await viewModel.send(.tapReady)
+        await viewModel.handle(.connected(latencyMs: 5))
+        await viewModel.handle(.connected(latencyMs: 6))
+
+        XCTAssertEqual(clock.startedBPMs, [80])
     }
 
     func test_tapReady_whileTheControllerIsNotConnected_waitsForItAsDisconnected() async throws {
