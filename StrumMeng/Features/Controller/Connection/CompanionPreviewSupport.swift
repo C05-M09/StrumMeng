@@ -15,6 +15,8 @@ private struct PreviewControllerClient: ControllerClient {
     func send(_ direction: StrumDirection, touchTime: TimeInterval) async {}
     func disconnect() async {}
     func unpair() async {}
+    func leaveForBackground() async {}
+    func returnFromBackground() async {}
 }
 
 private final class PreviewPairCodeStore: PairCodeStore {

@@ -205,10 +205,14 @@ actor BonjourControllerLink: ControllerLink {
             strumBroadcast.yield(strum)
         case .controllerLeft:
             controllerLeft()
+        case .controllerAway:
+            // Kept open: the iPhone comes back on the same connection if it is not gone for long.
+            // Otherwise the liveness check drops it as usual.
+            stateBroadcast.yield(.reconnecting)
         case .ignore:
             break
         }
-        if case .ping = message {
+        if case .ping = message, !handler.isAway {
             stateBroadcast.yield(.connected(latencyMs: handler.latencyMs ?? 0))
         }
     }

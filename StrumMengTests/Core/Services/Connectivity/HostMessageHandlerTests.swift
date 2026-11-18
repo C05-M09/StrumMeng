@@ -68,6 +68,34 @@ final class HostMessageHandlerTests: XCTestCase {
         XCTAssertEqual(handler.receive(.goodbye, arrivedAt: 1), .controllerLeft)
     }
 
+    func test_away_meansTheControllerCannotBeUsed() {
+        var handler = playingHandler()
+        XCTAssertEqual(handler.receive(.away, arrivedAt: 1), .controllerAway)
+        XCTAssertTrue(handler.isAway)
+    }
+
+    func test_pingAfterAway_isAnsweredButKeepsTheControllerAway() {
+        var handler = playingHandler()
+        _ = handler.receive(.away, arrivedAt: 1)
+        let output = handler.receive(.ping(sentAt: 0, latencyMs: nil), arrivedAt: 1.01)
+        XCTAssertEqual(output, .reply(.pong(sentAt: 0, receivedAt: 1.01, sessionActive: true)))
+        XCTAssertTrue(handler.isAway)
+    }
+
+    func test_helloAfterAway_meansTheControllerIsBack() {
+        var handler = playingHandler()
+        _ = handler.receive(.away, arrivedAt: 1)
+        _ = handler.receive(.hello(deviceName: "iPhone"), arrivedAt: 3)
+        XCTAssertFalse(handler.isAway)
+    }
+
+    func test_newConnection_isNotAway() {
+        var handler = playingHandler()
+        _ = handler.receive(.away, arrivedAt: 1)
+        handler.connectionOpened(at: 10)
+        XCTAssertFalse(handler.isAway)
+    }
+
     func test_iPadOnlyMessages_areIgnored() {
         var handler = playingHandler()
         XCTAssertEqual(handler.receive(.startSession, arrivedAt: 1), .ignore)

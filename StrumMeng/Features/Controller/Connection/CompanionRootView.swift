@@ -3,6 +3,7 @@ import SwiftUI
 /// What the iPhone opens to: pairing until connected, then the strum pad.
 struct CompanionRootView: View {
     @State private var viewModel: CompanionViewModel
+    @Environment(\.scenePhase) private var scenePhase
 
     init(viewModel: CompanionViewModel) {
         _viewModel = State(initialValue: viewModel)
@@ -25,6 +26,14 @@ struct CompanionRootView: View {
         .persistentSystemOverlays(.hidden)
         .onAppear { viewModel.appear() }
         .onDisappear { viewModel.stop() }
+        // Only .background: Control Center or a banner (.inactive) is too brief to pause the iPad.
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .background: viewModel.appMovedToBackground()
+            case .active: viewModel.appBecameActive()
+            default: break
+            }
+        }
     }
 }
 
