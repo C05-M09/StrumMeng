@@ -156,6 +156,7 @@ final class PlayViewModel {
          input: StrumInputService,
          touchInput: TouchStrumInput?,
          controller: ControllerLink? = nil,
+         knownControllerConnection: Bool? = nil,
          requiresController: Bool = true,
          guitar: (any GuitarSound)? = nil,
          metronome: (any MetronomeSound)? = nil,
@@ -186,6 +187,12 @@ final class PlayViewModel {
         self.guitar = guitar
         self.metronome = metronome
         isControllerConnected = controller == nil
+        // Practice comes from Listen, which already waited for the iPhone: start from what the link
+        // last said, so Ready counts in at once instead of waiting for the first state.
+        if controller != nil, let knownControllerConnection {
+            isControllerConnected = knownControllerConnection
+            hasConnectionState = true
+        }
         self.tolerance = tolerance
         self.latencyOffset = latencyOffset
         self.strumArrivalGrace = strumArrivalGrace

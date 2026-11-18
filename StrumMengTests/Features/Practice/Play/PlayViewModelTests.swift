@@ -21,12 +21,14 @@ final class PlayViewModelTests: XCTestCase {
                                strumArrivalGrace: TimeInterval = 0,
                                touchInput: TouchStrumInput? = nil,
                                controller: ControllerLink? = nil,
+                               knownControllerConnection: Bool? = nil,
                                requiresController: Bool = true,
                                sound: MockGuitarSound? = nil) throws -> PlayViewModel {
         let pattern = try XCTUnwrap(PatternCatalog.all.first { $0.id == patternID })
         return PlayViewModel(
             pattern: pattern, bpm: 80, clock: clock, input: MockStrumInputService(), touchInput: touchInput,
-            controller: controller, requiresController: requiresController,
+            controller: controller, knownControllerConnection: knownControllerConnection,
+            requiresController: requiresController,
             guitar: sound, metronome: sound, latencyOffset: latencyOffset, strumArrivalGrace: strumArrivalGrace,
             leadInSteps: leadInSteps, repetitions: repetitions, finishBreak: finishBreak,
             now: { [unowned self] in self.currentTime },
@@ -507,6 +509,26 @@ final class PlayViewModelTests: XCTestCase {
 
         await viewModel.send(.tapReady)
         await viewModel.handle(.reconnecting)
+
+        XCTAssertEqual(viewModel.state, .disconnected)
+        XCTAssertTrue(clock.startedBPMs.isEmpty)
+    }
+
+    func test_aKnownConnectedIPhone_readyCountsInAtOnce() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try makeViewModel(controller: controller, knownControllerConnection: true)
+
+        await viewModel.send(.tapReady)
+
+        XCTAssertEqual(viewModel.state, .countIn(3))
+        XCTAssertEqual(clock.startedBPMs, [80])
+    }
+
+    func test_aKnownMissingIPhone_readyWaitsAsDisconnectedAtOnce() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try makeViewModel(controller: controller, knownControllerConnection: false)
+
+        await viewModel.send(.tapReady)
 
         XCTAssertEqual(viewModel.state, .disconnected)
         XCTAssertTrue(clock.startedBPMs.isEmpty)
