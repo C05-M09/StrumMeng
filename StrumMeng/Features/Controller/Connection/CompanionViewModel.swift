@@ -29,6 +29,9 @@ final class CompanionViewModel {
     @ObservationIgnored private var linkTask: Task<Void, Never>?
     @ObservationIgnored private var sessionTask: Task<Void, Never>?
     @ObservationIgnored private var timeoutTask: Task<Void, Never>?
+    @ObservationIgnored private var isInBackground = false
+    /// Leaving and coming back are sent in order, even when the player switches away and back quickly.
+    @ObservationIgnored private var appStateTask: Task<Void, Never>?
 
     /// - Parameters:
     ///   - connectTimeout: how long a typed code may look for the iPad. A saved code has no limit:
@@ -88,6 +91,28 @@ final class CompanionViewModel {
         cancelTimeout()
         guitar?.stopStrums()
         Task { [client] in await client.disconnect() }
+    }
+
+    /// The app went to the background (home screen, lock, another app). The player cannot strum
+    /// from here, so the iPad is told at once and pauses a playing session.
+    func appMovedToBackground() {
+        guard !isInBackground else { return }
+        isInBackground = true
+        tracker.reset()
+        appStateTask = Task { [previous = appStateTask, client] in
+            await previous?.value
+            await client.leaveForBackground()
+        }
+    }
+
+    /// The app is in front again: the iPad sees the controller back and can offer Resume.
+    func appBecameActive() {
+        guard isInBackground else { return }
+        isInBackground = false
+        appStateTask = Task { [previous = appStateTask, client] in
+            await previous?.value
+            await client.returnFromBackground()
+        }
     }
 
     func send(_ event: CompanionEvent) {

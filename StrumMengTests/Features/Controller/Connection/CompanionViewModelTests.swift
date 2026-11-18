@@ -373,6 +373,44 @@ final class CompanionViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.state, .enteringCode(""))
     }
 
+    // MARK: Background
+
+    func test_goingToTheBackground_tellsTheIPad_andComingBack_too() async {
+        let (viewModel, client, _) = makeViewModel()
+
+        viewModel.appMovedToBackground()
+        await waitUntil { client.leaveForBackgroundCount == 1 }
+        viewModel.appBecameActive()
+        await waitUntil { client.returnFromBackgroundCount == 1 }
+
+        XCTAssertEqual(client.leaveForBackgroundCount, 1)
+        XCTAssertEqual(client.returnFromBackgroundCount, 1)
+    }
+
+    func test_becomingActive_withoutHavingLeft_sendsNothing() async {
+        let (viewModel, client, _) = makeViewModel()
+
+        // Control Center goes .inactive → .active without a background in between.
+        viewModel.appBecameActive()
+        for _ in 0..<100 { await Task.yield() }
+
+        XCTAssertEqual(client.returnFromBackgroundCount, 0)
+    }
+
+    func test_repeatedBackgroundChanges_areSentOnce() async {
+        let (viewModel, client, _) = makeViewModel()
+
+        viewModel.appMovedToBackground()
+        viewModel.appMovedToBackground()
+        viewModel.appBecameActive()
+        viewModel.appBecameActive()
+        await waitUntil { client.returnFromBackgroundCount == 1 }
+        for _ in 0..<100 { await Task.yield() }
+
+        XCTAssertEqual(client.leaveForBackgroundCount, 1)
+        XCTAssertEqual(client.returnFromBackgroundCount, 1)
+    }
+
     func test_stop_disconnects_butKeepsTheCode() async throws {
         let saved = try XCTUnwrap(PairCode("482913"))
         let (viewModel, client, store) = makeViewModel(saved: saved)
