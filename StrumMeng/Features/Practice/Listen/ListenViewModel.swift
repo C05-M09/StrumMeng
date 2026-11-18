@@ -7,10 +7,15 @@ final class ListenViewModel {
     let pattern: StrumPattern
     let bpm: Int
     private(set) var state: ListenState = .information
+    /// Always true without a controller (previews, tests). With one, Ready needs it.
+    private(set) var isControllerConnected: Bool
     @ObservationIgnored private let player: ListenPatternPlayer
     @ObservationIgnored private let history: any SessionHistoryChecking
     @ObservationIgnored private let onReady: () -> Void
     @ObservationIgnored private let onBack: () -> Void
+    @ObservationIgnored private let controller: (any ControllerLink)?
+    @ObservationIgnored private let onSetUpDevice: () -> Void
+    @ObservationIgnored private var controllerTask: Task<Void, Never>?
     @ObservationIgnored private var progressTask: Task<Void, Never>?
     @ObservationIgnored private var historyTask: Task<Void, Never>?
     /// The history question asked as soon as the example starts, so Ready already knows the
@@ -20,6 +25,8 @@ final class ListenViewModel {
 
     init(pattern: StrumPattern, bpm: Int, player: ListenPatternPlayer,
          history: any SessionHistoryChecking,
+         controller: (any ControllerLink)? = nil,
+         onSetUpDevice: @escaping () -> Void = {},
          onReady: @escaping () -> Void, onBack: @escaping () -> Void) {
         self.pattern = pattern
         self.bpm = bpm
@@ -27,9 +34,49 @@ final class ListenViewModel {
         self.history = history
         self.onReady = onReady
         self.onBack = onBack
+        self.controller = controller
+        self.onSetUpDevice = onSetUpDevice
+        isControllerConnected = controller == nil
+    }
+
+    /// Follows the iPhone for as long as the screen is up.
+    func appear() {
+        guard controllerTask == nil, let states = controller?.connectionStates else { return }
+        controllerTask = Task { [weak self] in
+            for await connection in states { self?.handle(connection) }
+        }
+    }
+
+    /// Leaving the screen: stops the example and stops following the iPhone.
+    func disappear() {
+        stop()
+        controllerTask?.cancel()
+        controllerTask = nil
+    }
+
+    func handle(_ connection: ControllerConnectionState) {
+        if case .connected = connection {
+            // Arrives with every ping; only a real change should notify observers.
+            if !isControllerConnected { isControllerConnected = true }
+            return
+        }
+        isControllerConnected = false
+        send(.controllerDisconnected)
+    }
+
+    /// Set Up Device from the disconnected popup; the example stays paused underneath.
+    func requestDeviceSetup() {
+        guard case .disconnected = state else { return }
+        onSetUpDevice()
     }
 
     func send(_ event: ListenEvent) {
+        // Play would only collect Misses without the iPhone, so Ready waits for it here.
+        if case .ready = event, state.canProceed, !isControllerConnected {
+            send(.readyWithoutController)
+            return
+        }
+        if case .resume = event, case .disconnected = state, !isControllerConnected { return }
         let previous = state
         state = reduce(state, event)
         switch event {
@@ -41,7 +88,15 @@ final class ListenViewModel {
         case .pause:
             if case .paused = state { player.pause(); progressTask?.cancel() }
         case .resume:
-            if case .paused = previous { player.resume(); observeProgress() }
+            switch previous {
+            case .paused, .disconnected: player.resume(); observeProgress()
+            default: break
+            }
+        case .controllerDisconnected:
+            // From the pause menu the example is already paused.
+            if case .listening = previous, case .disconnected = state { player.pause(); progressTask?.cancel() }
+        case .readyWithoutController:
+            if case .disconnected = state, state != previous { player.pause(); progressTask?.cancel() }
         case .ready, .retryHistory:
             if case .checkingHistory = state, state != previous { checkHistory() }
         case .historyChecked(let hasRecords):

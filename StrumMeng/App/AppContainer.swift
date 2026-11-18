@@ -220,6 +220,8 @@ final class AppContainer {
             bpm: bpm,
             player: SynthListenPlayer(sound: guitarSound),
             history: sessionHistory ?? UnavailableSessionRepository(),
+            controller: sharedControllerLink(),
+            onSetUpDevice: { [weak router] in router?.presentSessionDeviceSetup() },
             onReady: { [weak router] in router?.push(.play(patternID: pattern.id, bpm: bpm)) },
             onBack: { [weak router] in router?.popTo(.practiceList) }
         )

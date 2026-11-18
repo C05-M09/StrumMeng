@@ -49,6 +49,12 @@ struct ListenView: View {
                     information.transition(.opacity)
                 }
                 if case .paused = viewModel.state { pauseMenu }
+                if case .disconnected = viewModel.state {
+                    AppColors.brownInk.opacity(0.65)
+                    ControllerDisconnectedOverlay(unit: 1, isReconnected: viewModel.isControllerConnected,
+                                                  onResume: { viewModel.send(.resume) },
+                                                  onSetUpDevice: { viewModel.requestDeviceSetup() })
+                }
                 if case .checkingHistory = viewModel.state {
                     AppColors.brownInk.opacity(FirstPlayInstructionsLayout.scrimOpacity)
                     ProgressView("Getting ready…").tint(AppColors.cream)
@@ -82,9 +88,12 @@ struct ListenView: View {
         .ignoresSafeArea()
         .navigationBarBackButtonHidden()
         .statusBarHidden()
-        .onAppear { informationVisible = true }
+        .onAppear {
+            informationVisible = true
+            viewModel.appear()
+        }
         .animation(.easeOut(duration: 0.18), value: viewModel.state == .information)
-        .onDisappear { viewModel.stop() }
+        .onDisappear { viewModel.disappear() }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { viewModel.send(.pause) }
         }
@@ -238,6 +247,10 @@ struct ListenView: View {
 #Preview("04 · First Play instructions", traits: .landscapeLeft) {
     ListenPreviewFactory.make(events: [.next, .progress(step: 2, completed: true), .ready,
                                        .historyChecked(hasRecords: false)])
+}
+#Preview("06 · iPhone disconnected (back, Resume enabled)", traits: .landscapeLeft) {
+    ListenPreviewFactory.make(events: [.next, .progress(step: 3, completed: true), .controllerDisconnected],
+                              elapsed: 1.125)
 }
 #Preview("04 · Pause", traits: .landscapeLeft) {
     ListenPreviewFactory.make(events: [.next, .progress(step: 3, completed: false), .pause])
