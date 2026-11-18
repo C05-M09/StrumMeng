@@ -10,5 +10,7 @@ enum CompanionEvent: Equatable {
     case linkConnected
     case connectionTimedOut
     case linkLost
+    /// The iPad left in the middle of a session.
+    case hostLeftSession
     case disconnect
 }

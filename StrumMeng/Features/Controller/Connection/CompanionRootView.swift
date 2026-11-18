@@ -14,6 +14,11 @@ struct CompanionRootView: View {
             switch viewModel.state {
             case .connected, .reconnecting:
                 CompanionTouchpadView(viewModel: viewModel)
+            case .ipadDisconnected:
+                ZStack {
+                    CompanionTouchpadView(viewModel: viewModel)
+                    IPadDisconnectedOverlay { viewModel.send(.disconnect) }
+                }
             case .enteringCode, .connecting, .notFound:
                 CompanionPairingView(viewModel: viewModel)
             }
@@ -55,4 +60,8 @@ struct CompanionRootView: View {
 
 #Preview("Reconnecting") {
     CompanionRootView(viewModel: .preview(state: .reconnecting))
+}
+
+#Preview("iPad disconnected") {
+    CompanionRootView(viewModel: .preview(state: .ipadDisconnected))
 }

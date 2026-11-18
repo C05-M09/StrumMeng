@@ -136,7 +136,7 @@ struct CompanionPairingView: View {
     private var isCodeComplete: Bool {
         switch viewModel.state {
         case let .enteringCode(code), let .notFound(code): code.count == PairCode.length
-        case .connecting, .connected, .reconnecting: false
+        case .connecting, .connected, .reconnecting, .ipadDisconnected: false
         }
     }
 
@@ -148,7 +148,7 @@ struct CompanionPairingView: View {
     private var typedCode: String {
         switch viewModel.state {
         case let .enteringCode(code), let .connecting(code), let .notFound(code): code
-        case .connected, .reconnecting: ""
+        case .connected, .reconnecting, .ipadDisconnected: ""
         }
     }
 }
