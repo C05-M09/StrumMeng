@@ -15,5 +15,9 @@ protocol ControllerLink: StrumInputService {
     /// Tells the iPhone whether a session is playing. The iPhone sends strums only while it is,
     /// and the link drops any strum that arrives outside a session.
     func setSessionActive(_ active: Bool) async
+    /// The iPad app is leaving for the background in the middle of a session (true) or is back
+    /// (false). Leaving tells the iPhone, which shows that the iPad is gone, and the link answers
+    /// no ping until it is back.
+    func setHostAway(_ away: Bool) async
     func stop() async
 }
