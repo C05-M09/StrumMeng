@@ -1,54 +1,46 @@
 import SwiftUI
 
-/// iPhone popup when the iPad left in the middle of a session (its app went to the background, or
-/// it went quiet while playing). The mirror of the iPad's ControllerDisconnectedOverlay: same card
-/// and the same animated "Reconnecting" dots. It closes by itself when the iPad is back; Enter Code
-/// is the way out if it never returns (it unpairs, like the pad's Unpair).
+/// iPhone overlay when the iPad left in the middle of a session (its app went to the background,
+/// or it went quiet while playing): white text and Enter Code straight on a dark veil, no card. The
+/// "Reconnecting" dots animate like the iPad's ControllerDisconnectedOverlay. It closes by itself
+/// when the iPad is back; Enter Code is the way out if it never returns (it unpairs, like Unpair).
 struct IPadDisconnectedOverlay: View {
     let onEnterCode: () -> Void
 
-    /// The card is drawn for the iPad's 800 × 720 modal; on the phone it fills the width.
-    private static let cardAspectRatio: CGFloat = 800 / 720
-    private static let cardWidthFraction: CGFloat = 0.92
+    /// Dark enough for white text to keep 4.5:1 over the bright guitar artwork.
+    private static let veilOpacity = 0.85
+    private static let buttonWidthFraction: CGFloat = 0.6
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         GeometryReader { proxy in
-            let cardWidth = proxy.size.width * Self.cardWidthFraction
             ZStack {
-                // Covers the strum pad too, so a swipe cannot land under the popup.
-                AppColors.brownInk.opacity(0.65)
+                // Covers the strum pad too, so a swipe cannot land under the overlay.
+                AppColors.brownInk.opacity(Self.veilOpacity)
                     .ignoresSafeArea()
                     .contentShape(Rectangle())
 
-                ZStack {
-                    Image("Option_Card")
-                        .resizable()
-                        .scaledToFit()
-                        .accessibilityHidden(true)
-
-                    VStack(spacing: AppSpacing.m) {
+                VStack(spacing: AppSpacing.l) {
+                    VStack(spacing: AppSpacing.s) {
+                        Text("IPAD DISCONNECTED")
+                            .font(AppTypography.bungee(size: 28))
                         VStack(spacing: AppSpacing.xs) {
-                            Text("IPAD DISCONNECTED")
-                                .font(AppTypography.bungee(size: 24))
-                            VStack(spacing: 0) {
-                                reconnectingLine
-                                Text("Open StrumMeng on your iPad.")
-                            }
-                            .font(AppTypography.dmMono(size: 14))
-                            .accessibilityElement(children: .ignore)
-                            .accessibilityLabel("Reconnecting. Open StrumMeng on your iPad.")
+                            reconnectingLine
+                            Text("Open StrumMeng on your iPad.")
                         }
-                        .foregroundStyle(AppColors.brownInk)
-                        .multilineTextAlignment(.center)
-
-                        ChunkyButton(title: "Enter Code", style: .secondary, fontSize: 18,
-                                     width: cardWidth * 0.6, height: 48, action: onEnterCode)
+                        .font(AppTypography.dmMono(size: 16))
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("Reconnecting. Open StrumMeng on your iPad.")
                     }
-                    .padding(.horizontal, AppSpacing.l)
+                    .foregroundStyle(AppColors.white)
+                    .multilineTextAlignment(.center)
+
+                    ChunkyButton(title: "Enter Code", style: .secondary, fontSize: 18,
+                                 width: proxy.size.width * Self.buttonWidthFraction, height: 48,
+                                 action: onEnterCode)
                 }
-                .frame(width: cardWidth, height: cardWidth / Self.cardAspectRatio)
+                .padding(.horizontal, AppSpacing.l)
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
         }
