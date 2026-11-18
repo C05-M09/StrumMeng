@@ -106,6 +106,9 @@ struct PatternListView: View {
                         bpm: selectedBPM,
                         onDecreaseBPM: { viewModel.send(.decreaseBPM) },
                         onIncreaseBPM: { viewModel.send(.increaseBPM) },
+                        onSelectRecord: { result in
+                            viewModel.send(.selectRecord(result))
+                        },
                         recordsViewModel: viewModel.recordsViewModels[selectedPatternID],
                         recordsFallbackState: viewModel.recordsFallbackState,
                         recordsRefreshID: viewModel.recordsRefreshID

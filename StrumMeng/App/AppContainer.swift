@@ -260,6 +260,12 @@ final class AppContainer {
         router.replaceLast(with: .summary(sessionID: result.id))
     }
 
+    /// Opens the Summary screen for a clicked record directly, without the intro overlay and without retry.
+    func showSummary(for result: SessionResult) {
+        results.add(result)
+        router.push(.summary(sessionID: result.id, showIntroOverlay: false, canRetry: false))
+    }
+
     /// nil if the session is unknown (it never finished in this app session).
     func makeSummaryViewModel(sessionID: UUID) -> SummaryViewModel? {
         guard let result = results.result(for: sessionID) else { return nil }
@@ -320,6 +326,9 @@ final class AppContainer {
             },
             onBackRequested: { [weak router] in
                 router?.pop()
+            },
+            onRecordRequested: { [weak self] result in
+                self?.showSummary(for: result)
             }
         )
         patternListViewModel = viewModel

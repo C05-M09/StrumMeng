@@ -37,7 +37,7 @@ func reduce(_ state: PatternListState, _ event: PatternListEvent) -> PatternList
             selectedBPM: PracticeTempoConfig.clamped(bpm)
         )
 
-    case .tapPlay, .tapBack:
+    case .tapPlay, .tapBack, .selectRecord:
         return state
     }
 }

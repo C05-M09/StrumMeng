@@ -64,10 +64,15 @@ struct ContentView: View {
                                 .navigationBarBackButtonHidden()
                         }
 
-                    case let .summary(sessionID):
-                        SummaryRoute(sessionID: sessionID, container: container)
-                            .id(route)
-                            .navigationBarBackButtonHidden()
+                    case let .summary(sessionID, showIntroOverlay, canRetry):
+                        SummaryRoute(
+                            sessionID: sessionID,
+                            showIntroOverlay: showIntroOverlay,
+                            canRetry: canRetry,
+                            container: container
+                        )
+                        .id(route)
+                        .navigationBarBackButtonHidden()
 
                     case .deviceSetup:
                         DeviceSetupRoute(container: container)
@@ -176,14 +181,22 @@ private struct DeviceSetupRoute: View {
 /// Same idea for Summary, so a redraw cannot save the session twice or reset the overlays.
 private struct SummaryRoute: View {
     @State private var viewModel: SummaryViewModel?
+    private let showIntroOverlay: Bool
+    private let canRetry: Bool
 
-    init(sessionID: UUID, container: AppContainer) {
+    init(sessionID: UUID, showIntroOverlay: Bool = true, canRetry: Bool = true, container: AppContainer) {
+        self.showIntroOverlay = showIntroOverlay
+        self.canRetry = canRetry
         _viewModel = State(initialValue: container.makeSummaryViewModel(sessionID: sessionID))
     }
 
     var body: some View {
         if let viewModel {
-            SummaryView(viewModel: viewModel)
+            SummaryView(
+                viewModel: viewModel,
+                showIntroOverlay: showIntroOverlay,
+                canRetry: canRetry
+            )
         }
     }
 }

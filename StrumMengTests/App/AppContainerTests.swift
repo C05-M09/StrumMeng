@@ -264,6 +264,18 @@ final class AppContainerTests: XCTestCase {
         try await waitForPath([.practiceList], on: router)
     }
 
+    func test_selectRecord_navigatesToSummaryWithoutIntroOverlay() throws {
+        let container = AppContainer(router: router, inMemory: true)
+        let list = container.makePatternListViewModel()
+        let session = finishedSession(bpm: 85)
+
+        list.send(.selectRecord(session))
+
+        XCTAssertEqual(router.path.last, .summary(sessionID: session.id, showIntroOverlay: false, canRetry: false))
+        let summary = try XCTUnwrap(container.makeSummaryViewModel(sessionID: session.id))
+        XCTAssertEqual(summary.result.id, session.id)
+    }
+
     func test_backOnListen_returnsToThePracticeList() {
         let container = AppContainer(router: router, inMemory: true)
         let pattern = PatternCatalog.foundation
