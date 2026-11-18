@@ -20,7 +20,7 @@ struct OptionCardView: View {
 //            OptionCardArt()
 
             if OptionCardLayout.drawsTitle {
-                Text("OPTION")
+                Text("SETTINGS")
                     .font(AppTypography.bungee(size: OptionCardLayout.titleFontSize))
                     .foregroundStyle(AppColors.brownInk)
                     .padding(.top, OptionCardLayout.titleTopPadding)

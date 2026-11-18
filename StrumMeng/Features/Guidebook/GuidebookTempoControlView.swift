@@ -22,48 +22,47 @@ struct GuidebookTempoControlView: View {
                 
             Spacer()
             
-            // BPM Stepper and Audio Preview Row
-            HStack(spacing: 12) {
+            // BPM Stepper and Audio Preview Row (aligned to Guidebook_2 BPM box at x=219.4..286.2, y=277..322.1)
+            HStack(spacing: 8) {
                 // Decrease BPM button (-)
                 Button {
                     viewModel.decreaseBPM()
                 } label: {
-                    Text("−")
-                        .font(.system(size: 26, weight: .bold))
-                        .foregroundStyle(AppColors.brownInk)
-                        .frame(width: 36, height: 36)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.white)
-                                .shadow(color: Color.black.opacity(0.08), radius: 2, y: 1)
-                        )
+                    Color.clear
                 }
+                .buttonStyle(
+                    AssetButtonStyle(
+                        normalAssetName: "Button_Minus_Normal",
+                        pressedAssetName: "Button_Minus_Pressed",
+                        size: CGSize(width: 48, height: 51.66)
+                    )
+                )
+                .offset(y: 1.5)
                 .disabled(!viewModel.canDecreaseBPM)
                 .opacity(viewModel.canDecreaseBPM ? 1.0 : 0.35)
                 .accessibilityLabel("Decrease BPM")
 
-                // BPM value display (tanpa background kotak)
+                // BPM value display centered inside Guidebook_2's drawn box
                 Text("\(viewModel.bpm)")
                     .font(AppTypography.dmMono(size: 28).bold())
                     .foregroundStyle(AppColors.brownInk)
-                    .frame(minWidth: 48)
+                    .frame(width: 66.85, height: 45.1, alignment: .center)
                     .accessibilityLabel("Current tempo \(viewModel.bpm) BPM")
-                    .padding(.horizontal, 8)
 
                 // Increase BPM button (+)
                 Button {
                     viewModel.increaseBPM()
                 } label: {
-                    Text("+")
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundStyle(AppColors.brownInk)
-                        .frame(width: 36, height: 36)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.white)
-                                .shadow(color: Color.black.opacity(0.08), radius: 2, y: 1)
-                        )
+                    Color.clear
                 }
+                .buttonStyle(
+                    AssetButtonStyle(
+                        normalAssetName: "Button_Plus_Normal",
+                        pressedAssetName: "Button_Plus_Pressed",
+                        size: CGSize(width: 48, height: 51.66)
+                    )
+                )
+                .offset(y: 1.5)
                 .disabled(!viewModel.canIncreaseBPM)
                 .opacity(viewModel.canIncreaseBPM ? 1.0 : 0.35)
                 .accessibilityLabel("Increase BPM")
@@ -81,7 +80,8 @@ struct GuidebookTempoControlView: View {
                 .accessibilityLabel(viewModel.isPlayingAudio ? "Stop tempo audio" : "Play tempo audio")
                 .padding(.leading, 12)
             }
-            .padding(.leading, 100)
+            .padding(.leading, 91)
+            .padding(.bottom, -5.5)
             
             
         }
