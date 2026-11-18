@@ -5,6 +5,7 @@ struct PatternCardView: View {
     let bpm: Int
     let onDecreaseBPM: () -> Void
     let onIncreaseBPM: () -> Void
+    var onSelectRecord: ((SessionResult) -> Void)? = nil
     var recordsViewModel: RecordsViewModel? = nil
     var recordsFallbackState: RecordsViewState = .empty
     var recordsRefreshID: Int = 0
@@ -65,10 +66,10 @@ struct PatternCardView: View {
 
             Group {
                 if let recordsViewModel {
-                    RecordsView(viewModel: recordsViewModel)
+                    RecordsView(viewModel: recordsViewModel, onSelectRecord: onSelectRecord)
                         .id(recordsRefreshID)
                 } else {
-                    RecordsContentView(state: recordsFallbackState)
+                    RecordsContentView(state: recordsFallbackState, onSelectRecord: onSelectRecord)
                 }
             }
             .frame(width: 570)

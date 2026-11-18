@@ -8,4 +8,5 @@ enum PatternListEvent: Equatable {
     case setBPM(Int)
     case tapPlay
     case tapBack
+    case selectRecord(SessionResult)
 }

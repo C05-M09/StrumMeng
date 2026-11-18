@@ -64,10 +64,15 @@ struct ContentView: View {
                                 .navigationBarBackButtonHidden()
                         }
 
-                    case let .summary(sessionID):
-                        SummaryRoute(sessionID: sessionID, container: container)
-                            .id(route)
-                            .navigationBarBackButtonHidden()
+                    case let .summary(sessionID, showIntroOverlay, canRetry):
+                        SummaryRoute(
+                            sessionID: sessionID,
+                            showIntroOverlay: showIntroOverlay,
+                            canRetry: canRetry,
+                            container: container
+                        )
+                        .id(route)
+                        .navigationBarBackButtonHidden()
 
                     case .deviceSetup:
                         DeviceSetupRoute(container: container)
@@ -175,15 +180,59 @@ private struct DeviceSetupRoute: View {
 
 /// Same idea for Summary, so a redraw cannot save the session twice or reset the overlays.
 private struct SummaryRoute: View {
-    @State private var viewModel: SummaryViewModel?
+    @State private var practiceViewModel: SummaryViewModel?
+    @State private var showtimeViewModel: ShowtimeSummaryViewModel?
+    private let showIntroOverlay: Bool
+    private let canRetry: Bool
+    private let isShowtime: Bool
+    private let showtimeSongInfo: ShowtimeSongInfo?
+    private let container: AppContainer
 
-    init(sessionID: UUID, container: AppContainer) {
-        _viewModel = State(initialValue: container.makeSummaryViewModel(sessionID: sessionID))
+    init(sessionID: UUID, showIntroOverlay: Bool = true, canRetry: Bool = true, container: AppContainer) {
+        self.showIntroOverlay = showIntroOverlay
+        self.canRetry = canRetry
+        self.container = container
+        let result = container.sessionResult(for: sessionID)
+        let isShowtime = result?.songID != nil
+        self.isShowtime = isShowtime
+        if isShowtime, let result {
+            _showtimeViewModel = State(initialValue: container.makeShowtimeSummaryViewModel(sessionID: sessionID))
+            _practiceViewModel = State(initialValue: nil)
+            self.showtimeSongInfo = container.showtimeSongInfo(for: result)
+        } else {
+            _practiceViewModel = State(initialValue: container.makeSummaryViewModel(sessionID: sessionID))
+            _showtimeViewModel = State(initialValue: nil)
+            self.showtimeSongInfo = nil
+        }
     }
 
     var body: some View {
-        if let viewModel {
-            SummaryView(viewModel: viewModel)
+        if isShowtime, let showtimeViewModel {
+            ShowtimeSummaryView(
+                viewModel: showtimeViewModel,
+                songInfo: showtimeSongInfo,
+                showIntroOverlay: showIntroOverlay,
+                canRetry: canRetry,
+                makeReplayView: { [container] result, dismiss in
+                    guard let replay = container.makeShowtimeReplayViewModel(result: result) else {
+                        return AnyView(Color.clear.onAppear(perform: dismiss))
+                    }
+                    return AnyView(ReplayView(
+                        viewModel: replay,
+                        backgroundAssetName: "Showtime_Assets/Showtime_BG",
+                        bpmColor: AppColors.white,
+                        onDismiss: dismiss
+                    ))
+                }
+            )
+        } else if let practiceViewModel {
+            SummaryView(
+                viewModel: practiceViewModel,
+                showIntroOverlay: showIntroOverlay,
+                canRetry: canRetry
+            )
+        } else {
+            EmptyView()
         }
     }
 }

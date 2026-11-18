@@ -69,6 +69,24 @@ final class PatternListReducerTests: XCTestCase {
         XCTAssertEqual(reduce(state, .selectPattern(id: "unknown")), state)
     }
 
+    func test_selectRecord_doesNotMutateState() {
+        let state = makeLoadedState(selectedPatternID: "foundation", selectedBPM: 80)
+        let sample = SessionResult(
+            id: UUID(),
+            patternID: "foundation",
+            songID: nil,
+            bpm: 80,
+            accuracy: 0.9,
+            perfectCount: 10,
+            tooEarlyCount: 0,
+            missCount: 0,
+            createdAt: .now,
+            beatEvents: []
+        )
+
+        XCTAssertEqual(reduce(state, .selectRecord(sample)), state)
+    }
+
     private func makeLoadedState(
         selectedPatternID: String,
         selectedBPM: Int

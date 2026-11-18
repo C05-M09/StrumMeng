@@ -58,11 +58,83 @@ final class ListenTests: XCTestCase {
         let player = FakeListenPlayer()
         var wentBack = false
         let model = ListenViewModel(pattern: PatternCatalog.all[0], bpm: 80, player: player, history: ExistingListenHistory(),
+                                    guidanceStore: InMemoryPracticeGuidanceStore(hasCompletedGuidance: true),
                                     onReady: {}, onBack: { wentBack = true })
         model.send(.next)
         model.send(.back)
         XCTAssertTrue(player.stopped)
         XCTAssertTrue(wentBack)
+    }
+
+    func test_firstPlay_tappingNextShowsGuidanceInstructionsWithoutStartingPlayback() {
+        let player = FakeListenPlayer()
+        let store = InMemoryPracticeGuidanceStore(hasCompletedGuidance: false)
+        let model = makeModel(player: player, guidanceStore: store)
+
+        XCTAssertEqual(model.state, .information)
+        model.send(.next)
+
+        XCTAssertEqual(model.state, .instructions(step: 0))
+        XCTAssertEqual(player.starts, 0)
+        XCTAssertFalse(store.hasCompletedGuidance)
+    }
+
+    func test_firstPlay_instructionsNextMarksGuidanceCompletedAndStartsListening() {
+        let player = FakeListenPlayer()
+        let store = InMemoryPracticeGuidanceStore(hasCompletedGuidance: false)
+        let model = makeModel(player: player, guidanceStore: store)
+
+        model.send(.next)
+        XCTAssertEqual(model.state, .instructions(step: 0))
+
+        model.send(.instructionsNext)
+
+        XCTAssertEqual(model.state, .listening(step: 0, completed: false))
+        XCTAssertTrue(store.hasCompletedGuidance)
+        XCTAssertEqual(player.starts, 1)
+    }
+
+    func test_subsequentPlay_skipsGuidanceInstructionsDirectlyToListening() {
+        let player = FakeListenPlayer()
+        let store = InMemoryPracticeGuidanceStore(hasCompletedGuidance: true)
+        let model = makeModel(player: player, guidanceStore: store)
+
+        model.send(.next)
+
+        XCTAssertEqual(model.state, .listening(step: 0, completed: false))
+        XCTAssertEqual(player.starts, 1)
+    }
+
+    func test_readyProceedsDirectlyToPlayWhenLoopIsComplete() {
+        let player = FakeListenPlayer()
+        var readyCount = 0
+        let model = makeModel(player: player, onReady: { readyCount += 1 })
+
+        model.send(.next)
+        player.elapsed = 3.0
+        model.refreshProgress()
+        XCTAssertTrue(model.state.canProceed)
+
+        model.send(.ready)
+
+        XCTAssertEqual(model.state, .departed)
+        XCTAssertEqual(readyCount, 1)
+        XCTAssertTrue(player.stopped)
+    }
+
+    func test_userDefaultsPracticeGuidanceStore_persistsCompletion() {
+        let defaults = UserDefaults(suiteName: "ListenTestsDefaults")!
+        defaults.removePersistentDomain(forName: "ListenTestsDefaults")
+        let store = UserDefaultsPracticeGuidanceStore(defaults: defaults)
+
+        XCTAssertFalse(store.hasCompletedGuidance)
+        store.completeGuidance()
+        XCTAssertTrue(store.hasCompletedGuidance)
+
+        let reloadedStore = UserDefaultsPracticeGuidanceStore(defaults: defaults)
+        XCTAssertTrue(reloadedStore.hasCompletedGuidance)
+
+        defaults.removePersistentDomain(forName: "ListenTestsDefaults")
     }
 
     func test_illegalEventsDoNotChangeInformationOrPausedProgress() {
@@ -72,9 +144,20 @@ final class ListenTests: XCTestCase {
         XCTAssertEqual(reduce(paused, .progress(step: 4, completed: true)), paused)
     }
 
-    private func makeModel(player: FakeListenPlayer, onReady: @escaping () -> Void = {}) -> ListenViewModel {
-        ListenViewModel(pattern: PatternCatalog.all[1], bpm: 80, player: player, history: ExistingListenHistory(),
-                        onReady: onReady, onBack: {})
+    private func makeModel(
+        player: FakeListenPlayer,
+        guidanceStore: (any PracticeGuidanceStore)? = nil,
+        onReady: @escaping () -> Void = {}
+    ) -> ListenViewModel {
+        ListenViewModel(
+            pattern: PatternCatalog.all[1],
+            bpm: 80,
+            player: player,
+            history: ExistingListenHistory(),
+            guidanceStore: guidanceStore ?? InMemoryPracticeGuidanceStore(hasCompletedGuidance: true),
+            onReady: onReady,
+            onBack: {}
+        )
     }
 }
 

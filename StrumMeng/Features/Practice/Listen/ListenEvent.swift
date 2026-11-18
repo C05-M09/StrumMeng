@@ -1,5 +1,5 @@
-enum ListenEvent {
-    case next, pause, resume, restart, ready, back
+enum ListenEvent: Equatable {
+    case next, showGuidance, pause, resume, restart, ready, back
     case progress(step: Int, completed: Bool)
     case instructionsNext, retryHistory
     case historyChecked(hasRecords: Bool)

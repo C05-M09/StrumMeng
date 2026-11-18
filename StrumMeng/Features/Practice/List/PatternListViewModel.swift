@@ -14,6 +14,7 @@ final class PatternListViewModel {
     @ObservationIgnored private let lastPlayedBPM: (String) async -> Int?
     private let onListenRequested: (String, Int) -> Void
     private let onBackRequested: () -> Void
+    private let onRecordRequested: (SessionResult) -> Void
 
     init(
         patterns: [StrumPattern]? = nil,
@@ -21,7 +22,8 @@ final class PatternListViewModel {
         recordsFallbackState: RecordsViewState = .empty,
         lastPlayedBPM: @escaping (String) async -> Int? = { _ in nil },
         onListenRequested: @escaping (String, Int) -> Void,
-        onBackRequested: @escaping () -> Void
+        onBackRequested: @escaping () -> Void,
+        onRecordRequested: @escaping (SessionResult) -> Void = { _ in }
     ) {
         let orderedPatterns = (patterns ?? PatternCatalog.all)
             .sorted { $0.suggestedOrder < $1.suggestedOrder }
@@ -38,6 +40,7 @@ final class PatternListViewModel {
 
         self.onListenRequested = onListenRequested
         self.onBackRequested = onBackRequested
+        self.onRecordRequested = onRecordRequested
         self.recordsViewModels = recordsViewModels
         self.recordsFallbackState = recordsFallbackState
         self.lastPlayedBPM = lastPlayedBPM
@@ -61,6 +64,9 @@ final class PatternListViewModel {
 
         case .tapBack:
             onBackRequested()
+
+        case let .selectRecord(result):
+            onRecordRequested(result)
 
         case .decreaseBPM, .increaseBPM, .setBPM:
             break

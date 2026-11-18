@@ -264,6 +264,18 @@ final class AppContainerTests: XCTestCase {
         try await waitForPath([.practiceList], on: router)
     }
 
+    func test_selectRecord_navigatesToSummaryWithoutIntroOverlay() throws {
+        let container = AppContainer(router: router, inMemory: true)
+        let list = container.makePatternListViewModel()
+        let session = finishedSession(bpm: 85)
+
+        list.send(.selectRecord(session))
+
+        XCTAssertEqual(router.path.last, .summary(sessionID: session.id, showIntroOverlay: false, canRetry: false))
+        let summary = try XCTUnwrap(container.makeSummaryViewModel(sessionID: session.id))
+        XCTAssertEqual(summary.result.id, session.id)
+    }
+
     func test_backOnListen_returnsToThePracticeList() {
         let container = AppContainer(router: router, inMemory: true)
         let pattern = PatternCatalog.foundation
@@ -273,6 +285,20 @@ final class AppContainerTests: XCTestCase {
         listen.send(.back)
 
         XCTAssertEqual(router.path, [.practiceList])
+    }
+
+    func test_makeListenViewModel_usesInjectedPracticeGuidanceStore() {
+        let store = InMemoryPracticeGuidanceStore(hasCompletedGuidance: false)
+        let container = AppContainer(router: router, inMemory: true, practiceGuidanceStore: store)
+        let pattern = PatternCatalog.foundation
+        let listen = container.makeListenViewModel(pattern: pattern, bpm: 80)
+
+        listen.send(.next)
+        XCTAssertEqual(listen.state, .instructions(step: 0))
+
+        listen.send(.instructionsNext)
+        XCTAssertEqual(listen.state, .listening(step: 0, completed: false))
+        XCTAssertTrue(store.hasCompletedGuidance)
     }
 
     // MARK: - Guidebook
@@ -327,6 +353,50 @@ final class AppContainerTests: XCTestCase {
         XCTAssertEqual(replay.screenModel().title, song.title)
         XCTAssertNil(container.makeShowtimeReplayViewModel(result: result(songID: "unknown-song")))
         XCTAssertNil(container.makeShowtimeReplayViewModel(result: result(songID: nil)))
+
+        // When the record has a different pattern than the song's default pattern
+        let customPatternID = "half-time-hold"
+        let customResult = SessionResult(
+            id: UUID(),
+            patternID: customPatternID,
+            songID: song.id,
+            bpm: song.bpm,
+            accuracy: 1,
+            perfectCount: 0,
+            tooEarlyCount: 0,
+            missCount: 0,
+            createdAt: Date(),
+            beatEvents: []
+        )
+        let customReplay = try XCTUnwrap(container.makeShowtimeReplayViewModel(result: customResult))
+        XCTAssertEqual(customReplay.pattern.id, customPatternID)
+        let expectedStrokes = try XCTUnwrap(ShowtimePatternCatalog.patternInfo(forID: customPatternID)?.strokes)
+        XCTAssertEqual(Array(customReplay.pattern.strokes.prefix(expectedStrokes.count)), expectedStrokes)
     }
 
+    func test_showSummary_forShowtimeResult_pushesSummaryRouteWithoutIntroAndRetry() {
+        let container = AppContainer(router: router, inMemory: true)
+        let result = SessionResult(
+            id: UUID(),
+            patternID: "foundation",
+            songID: "twinkle-twinkle",
+            bpm: 80,
+            accuracy: 0.95,
+            perfectCount: 15,
+            tooEarlyCount: 0,
+            missCount: 1,
+            createdAt: .now,
+            beatEvents: []
+        )
+
+        container.showSummary(for: result)
+
+        XCTAssertEqual(
+            router.path,
+            [.summary(sessionID: result.id, showIntroOverlay: false, canRetry: false)]
+        )
+        let vm = container.makeShowtimeSummaryViewModel(sessionID: result.id)
+        XCTAssertNotNil(vm)
+        XCTAssertEqual(vm?.result.id, result.id)
+    }
 }

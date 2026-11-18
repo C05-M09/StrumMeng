@@ -11,6 +11,7 @@ final class ListenViewModel {
     private(set) var isControllerConnected: Bool
     @ObservationIgnored private let player: ListenPatternPlayer
     @ObservationIgnored private let history: any SessionHistoryChecking
+    @ObservationIgnored private let guidanceStore: any PracticeGuidanceStore
     @ObservationIgnored private let onReady: () -> Void
     @ObservationIgnored private let onBack: () -> Void
     @ObservationIgnored private let controller: (any ControllerLink)?
@@ -24,18 +25,20 @@ final class ListenViewModel {
     @ObservationIgnored private var knownHasRecords: Bool?
 
     init(pattern: StrumPattern, bpm: Int, player: ListenPatternPlayer,
-         history: any SessionHistoryChecking,
+         history: (any SessionHistoryChecking)? = nil,
+         guidanceStore: any PracticeGuidanceStore,
          controller: (any ControllerLink)? = nil,
          onSetUpDevice: @escaping () -> Void = {},
          onReady: @escaping () -> Void, onBack: @escaping () -> Void) {
         self.pattern = pattern
         self.bpm = bpm
         self.player = player
-        self.history = history
-        self.onReady = onReady
-        self.onBack = onBack
+        self.history = history ?? UnavailableSessionRepository()
+        self.guidanceStore = guidanceStore
         self.controller = controller
         self.onSetUpDevice = onSetUpDevice
+        self.onReady = onReady
+        self.onBack = onBack
         isControllerConnected = controller == nil
     }
 
@@ -70,6 +73,19 @@ final class ListenViewModel {
         onSetUpDevice()
     }
 
+    convenience init(pattern: StrumPattern, bpm: Int, player: ListenPatternPlayer,
+                     history: (any SessionHistoryChecking)? = nil,
+                     guidanceStore: (any PracticeGuidanceStore)? = nil,
+                     controller: (any ControllerLink)? = nil,
+                     onSetUpDevice: @escaping () -> Void = {},
+                     onReady: @escaping () -> Void, onBack: @escaping () -> Void) {
+        self.init(pattern: pattern, bpm: bpm, player: player, history: history,
+                  guidanceStore: guidanceStore ?? UserDefaultsPracticeGuidanceStore(),
+                  controller: controller,
+                  onSetUpDevice: onSetUpDevice,
+                  onReady: onReady, onBack: onBack)
+    }
+
     func send(_ event: ListenEvent) {
         // Play would only collect Misses without the iPhone, so Ready waits for it here.
         if case .ready = event, state.canProceed, !isControllerConnected {
@@ -78,11 +94,29 @@ final class ListenViewModel {
         }
         if case .resume = event, case .disconnected = state, !isControllerConnected { return }
         let previous = state
-        state = reduce(state, event)
-        switch event {
+        let actualEvent: ListenEvent
+        if case .next = event, previous == .information, !guidanceStore.hasCompletedGuidance {
+            actualEvent = .showGuidance
+        } else {
+            actualEvent = event
+        }
+        state = reduce(state, actualEvent)
+        switch actualEvent {
         case .next where previous == .information:
             lookUpHistoryEarly()
             startPlayback()
+        case .showGuidance:
+            break
+        case .instructionsNext:
+            if case .instructions = previous {
+                guidanceStore.completeGuidance()
+                startPlayback()
+            }
+        case .ready:
+            if case .departed = state {
+                stop()
+                onReady()
+            }
         case .restart where state != previous:
             startPlayback()
         case .pause:
@@ -97,14 +131,12 @@ final class ListenViewModel {
             if case .listening = previous, case .disconnected = state { player.pause(); progressTask?.cancel() }
         case .readyWithoutController:
             if case .disconnected = state, state != previous { player.pause(); progressTask?.cancel() }
-        case .ready, .retryHistory:
+        case .retryHistory:
             if case .checkingHistory = state, state != previous { checkHistory() }
         case .historyChecked(let hasRecords):
             if hasRecords, case .checkingHistory = previous, state == .departed {
                 stop(); onReady()
             }
-        case .instructionsNext:
-            if case .instructions = previous { stop(); onReady() }
         case .back where previous != .departed:
             stop(); onBack()
         default: break

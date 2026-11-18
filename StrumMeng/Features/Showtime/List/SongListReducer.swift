@@ -14,7 +14,7 @@ func reduce(_ state: SongListState, _ event: SongListEvent) -> SongListState {
     case .swipeRight:
         return .loaded(songs: songs, selectedIndex: (selectedIndex - 1 + songs.count) % songs.count)
 
-    case .selectSong, .tapBack:
+    case .selectSong, .tapBack, .selectRecord:
         return state
     }
 }
