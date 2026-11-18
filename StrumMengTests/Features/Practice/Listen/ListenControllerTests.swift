@@ -10,7 +10,9 @@ final class ListenControllerTests: XCTestCase {
         let player = CountingListenPlayer()
         let controller = given ?? (withController ? MockControllerLink() : nil)
         let model = ListenViewModel(pattern: PatternCatalog.all[1], bpm: 80, player: player,
-                                    history: KnownHistory(), controller: controller,
+                                    history: KnownHistory(),
+                                    guidanceStore: InMemoryPracticeGuidanceStore(hasCompletedGuidance: true),
+                                    controller: controller,
                                     onSetUpDevice: onSetUpDevice, onReady: onReady, onBack: {})
         return (model, player)
     }

@@ -248,14 +248,13 @@ struct ListenView: View {
     ListenPreviewFactory.make(events: [.showGuidance])
 }
 #Preview("05 · Pause", traits: .landscapeLeft) {
+    ListenPreviewFactory.make(events: [.next, .progress(step: 3, completed: false), .pause])
+}
 #Preview("06 · iPhone disconnected (back, Resume enabled)", traits: .landscapeLeft) {
     ListenPreviewFactory.make(events: [.next, .progress(step: 3, completed: true), .controllerDisconnected],
                               elapsed: 1.125)
 }
-#Preview("04 · Pause", traits: .landscapeLeft) {
-    ListenPreviewFactory.make(events: [.next, .progress(step: 3, completed: false), .pause])
-}
-#Preview("06 · Playback error", traits: .landscapeLeft) {
+#Preview("07 · Playback error", traits: .landscapeLeft) {
     ListenPreviewFactory.make(events: [.failed("The guitar example couldn’t play. Please try again.")])
 }
 #endif

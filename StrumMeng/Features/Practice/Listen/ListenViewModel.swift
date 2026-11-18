@@ -25,21 +25,20 @@ final class ListenViewModel {
     @ObservationIgnored private var knownHasRecords: Bool?
 
     init(pattern: StrumPattern, bpm: Int, player: ListenPatternPlayer,
-         history: any SessionHistoryChecking,
-         controller: (any ControllerLink)? = nil,
-         onSetUpDevice: @escaping () -> Void = {},
          history: (any SessionHistoryChecking)? = nil,
          guidanceStore: any PracticeGuidanceStore,
+         controller: (any ControllerLink)? = nil,
+         onSetUpDevice: @escaping () -> Void = {},
          onReady: @escaping () -> Void, onBack: @escaping () -> Void) {
         self.pattern = pattern
         self.bpm = bpm
         self.player = player
         self.history = history ?? UnavailableSessionRepository()
         self.guidanceStore = guidanceStore
-        self.onReady = onReady
-        self.onBack = onBack
         self.controller = controller
         self.onSetUpDevice = onSetUpDevice
+        self.onReady = onReady
+        self.onBack = onBack
         isControllerConnected = controller == nil
     }
 
@@ -76,9 +75,14 @@ final class ListenViewModel {
 
     convenience init(pattern: StrumPattern, bpm: Int, player: ListenPatternPlayer,
                      history: (any SessionHistoryChecking)? = nil,
+                     guidanceStore: (any PracticeGuidanceStore)? = nil,
+                     controller: (any ControllerLink)? = nil,
+                     onSetUpDevice: @escaping () -> Void = {},
                      onReady: @escaping () -> Void, onBack: @escaping () -> Void) {
         self.init(pattern: pattern, bpm: bpm, player: player, history: history,
-                  guidanceStore: UserDefaultsPracticeGuidanceStore(),
+                  guidanceStore: guidanceStore ?? UserDefaultsPracticeGuidanceStore(),
+                  controller: controller,
+                  onSetUpDevice: onSetUpDevice,
                   onReady: onReady, onBack: onBack)
     }
 
@@ -127,8 +131,6 @@ final class ListenViewModel {
             if case .listening = previous, case .disconnected = state { player.pause(); progressTask?.cancel() }
         case .readyWithoutController:
             if case .disconnected = state, state != previous { player.pause(); progressTask?.cancel() }
-        case .ready, .retryHistory:
-            if case .paused = previous { player.resume(); observeProgress() }
         case .retryHistory:
             if case .checkingHistory = state, state != previous { checkHistory() }
         case .historyChecked(let hasRecords):
