@@ -23,7 +23,11 @@ struct CompanionTouchpadView: View {
             .ignoresSafeArea()
 
             VStack {
-                statusBar
+                // The iPad-disconnected popup already says what is going on and offers Enter Code,
+                // so the status and Unpair would only repeat it behind the veil.
+                if viewModel.state != .ipadDisconnected {
+                    statusBar
+                }
                 Spacer()
                 strumIndicator
                 Spacer()
