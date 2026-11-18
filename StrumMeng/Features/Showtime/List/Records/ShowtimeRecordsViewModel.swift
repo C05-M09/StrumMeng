@@ -7,12 +7,24 @@ import Observation
 final class ShowtimeRecordsViewModel {
     private(set) var state: ShowtimeRecordsViewState = .loading
 
-    private let songID: String
+    let songID: String
+    private(set) var patternID: String?
     private let repository: any SongRecordsRepository
 
-    init(songID: String, repository: any SongRecordsRepository) {
+    init(songID: String, patternID: String? = nil, repository: any SongRecordsRepository) {
         self.songID = songID
+        self.patternID = patternID
         self.repository = repository
+    }
+
+    /// Update the pattern for this record view model and trigger a reload.
+    func updatePatternID(_ newPatternID: String) async {
+        if patternID != newPatternID {
+            patternID = newPatternID
+            await load()
+        } else if case .loading = state {
+            await load()
+        }
     }
 
     /// Stars of the best record (the first row), shown above the card.
@@ -26,7 +38,12 @@ final class ShowtimeRecordsViewModel {
     /// It keeps the current rows on screen while reloading, so there is no flicker.
     func load() async {
         do {
-            let results = try await repository.records(forSong: songID, sortedBy: .accuracy)
+            let results: [SessionResult]
+            if let patternID {
+                results = try await repository.records(forSong: songID, patternID: patternID, sortedBy: .accuracy)
+            } else {
+                results = try await repository.records(forSong: songID, sortedBy: .accuracy)
+            }
             guard !Task.isCancelled else { return }
             if results.isEmpty {
                 state = .empty

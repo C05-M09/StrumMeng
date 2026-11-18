@@ -43,8 +43,8 @@ struct ShowtimeSongSelectView: View {
         static let sideBrightness: Double = -0.38
         static let sideExposure: Color = Color(white: 0.62)
         /// The middle character while the detail card is open.
-        static let detailSize: CGFloat = 1450
-        static let detailFeet: CGFloat = 650
+        static let detailSize: CGFloat = 1400
+        static let detailFeet: CGFloat = 600
         static let detailX: CGFloat = 1079
  
         /// The part of a character's frame that is left out of its tap area on every side, as a
@@ -139,16 +139,28 @@ struct ShowtimeSongSelectView: View {
                     }
 
                     if isDetailShown {
-                        ShowtimeSongDetailCard(song: song)
-                            .position(x: 358, y: 410)
-                            .transition(.opacity)
-                            .zIndex(Layer.foreground)
-                        ShowtimeRecordsCard(stars: viewModel.bestStars(for: song) ?? 0) {
-                            recordsContent(for: song)
+                        let activePatternID = viewModel.activePatternID(for: song.id)
+                        ShowtimeSongDetailCard(
+                            song: song,
+                            activePatternID: activePatternID,
+                            onSelectPattern: { patternID in
+                                viewModel.setActivePatternID(patternID, for: song.id)
+                            }
+                        )
+                        .position(x: 358, y: 410)
+                        .transition(.opacity)
+                        .zIndex(Layer.foreground)
+
+                        ShowtimeRecordsCard(stars: viewModel.bestStars(for: song, patternID: activePatternID) ?? 0) {
+                            recordsContent(for: song, patternID: activePatternID)
+                                .transaction { $0.animation = nil }
                         }
+                        .id(song.id)
+                        .transaction { $0.animation = nil }
                         .position(Stage.recordsCardCenter)
                         .transition(.opacity)
                         .zIndex(Layer.foreground)
+
                         playButton
                             .zIndex(Layer.foreground)
                     }
@@ -292,9 +304,12 @@ struct ShowtimeSongSelectView: View {
 
     /// The song's own records view. It loads again every time the card opens.
     @ViewBuilder
-    private func recordsContent(for song: Song) -> some View {
-        if let recordsViewModel = viewModel.recordsViewModels[song.id] {
-            ShowtimeRecordsView(viewModel: recordsViewModel)
+    private func recordsContent(for song: Song, patternID: String? = nil) -> some View {
+        let activeID = patternID ?? viewModel.activePatternID(for: song.id)
+        if let recordsViewModel = viewModel.recordsViewModel(forSong: song, patternID: activeID) {
+            ShowtimeRecordsView(viewModel: recordsViewModel, patternID: activeID)
+        } else if let recordsViewModel = viewModel.recordsViewModels[song.id] {
+            ShowtimeRecordsView(viewModel: recordsViewModel, patternID: activeID)
         } else {
             ShowtimeRecordsContentView(state: viewModel.recordsFallbackState)
         }

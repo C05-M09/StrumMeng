@@ -21,7 +21,7 @@ struct SongTimeline: Equatable, Sendable {
     /// Each distinct pattern is listened to on C, independently of the song's chord schedule.
     var previewPatterns: [StrumPattern] {
         let base = StrumPattern(id: song.patternID,
-            name: PatternCatalog.all.first(where: { $0.id == song.patternID })?.name ?? "Pattern 1",
+            name: PatternCatalog.pattern(forID: song.patternID)?.name ?? "Pattern 1",
             strokes: song.strokes, beatLabels: song.strokes.indices.map { PlayTimeline.countLabels[$0 % 8] },
             beatsPerPattern: song.strokes.count / 2, suggestedOrder: 1, defaultBPM: song.bpm)
         let candidates = [base] + song.patternChanges.sorted(by: { $0.slot < $1.slot }).map(\.pattern)

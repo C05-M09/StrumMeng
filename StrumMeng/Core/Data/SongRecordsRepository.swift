@@ -9,4 +9,14 @@ nonisolated protocol SongRecordsRepository: Sendable {
     /// Every Showtime record of one song, ordered by `sortedBy` (best accuracy first, ties to the
     /// more recent session). Practice sessions are never included: they have no `songID`.
     func records(forSong songID: String, sortedBy: RecordSortCriterion) async throws -> [SessionResult]
+
+    /// Records of a specific song and strumming pattern combination.
+    func records(forSong songID: String, patternID: String, sortedBy: RecordSortCriterion) async throws -> [SessionResult]
+}
+
+extension SongRecordsRepository {
+    func records(forSong songID: String, patternID: String, sortedBy criterion: RecordSortCriterion) async throws -> [SessionResult] {
+        let all = try await records(forSong: songID, sortedBy: criterion)
+        return all.filter { $0.patternID == patternID }
+    }
 }

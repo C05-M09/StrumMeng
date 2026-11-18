@@ -21,6 +21,7 @@ final class AppContainer {
     private weak var patternListViewModel: PatternListViewModel?
     /// The one song list of the app, so its records can be reloaded after a session.
     private weak var songListViewModel: SongListViewModel?
+    private var selectedShowtimePatternID: String? = nil
     private var customShowtimeSongPlayer: (any ShowtimeSongPlayer)?
     private lazy var showtimeSongPlayer: (any ShowtimeSongPlayer)? = {
         if let customShowtimeSongPlayer { return customShowtimeSongPlayer }
@@ -121,10 +122,17 @@ final class AppContainer {
     }
 
     func makeSongListViewModel() -> SongListViewModel {
-        let records = songRecords.map { repository in
-            Dictionary(uniqueKeysWithValues: songCatalog.songs.map { song in
-                (song.id, ShowtimeRecordsViewModel(songID: song.id, repository: repository))
-            })
+        let records: [String: ShowtimeRecordsViewModel] = songRecords.map { repository in
+            var dict: [String: ShowtimeRecordsViewModel] = [:]
+            for song in songCatalog.songs {
+                dict[song.id] = ShowtimeRecordsViewModel(songID: song.id, repository: repository)
+                let patterns = ShowtimePatternCatalog.patterns(forSongID: song.id)
+                for pattern in patterns {
+                    let key = SongListViewModel.recordsKey(songID: song.id, patternID: pattern.id)
+                    dict[key] = ShowtimeRecordsViewModel(songID: song.id, patternID: pattern.id, repository: repository)
+                }
+            }
+            return dict
         } ?? [:]
         let viewModel = SongListViewModel(
             songs: songCatalog.songs,
@@ -138,12 +146,23 @@ final class AppContainer {
                 router?.pop()
             }
         )
+        viewModel.onSongWithPatternSelected = { [weak self, weak router] (songID: String, patternID: String) in
+            self?.selectedShowtimePatternID = patternID
+            router?.push(.showtime(songID: songID))
+        }
         songListViewModel = viewModel
         return viewModel
     }
 
     func makeShowtimeViewModel(songID: String) -> ShowtimeViewModel? {
-        guard let song = songCatalog.songs.first(where: { $0.id == songID }) else { return nil }
+        guard var song = songCatalog.songs.first(where: { $0.id == songID }) else { return nil }
+        let patternID = selectedShowtimePatternID
+            ?? songListViewModel?.activePatternID(for: song.id)
+            ?? song.patternID
+        if let chosenPattern = PatternCatalog.pattern(forID: patternID) {
+            song.patternID = chosenPattern.id
+            song.strokes = chosenPattern.strokes
+        }
         let timeline = SongTimeline(song: song)
         let link = sharedControllerLink()
         let gameplay = PlayViewModel(pattern: timeline.sessionPattern, bpm: song.bpm, songID: song.id,

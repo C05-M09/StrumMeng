@@ -24,4 +24,26 @@ extension SwiftDataSessionRepository: SongRecordsRepository {
         )
         return try modelContext.fetch(descriptor).map(SessionRecordMapper.makeResult(from:))
     }
+
+    func records(forSong songID: String, patternID: String, sortedBy criterion: RecordSortCriterion) async throws -> [SessionResult] {
+        let wantedSongID: String? = songID
+        let wantedPatternID: String = patternID
+
+        let sort: [SortDescriptor<PracticeSessionRecord>]
+        switch criterion {
+        case .accuracy:
+            sort = [
+                SortDescriptor(\.accuracy, order: .reverse),
+                SortDescriptor(\.createdAt, order: .reverse)
+            ]
+        case .mostRecent:
+            sort = [SortDescriptor(\.createdAt, order: .reverse)]
+        }
+
+        let descriptor = FetchDescriptor<PracticeSessionRecord>(
+            predicate: #Predicate<PracticeSessionRecord> { $0.songID == wantedSongID && $0.patternID == wantedPatternID },
+            sortBy: sort
+        )
+        return try modelContext.fetch(descriptor).map(SessionRecordMapper.makeResult(from:))
+    }
 }
