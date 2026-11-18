@@ -28,6 +28,45 @@ final class ClientMessageHandlerTests: XCTestCase {
         XCTAssertTrue(handler.sessionActive)
     }
 
+    // MARK: iPad away
+
+    func test_hostAway_marksTheIPadAway_andEndsTheSession() {
+        var handler = ClientMessageHandler()
+        handler.receive(.startSession, arrivedAt: 1)
+        handler.receive(.hostAway, arrivedAt: 2)
+        XCTAssertTrue(handler.isHostAway)
+        XCTAssertFalse(handler.sessionActive)
+    }
+
+    func test_copiesOfHostAway_keepTheFirstTime() {
+        var handler = ClientMessageHandler()
+        handler.receive(.hostAway, arrivedAt: 2)
+        handler.receive(.hostAway, arrivedAt: 2.01)
+        XCTAssertEqual(handler.hostAwaySince, 2)
+    }
+
+    func test_aPongToAnOlderPing_doesNotBringTheIPadBack() {
+        var handler = ClientMessageHandler()
+        handler.receive(.hostAway, arrivedAt: 2)
+        handler.receive(.pong(sentAt: 1.99, receivedAt: 102, sessionActive: true), arrivedAt: 2.02)
+        XCTAssertTrue(handler.isHostAway)
+        XCTAssertFalse(handler.sessionActive)
+    }
+
+    func test_aPongToANewerPing_bringsTheIPadBack() {
+        var handler = ClientMessageHandler()
+        handler.receive(.hostAway, arrivedAt: 2)
+        handler.receive(.pong(sentAt: 9, receivedAt: 109, sessionActive: false), arrivedAt: 9.02)
+        XCTAssertFalse(handler.isHostAway)
+    }
+
+    func test_newConnection_isNotAway() {
+        var handler = ClientMessageHandler()
+        handler.receive(.hostAway, arrivedAt: 2)
+        handler.connectionOpened(at: 10)
+        XCTAssertFalse(handler.isHostAway)
+    }
+
     func test_strumOutsideASession_isNotSent() {
         let handler = ClientMessageHandler()
         XCTAssertNil(handler.strumMessage(id: UUID(), direction: .down, touchTime: 5))

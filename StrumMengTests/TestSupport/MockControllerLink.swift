@@ -7,6 +7,7 @@ final class MockControllerLink: ControllerLink {
     private(set) var refreshCount = 0
     private(set) var stopCount = 0
     private(set) var sessionActiveCalls: [Bool] = []
+    private(set) var hostAwayCalls: [Bool] = []
     /// When set, start() throws it.
     var startError: Error?
 
@@ -28,6 +29,7 @@ final class MockControllerLink: ControllerLink {
     }
     func refreshIfNeeded() async throws { refreshCount += 1 }
     func setSessionActive(_ active: Bool) async { sessionActiveCalls.append(active) }
+    func setHostAway(_ away: Bool) async { hostAwayCalls.append(away) }
     func stop() async { stopCount += 1 }
 
     func emit(_ strum: StrumEvent) {

@@ -118,6 +118,7 @@ private struct PreviewControllerLink: ControllerLink {
     func start() async throws {}
     func refreshIfNeeded() async throws {}
     func setSessionActive(_ active: Bool) async {}
+    func setHostAway(_ away: Bool) async {}
     func stop() async {}
 }
 

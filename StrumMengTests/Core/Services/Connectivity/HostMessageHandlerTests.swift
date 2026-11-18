@@ -14,6 +14,21 @@ final class HostMessageHandlerTests: XCTestCase {
         XCTAssertEqual(output, .reply(.pong(sentAt: 5, receivedAt: 100, sessionActive: true)))
     }
 
+    func test_whileTheiPadIsAway_pingsGoUnanswered_butStillCountAsHeard() {
+        var handler = playingHandler()
+        handler.isHostAway = true
+        XCTAssertEqual(handler.receive(.ping(sentAt: 5, latencyMs: nil), arrivedAt: 100), .ignore)
+        XCTAssertTrue(handler.isAlive(now: 101))
+    }
+
+    func test_backFromAway_pingsAreAnsweredAgain() {
+        var handler = playingHandler()
+        handler.isHostAway = true
+        handler.isHostAway = false
+        XCTAssertEqual(handler.receive(.ping(sentAt: 5, latencyMs: nil), arrivedAt: 100),
+                       .reply(.pong(sentAt: 5, receivedAt: 100, sessionActive: true)))
+    }
+
     func test_ping_recordsTheLatencyTheIPhoneMeasured() {
         var handler = HostMessageHandler()
         _ = handler.receive(.ping(sentAt: 5, latencyMs: 12), arrivedAt: 100)
@@ -100,6 +115,7 @@ final class HostMessageHandlerTests: XCTestCase {
         var handler = playingHandler()
         XCTAssertEqual(handler.receive(.startSession, arrivedAt: 1), .ignore)
         XCTAssertEqual(handler.receive(.stopSession, arrivedAt: 1), .ignore)
+        XCTAssertEqual(handler.receive(.hostAway, arrivedAt: 1), .ignore)
         XCTAssertEqual(handler.receive(.pong(sentAt: 0, receivedAt: 0, sessionActive: true), arrivedAt: 1), .ignore)
     }
 

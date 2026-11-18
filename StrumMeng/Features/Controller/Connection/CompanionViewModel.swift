@@ -28,6 +28,7 @@ final class CompanionViewModel {
     @ObservationIgnored private var tracker = SwipeTracker()
     @ObservationIgnored private var linkTask: Task<Void, Never>?
     @ObservationIgnored private var sessionTask: Task<Void, Never>?
+    @ObservationIgnored private var hostLeftTask: Task<Void, Never>?
     @ObservationIgnored private var timeoutTask: Task<Void, Never>?
     @ObservationIgnored private var isInBackground = false
     /// Leaving and coming back are sent in order, even when the player switches away and back quickly.
@@ -70,6 +71,12 @@ final class CompanionViewModel {
                 self?.sessionChanged(active)
             }
         }
+        hostLeftTask = Task { [weak self, left = client.hostLeftSession] in
+            // Only leaving matters here: the iPad coming back arrives as linkConnected.
+            for await hasLeft in left where hasLeft {
+                self?.send(.hostLeftSession)
+            }
+        }
         if guitar == nil, let made = makeGuitar() {
             guitar = made
             Task { await made.prepare() }
@@ -88,6 +95,8 @@ final class CompanionViewModel {
         linkTask = nil
         sessionTask?.cancel()
         sessionTask = nil
+        hostLeftTask?.cancel()
+        hostLeftTask = nil
         cancelTimeout()
         guitar?.stopStrums()
         Task { [client] in await client.disconnect() }
@@ -135,7 +144,7 @@ final class CompanionViewModel {
         case .notFound:
             // The link would otherwise keep looking for an iPad with the wrong code.
             Task { [client] in await client.disconnect() }
-        case .enteringCode, .reconnecting:
+        case .enteringCode, .reconnecting, .ipadDisconnected:
             tracker.reset()
         }
 

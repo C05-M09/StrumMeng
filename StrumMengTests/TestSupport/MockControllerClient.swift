@@ -12,9 +12,11 @@ final class MockControllerClient: ControllerClient {
 
     private let stateChannel = AsyncStream.makeStream(of: ControllerConnectionState.self)
     private let sessionChannel = AsyncStream.makeStream(of: Bool.self)
+    private let hostLeftChannel = AsyncStream.makeStream(of: Bool.self)
 
     var connectionStates: AsyncStream<ControllerConnectionState> { stateChannel.stream }
     var sessionActive: AsyncStream<Bool> { sessionChannel.stream }
+    var hostLeftSession: AsyncStream<Bool> { hostLeftChannel.stream }
 
     func connect(pairCode: PairCode) async { connectedCodes.append(pairCode) }
     func send(_ direction: StrumDirection, touchTime: TimeInterval) async { sentStrums.append((direction, touchTime)) }
@@ -29,5 +31,9 @@ final class MockControllerClient: ControllerClient {
 
     func emitSessionActive(_ active: Bool) {
         sessionChannel.continuation.yield(active)
+    }
+
+    func emitHostLeftSession(_ left: Bool) {
+        hostLeftChannel.continuation.yield(left)
     }
 }

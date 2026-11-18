@@ -12,6 +12,10 @@ nonisolated struct ClientMessageHandler: Sendable {
 
     private(set) var clock = ClockSync()
     private(set) var sessionActive = false
+    /// When hostAway arrived, on this iPhone's clock. Cleared by the first pong to a ping sent
+    /// after it: a pong already on its way when the iPad left does not mean it is back.
+    private(set) var hostAwaySince: TimeInterval?
+    var isHostAway: Bool { hostAwaySince != nil }
     private var lastHeard: TimeInterval?
 
     mutating func receive(_ message: ControllerMessage, arrivedAt arrival: TimeInterval) {
@@ -19,11 +23,19 @@ nonisolated struct ClientMessageHandler: Sendable {
         switch message {
         case let .pong(sentAt, receivedAt, sessionActive):
             clock.record(sentAt: sentAt, hostReceivedAt: receivedAt, receivedBackAt: arrival)
+            if let since = hostAwaySince {
+                guard sentAt >= since else { return }
+                hostAwaySince = nil
+            }
             // A pong reordered behind a start/stop can briefly undo it; the next pong fixes that.
             self.sessionActive = sessionActive
         case .startSession:
             sessionActive = true
         case .stopSession:
+            sessionActive = false
+        case .hostAway:
+            // The copies keep the first time.
+            if hostAwaySince == nil { hostAwaySince = arrival }
             sessionActive = false
         case .hello, .goodbye, .away, .ping, .strum:
             // iPhone → iPad messages; never expected here.
