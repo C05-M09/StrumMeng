@@ -55,6 +55,11 @@ struct ShowtimeSessionView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { send(.pause(.background)) }
+            switch phase {
+            case .background: Task { await viewModel.appEnteredBackground() }
+            case .active: Task { await viewModel.appBecameActive() }
+            default: break
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .listenAudioInterrupted)) { _ in
             send(.pause(.background))

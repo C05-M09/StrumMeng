@@ -62,6 +62,8 @@ final class PlayViewModel {
     /// Whether the clock has started for the current session. Ready tapped before the iPhone
     /// connected waits as disconnected without starting it, so Resume must start it fresh.
     @ObservationIgnored private var hasStartedClock = false
+    /// The iPhone was told the iPad left in the middle of this session.
+    @ObservationIgnored private var isHostAway = false
     @ObservationIgnored private let tolerance: ToleranceConfig
     @ObservationIgnored private let latencyOffset: TimeInterval
     @ObservationIgnored private let strumArrivalGrace: TimeInterval
@@ -213,6 +215,30 @@ final class PlayViewModel {
 
     // MARK: Lifecycle
 
+    /// The iPad app went to the background. In the middle of a session (already paused by then)
+    /// the iPhone is told, so it can show that the iPad is gone instead of a dead strum pad.
+    func appEnteredBackground() async {
+        guard isSessionInProgress, !isHostAway else { return }
+        isHostAway = true
+        await controller?.setHostAway(true)
+    }
+
+    /// The iPad app is in front again: the iPhone sees it back once its pings are answered.
+    func appBecameActive() async {
+        guard isHostAway else { return }
+        isHostAway = false
+        await controller?.setHostAway(false)
+    }
+
+    /// A session that has started and not ended: counting in, playing, or stopped part-way.
+    private var isSessionInProgress: Bool {
+        guard hasStartedClock else { return false }
+        switch state {
+        case .countIn, .playing, .paused, .disconnected: return true
+        default: return false
+        }
+    }
+
     func onAppear() {
         tickTask?.cancel()
         strumTask?.cancel()
@@ -253,6 +279,8 @@ final class PlayViewModel {
         metronome?.cancelClicks()
         await clock.stop()
         await controller?.setSessionActive(false)
+        // Leaving the screen ends the session, so the iPad must not stay "away" for the iPhone.
+        await appBecameActive()
     }
 
     // MARK: Events from the View

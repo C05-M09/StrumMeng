@@ -77,6 +77,15 @@ final class ShowtimeViewModel {
         onSetUpDevice()
     }
 
+    /// The iPad app went to the background: a song in progress tells the iPhone (see PlayViewModel).
+    func appEnteredBackground() async {
+        await gameplay.appEnteredBackground()
+    }
+
+    func appBecameActive() async {
+        await gameplay.appBecameActive()
+    }
+
     func appear() {
         guard !started else { return }
         started = true
