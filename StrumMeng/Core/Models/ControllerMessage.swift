@@ -9,6 +9,10 @@ nonisolated enum ControllerMessage: Codable, Sendable, Equatable {
     /// iPhone → iPad: the player tapped Unpair. The iPad stops waiting for this iPhone and shows
     /// the pair code again, instead of noticing only when the pings stop.
     case goodbye
+    /// iPhone → iPad: the player left the StrumMeng app on the iPhone (home screen, lock, another
+    /// app), so it cannot strum until it comes back. The iPad pauses at once instead of judging
+    /// Misses until the pings time out. The next hello says the iPhone is back.
+    case away
     /// iPad → iPhone. The iPhone sends strums only between startSession and stopSession.
     case startSession
     case stopSession

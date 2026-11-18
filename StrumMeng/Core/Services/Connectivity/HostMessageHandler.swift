@@ -8,6 +8,8 @@ nonisolated struct HostMessageHandler: Sendable {
         case strum(StrumEvent)
         /// The iPhone unpaired: drop the connection and wait for a new pairing.
         case controllerLeft
+        /// The iPhone app went to the background: the controller cannot be used until its next hello.
+        case controllerAway
         case ignore
     }
 
@@ -19,6 +21,9 @@ nonisolated struct HostMessageHandler: Sendable {
     private(set) var controllerName: String?
     /// Latency the iPhone reported in its latest ping.
     private(set) var latencyMs: Double?
+    /// Set by away, cleared by hello. A ping still in flight when the iPhone left must not make the
+    /// controller look usable again.
+    private(set) var isAway = false
     private var lastHeard: TimeInterval?
     private var deduplicator = StrumDeduplicator()
 
@@ -27,9 +32,13 @@ nonisolated struct HostMessageHandler: Sendable {
         switch message {
         case let .hello(deviceName):
             controllerName = deviceName
+            isAway = false
             return .ignore
         case .goodbye:
             return .controllerLeft
+        case .away:
+            isAway = true
+            return .controllerAway
         case let .ping(sentAt, latencyMs):
             if let latencyMs { self.latencyMs = latencyMs }
             return .reply(.pong(sentAt: sentAt, receivedAt: arrival, sessionActive: sessionActive))
@@ -49,6 +58,7 @@ nonisolated struct HostMessageHandler: Sendable {
         lastHeard = time
         latencyMs = nil
         controllerName = nil
+        isAway = false
     }
 
     func isAlive(now: TimeInterval) -> Bool {

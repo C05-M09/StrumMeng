@@ -16,4 +16,10 @@ protocol ControllerClient: Sendable {
     /// Tells the iPad this iPhone is leaving (the player tapped Unpair), then disconnects. Unlike
     /// disconnect(), the iPad goes straight back to showing the pair code.
     func unpair() async
+    /// The iPhone app went to the background. Tells the iPad, which pauses a playing session at
+    /// once, and stops pinging until returnFromBackground() so the iPad does not see it as back.
+    func leaveForBackground() async
+    /// The iPhone app is in front again: says hello and pings again, or reconnects if the iPad
+    /// stopped answering meanwhile.
+    func returnFromBackground() async
 }

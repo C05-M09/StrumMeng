@@ -25,6 +25,9 @@ actor BonjourControllerClient: ControllerClient {
     /// iPads that rejected our code (someone else's iPad nearby). Cleared when we run out.
     private var rejected: Set<NWEndpoint> = []
     private var hasEverConnected = false
+    /// Between leaveForBackground and returnFromBackground: no pings, so the iPad keeps the
+    /// controller paused even if the connection survives.
+    private var isAway = false
     private var handler = ClientMessageHandler()
     private var pingTask: Task<Void, Never>?
     private var handshakeTask: Task<Void, Never>?
@@ -74,6 +77,30 @@ actor BonjourControllerClient: ControllerClient {
             try? await Task.sleep(for: Self.goodbyeFlushDelay)
         }
         await disconnect()
+    }
+
+    func leaveForBackground() async {
+        guard !isAway else { return }
+        isAway = true
+        pingTask?.cancel()
+        pingTask = nil
+        guard isReady, let connection, let data = try? ControllerMessage.away.encoded() else { return }
+        // Several copies, as UDP may lose one. If all are lost the iPad notices when the pings stop.
+        for _ in 0..<ClientMessageHandler.strumCopies {
+            connection.send(content: data, completion: .idempotent)
+        }
+    }
+
+    func returnFromBackground() async {
+        guard isAway else { return }
+        isAway = false
+        guard isReady else { return }
+        guard handler.isAlive(now: HostClock.now()) else {
+            // Gone long enough for the iPad to drop us: find it again.
+            connectionLost()
+            return
+        }
+        greetAndPing()
     }
 
     func disconnect() async {
@@ -141,8 +168,8 @@ actor BonjourControllerClient: ControllerClient {
             handler.connectionOpened(at: HostClock.now())
             sessionBroadcast.yield(false)
             receiveNext(on: changed)
-            send(.hello(deviceName: deviceName))
-            startPinging()
+            // Connected while the app was on its way out: say hello on return instead.
+            if !isAway { greetAndPing() }
         case let .waiting(error), let .failed(error):
             if case .tls = error { rejected.insert(endpoint) }
             connectionLost()
@@ -188,6 +215,12 @@ actor BonjourControllerClient: ControllerClient {
     }
 
     // MARK: - Messages
+
+    /// The hello also tells the iPad that an away iPhone is back.
+    private func greetAndPing() {
+        send(.hello(deviceName: deviceName))
+        startPinging()
+    }
 
     /// Pings keep the clock offset fresh and double as the liveness check in both directions.
     private func startPinging() {
