@@ -5,9 +5,10 @@ import SwiftUI
 struct ShowtimeRecordsView: View {
     let viewModel: ShowtimeRecordsViewModel
     var patternID: String? = nil
+    var onSelectRecord: ((SessionResult) -> Void)? = nil
 
     var body: some View {
-        ShowtimeRecordsContentView(state: viewModel.state)
+        ShowtimeRecordsContentView(state: viewModel.state, onSelectRecord: onSelectRecord)
             .task(id: "\(viewModel.songID)_\(patternID ?? viewModel.patternID ?? "")") {
                 if let patternID {
                     await viewModel.updatePatternID(patternID)
@@ -27,6 +28,7 @@ struct ShowtimeRecordsView: View {
 /// instead of BPM.
 struct ShowtimeRecordsContentView: View {
     let state: ShowtimeRecordsViewState
+    var onSelectRecord: ((SessionResult) -> Void)? = nil
 
     private enum Layout {
         static let cardWidth: CGFloat = 584
@@ -91,8 +93,16 @@ struct ShowtimeRecordsContentView: View {
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(rows) { row in
-                        ShowtimeRecordRowView(model: row)
-                            .frame(height: rowHeight)
+                        Button {
+                            onSelectRecord?(row.result)
+                        } label: {
+                            ShowtimeRecordRowView(model: row)
+                                .frame(height: rowHeight)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(ShowtimeRecordRowButtonStyle())
+                        .disabled(onSelectRecord == nil)
+
                         Rectangle()
                             .fill(AppColors.recordOutline)
                             .frame(height: Layout.dividerHeight)
@@ -128,6 +138,15 @@ struct ShowtimeRecordsContentView: View {
     }
 }
 
+private struct ShowtimeRecordRowButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .opacity(configuration.isPressed ? 0.65 : 1.0)
+            .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+            .clicksWhenPressed(configuration.isPressed)
+    }
+}
+
 /// One Showtime record: rank, accuracy, Perfect, Miss and the stars it earned.
 struct ShowtimeRecordRowView: View {
     let model: ShowtimeRecordRowModel
@@ -145,6 +164,8 @@ struct ShowtimeRecordRowView: View {
         static let mutedOpacity: Double = 0.75
         static let valueAreaHeight: CGFloat = 36
         static let starsHeight: CGFloat = 32
+        static let arrowSize: CGFloat = 26
+        static let arrowSpacing: CGFloat = 10
     }
 
     var body: some View {
@@ -168,10 +189,16 @@ struct ShowtimeRecordRowView: View {
 
             Spacer(minLength: 0)
 
-            Image(ShowtimeAssets.star(model.stars))
-                .resizable()
-                .scaledToFit()
-                .frame(height: Layout.starsHeight)
+            HStack(spacing: Layout.arrowSpacing) {
+                Image(ShowtimeAssets.star(model.stars))
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: Layout.starsHeight)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: Layout.arrowSize, weight: .medium))
+                    .foregroundStyle(AppColors.recordOutline)
+            }
         }
         .foregroundStyle(AppColors.brownInk)
         .accessibilityElement(children: .ignore)
@@ -179,6 +206,7 @@ struct ShowtimeRecordRowView: View {
             "Record \(model.rank): accuracy \(model.accuracyPercent) percent, "
             + "\(model.perfectCount) perfect, \(model.missCount) miss, \(model.stars) of 3 stars"
         )
+        .accessibilityHint("Shows summary of this record")
     }
 
     private func statColumn(value: String, label: String, valueFont: Font? = nil) -> some View {

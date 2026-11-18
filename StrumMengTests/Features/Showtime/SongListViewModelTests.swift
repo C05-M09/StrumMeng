@@ -106,5 +106,34 @@ final class SongListViewModelTests: XCTestCase {
         XCTAssertEqual(mockPlayer.resumeCount, 1)
         XCTAssertTrue(mockPlayer.isPlaying)
     }
+
+    func test_selectRecord_stopsPlayback_andCallsCallback() {
+        let viewModel = makeViewModel()
+        viewModel.startPlayback()
+
+        var selectedRecord: SessionResult?
+        viewModel.onRecordRequested = { record in
+            selectedRecord = record
+        }
+
+        let result = SessionResult(
+            id: UUID(),
+            patternID: "foundation",
+            songID: "twinkle-twinkle",
+            bpm: 80,
+            accuracy: 0.9,
+            perfectCount: 10,
+            tooEarlyCount: 1,
+            missCount: 2,
+            createdAt: .now,
+            beatEvents: []
+        )
+
+        viewModel.send(.selectRecord(result))
+
+        XCTAssertEqual(selectedRecord?.id, result.id)
+        XCTAssertEqual(mockPlayer.stopCount, 1)
+        XCTAssertFalse(mockPlayer.isPlaying)
+    }
 }
 

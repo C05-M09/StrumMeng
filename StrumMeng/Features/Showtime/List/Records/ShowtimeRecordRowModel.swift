@@ -12,6 +12,7 @@ struct ShowtimeRecordRowModel: Identifiable, Equatable, Sendable {
     let missCount: Int
     /// 0...3, from `StarRating`, the same rule as the summary.
     let stars: Int
+    let result: SessionResult
 
     /// `rank` is 1-based and is decided by the order the repository returns.
     init(rank: Int, result: SessionResult) {
@@ -23,5 +24,6 @@ struct ShowtimeRecordRowModel: Identifiable, Equatable, Sendable {
         self.tooEarlyCount = result.tooEarlyCount
         self.missCount = result.missCount
         self.stars = StarRating.stars(for: result.accuracy)
+        self.result = result
     }
 }

@@ -339,6 +339,50 @@ final class AppContainerTests: XCTestCase {
         XCTAssertEqual(replay.screenModel().title, song.title)
         XCTAssertNil(container.makeShowtimeReplayViewModel(result: result(songID: "unknown-song")))
         XCTAssertNil(container.makeShowtimeReplayViewModel(result: result(songID: nil)))
+
+        // When the record has a different pattern than the song's default pattern
+        let customPatternID = "half-time-hold"
+        let customResult = SessionResult(
+            id: UUID(),
+            patternID: customPatternID,
+            songID: song.id,
+            bpm: song.bpm,
+            accuracy: 1,
+            perfectCount: 0,
+            tooEarlyCount: 0,
+            missCount: 0,
+            createdAt: Date(),
+            beatEvents: []
+        )
+        let customReplay = try XCTUnwrap(container.makeShowtimeReplayViewModel(result: customResult))
+        XCTAssertEqual(customReplay.pattern.id, customPatternID)
+        let expectedStrokes = try XCTUnwrap(ShowtimePatternCatalog.patternInfo(forID: customPatternID)?.strokes)
+        XCTAssertEqual(Array(customReplay.pattern.strokes.prefix(expectedStrokes.count)), expectedStrokes)
     }
 
+    func test_showSummary_forShowtimeResult_pushesSummaryRouteWithoutIntroAndRetry() {
+        let container = AppContainer(router: router, inMemory: true)
+        let result = SessionResult(
+            id: UUID(),
+            patternID: "foundation",
+            songID: "twinkle-twinkle",
+            bpm: 80,
+            accuracy: 0.95,
+            perfectCount: 15,
+            tooEarlyCount: 0,
+            missCount: 1,
+            createdAt: .now,
+            beatEvents: []
+        )
+
+        container.showSummary(for: result)
+
+        XCTAssertEqual(
+            router.path,
+            [.summary(sessionID: result.id, showIntroOverlay: false, canRetry: false)]
+        )
+        let vm = container.makeShowtimeSummaryViewModel(sessionID: result.id)
+        XCTAssertNotNil(vm)
+        XCTAssertEqual(vm?.result.id, result.id)
+    }
 }

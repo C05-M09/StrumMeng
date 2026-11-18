@@ -10,6 +10,7 @@ import SwiftUI
 struct ShowtimeSummaryView: View {
     let viewModel: ShowtimeSummaryViewModel
     let songInfo: ShowtimeSongInfo
+    let canRetry: Bool
     var onNavigate: ((ShowtimeSummaryDestination) -> Void)?
     var makeReplayView: ((SessionResult, @escaping () -> Void) -> AnyView)?
 
@@ -25,14 +26,17 @@ struct ShowtimeSummaryView: View {
         viewModel: ShowtimeSummaryViewModel,
         songInfo: ShowtimeSongInfo? = nil,
         showIntroOverlay: Bool = true,
+        canRetry: Bool = true,
         onNavigate: ((ShowtimeSummaryDestination) -> Void)? = nil,
         makeReplayView: ((SessionResult, @escaping () -> Void) -> AnyView)? = nil
     ) {
         self.viewModel = viewModel
         self.songInfo = songInfo ?? .fallback(for: viewModel.result)
+        self.canRetry = canRetry
         self.onNavigate = onNavigate
         self.makeReplayView = makeReplayView
         self._isShowingFeedbackOverlay = State(initialValue: showIntroOverlay)
+        self._isGarageOpen = State(initialValue: !showIntroOverlay)
     }
 
     var body: some View {
@@ -91,9 +95,11 @@ struct ShowtimeSummaryView: View {
         .persistentSystemOverlays(.hidden)
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
-            playSoundEffect(.garage)
-            withAnimation(.spring(response: 0.58, dampingFraction: 0.86).delay(0.10)) {
-                isGarageOpen = true
+            if !isGarageOpen {
+                playSoundEffect(.garage)
+                withAnimation(.spring(response: 0.58, dampingFraction: 0.86).delay(0.10)) {
+                    isGarageOpen = true
+                }
             }
         }
         .task {
@@ -191,18 +197,20 @@ struct ShowtimeSummaryView: View {
 
         // 4. Tombol REPLAY & RETRY
         VStack(spacing: 8) {
-            Button {
-                viewModel.send(.tapRetry)
-            } label: {
-                EmptyView()
-            }
-            .buttonStyle(
-                AssetButtonStyle(
-                    normalAssetName: "Button_Retry_Normal",
-                    pressedAssetName: "Button_Retry_Pressed",
-                    size: CGSize(width: 360, height: 104)
+            if canRetry {
+                Button {
+                    viewModel.send(.tapRetry)
+                } label: {
+                    EmptyView()
+                }
+                .buttonStyle(
+                    AssetButtonStyle(
+                        normalAssetName: "Button_Retry_Normal",
+                        pressedAssetName: "Button_Retry_Pressed",
+                        size: CGSize(width: 360, height: 104)
+                    )
                 )
-            )
+            }
 
             Button {
                 viewModel.send(.tapReplay)
@@ -217,7 +225,7 @@ struct ShowtimeSummaryView: View {
                 )
             )
         }
-        .frame(width: 760)
+        .frame(width: 760, height: 216, alignment: .bottom)
         .position(x: 1133, y: 860)
     }
 

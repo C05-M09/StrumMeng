@@ -307,11 +307,17 @@ struct ShowtimeSongSelectView: View {
     private func recordsContent(for song: Song, patternID: String? = nil) -> some View {
         let activeID = patternID ?? viewModel.activePatternID(for: song.id)
         if let recordsViewModel = viewModel.recordsViewModel(forSong: song, patternID: activeID) {
-            ShowtimeRecordsView(viewModel: recordsViewModel, patternID: activeID)
+            ShowtimeRecordsView(viewModel: recordsViewModel, patternID: activeID, onSelectRecord: { result in
+                viewModel.send(.selectRecord(result))
+            })
         } else if let recordsViewModel = viewModel.recordsViewModels[song.id] {
-            ShowtimeRecordsView(viewModel: recordsViewModel, patternID: activeID)
+            ShowtimeRecordsView(viewModel: recordsViewModel, patternID: activeID, onSelectRecord: { result in
+                viewModel.send(.selectRecord(result))
+            })
         } else {
-            ShowtimeRecordsContentView(state: viewModel.recordsFallbackState)
+            ShowtimeRecordsContentView(state: viewModel.recordsFallbackState, onSelectRecord: { result in
+                viewModel.send(.selectRecord(result))
+            })
         }
     }
 
