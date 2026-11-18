@@ -23,10 +23,10 @@ struct CompanionTouchpadView: View {
             .ignoresSafeArea()
 
             VStack {
-                // The iPad-disconnected popup already says what is going on and offers Enter Code,
-                // so the status and Unpair would only repeat it behind the veil.
+                // The iPad-disconnected popup offers Enter Code, so Unpair would only repeat it
+                // behind the veil.
                 if viewModel.state != .ipadDisconnected {
-                    statusBar
+                    unpairBar
                 }
                 Spacer()
                 strumIndicator
@@ -42,22 +42,11 @@ struct CompanionTouchpadView: View {
         .sensoryFeedback(.impact(weight: .light), trigger: viewModel.strumCount)
     }
 
-    private var statusBar: some View {
+    /// No connection status here: the iPad shows the link state, and a dropped iPad mid-session
+    /// gets its own popup on this phone.
+    private var unpairBar: some View {
         HStack {
-            HStack(spacing: AppSpacing.s) {
-                Circle()
-                    .fill(viewModel.state == .connected ? AppColor.perfect : AppColor.tooEarly)
-                    .frame(width: 12, height: 12)
-                Text(viewModel.state == .connected ? "Connected" : "Reconnecting...")
-                    .font(AppFont.mono(14))
-                    .foregroundStyle(AppColor.ink)
-            }
-            .padding(.horizontal, AppSpacing.m)
-            .padding(.vertical, AppSpacing.s)
-            .background(AppColor.paper, in: Capsule())
-
             Spacer()
-
             ChunkyButton(title: "Unpair", style: .danger, fontSize: 14, width: 90, height: 38,
                          hasDropShadow: true) {
                 viewModel.send(.disconnect)
