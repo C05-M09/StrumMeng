@@ -4,7 +4,13 @@ import SwiftUI
 struct CompanionTouchpadView: View {
     let viewModel: CompanionViewModel
 
+    /// How long the last strum's node stays fully visible, then how long it takes to fade out.
+    /// Purely cosmetic, so a sleeping task is fine (this is not beat timing).
+    private static let nodeHold: Duration = .milliseconds(600)
+    private static let nodeFade: TimeInterval = 0.4
+
     @State private var pulse = false
+    @State private var nodeOpacity: Double = 1
 
     var body: some View {
         ZStack {
@@ -23,7 +29,11 @@ struct CompanionTouchpadView: View {
             .ignoresSafeArea()
 
             VStack {
-                statusBar
+                // The iPad-disconnected popup offers Enter Code, so Unpair would only repeat it
+                // behind the veil.
+                if viewModel.state != .ipadDisconnected {
+                    unpairBar
+                }
                 Spacer()
                 strumIndicator
                 Spacer()
@@ -34,26 +44,23 @@ struct CompanionTouchpadView: View {
             pulse = true
             withAnimation(.easeOut(duration: 0.2)) { pulse = false }
         }
+        // Each strum shows its node again and restarts the fade; the previous wait is cancelled.
+        .task(id: viewModel.strumCount) {
+            guard viewModel.lastStrum != nil else { return }
+            nodeOpacity = 1
+            try? await Task.sleep(for: Self.nodeHold)
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: Self.nodeFade)) { nodeOpacity = 0 }
+        }
         // The player's eyes are on the iPad, so the phone confirms each strum by feel.
         .sensoryFeedback(.impact(weight: .light), trigger: viewModel.strumCount)
     }
 
-    private var statusBar: some View {
+    /// No connection status here: the iPad shows the link state, and a dropped iPad mid-session
+    /// gets its own popup on this phone.
+    private var unpairBar: some View {
         HStack {
-            HStack(spacing: AppSpacing.s) {
-                Circle()
-                    .fill(viewModel.state == .connected ? AppColor.perfect : AppColor.tooEarly)
-                    .frame(width: 12, height: 12)
-                Text(viewModel.state == .connected ? "Connected" : "Reconnecting...")
-                    .font(AppFont.mono(14))
-                    .foregroundStyle(AppColor.ink)
-            }
-            .padding(.horizontal, AppSpacing.m)
-            .padding(.vertical, AppSpacing.s)
-            .background(AppColor.paper, in: Capsule())
-
             Spacer()
-
             ChunkyButton(title: "Unpair", style: .danger, fontSize: 14, width: 90, height: 38,
                          hasDropShadow: true) {
                 viewModel.send(.disconnect)
@@ -68,6 +75,7 @@ struct CompanionTouchpadView: View {
                 BeatNodeView(arrow: strum == .down ? .down : .up, size: 96)
                     .scaleEffect(pulse ? 1.25 : 1)
                     .rotationEffect(.degrees(-90))
+                    .opacity(nodeOpacity)
             } else {
                 Text("SWIPE LEFT OR RIGHT\nTO STRUM")
                     .font(AppFont.display(20))

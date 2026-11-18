@@ -21,12 +21,14 @@ final class PlayViewModelTests: XCTestCase {
                                strumArrivalGrace: TimeInterval = 0,
                                touchInput: TouchStrumInput? = nil,
                                controller: ControllerLink? = nil,
+                               knownControllerConnection: Bool? = nil,
                                requiresController: Bool = true,
                                sound: MockGuitarSound? = nil) throws -> PlayViewModel {
         let pattern = try XCTUnwrap(PatternCatalog.all.first { $0.id == patternID })
         return PlayViewModel(
             pattern: pattern, bpm: 80, clock: clock, input: MockStrumInputService(), touchInput: touchInput,
-            controller: controller, requiresController: requiresController,
+            controller: controller, knownControllerConnection: knownControllerConnection,
+            requiresController: requiresController,
             guitar: sound, metronome: sound, latencyOffset: latencyOffset, strumArrivalGrace: strumArrivalGrace,
             leadInSteps: leadInSteps, repetitions: repetitions, finishBreak: finishBreak,
             now: { [unowned self] in self.currentTime },
@@ -483,6 +485,66 @@ final class PlayViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.state, .countIn(3))
     }
 
+    // MARK: Ready before the first connection state
+
+    func test_readyBeforeTheFirstConnectionState_waits_andCountsInOnceConnected() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try makeViewModel(controller: controller)
+        var states: [PracticeState] = []
+        viewModel.onStateChanged = { states.append($0) }
+
+        await viewModel.send(.tapReady)
+        XCTAssertEqual(viewModel.state, .ready)
+        await viewModel.handle(.connected(latencyMs: 5))
+
+        XCTAssertEqual(viewModel.state, .countIn(3))
+        // Never flashed the disconnected popup on the way.
+        XCTAssertFalse(states.contains(.disconnected))
+        XCTAssertEqual(clock.startedBPMs, [80])
+    }
+
+    func test_readyBeforeTheFirstConnectionState_waitsAsDisconnected_whenTheIPhoneIsMissing() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try makeViewModel(controller: controller)
+
+        await viewModel.send(.tapReady)
+        await viewModel.handle(.reconnecting)
+
+        XCTAssertEqual(viewModel.state, .disconnected)
+        XCTAssertTrue(clock.startedBPMs.isEmpty)
+    }
+
+    func test_aKnownConnectedIPhone_readyCountsInAtOnce() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try makeViewModel(controller: controller, knownControllerConnection: true)
+
+        await viewModel.send(.tapReady)
+
+        XCTAssertEqual(viewModel.state, .countIn(3))
+        XCTAssertEqual(clock.startedBPMs, [80])
+    }
+
+    func test_aKnownMissingIPhone_readyWaitsAsDisconnectedAtOnce() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try makeViewModel(controller: controller, knownControllerConnection: false)
+
+        await viewModel.send(.tapReady)
+
+        XCTAssertEqual(viewModel.state, .disconnected)
+        XCTAssertTrue(clock.startedBPMs.isEmpty)
+    }
+
+    func test_aWaitingReady_isUsedOnlyOnce() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try makeViewModel(controller: controller)
+
+        await viewModel.send(.tapReady)
+        await viewModel.handle(.connected(latencyMs: 5))
+        await viewModel.handle(.connected(latencyMs: 6))
+
+        XCTAssertEqual(clock.startedBPMs, [80])
+    }
+
     func test_tapReady_whileTheControllerIsNotConnected_waitsForItAsDisconnected() async throws {
         let controller = MockControllerLink()
         let viewModel = try makeViewModel(controller: controller)
@@ -554,6 +616,70 @@ final class PlayViewModelTests: XCTestCase {
         currentTime = time(ofTick: 20)
         viewModel.closeWindows(upTo: currentTime)
         XCTAssertFalse(viewModel.beatEvents.contains { $0.result == .miss })
+    }
+
+    // MARK: iPad in the background
+
+    func test_backgroundDuringASession_tellsTheIPhone_andReturningToo() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try await makeConnectedViewModel(controller)
+        await startPlaying(viewModel)
+        await viewModel.send(.appMovedToBackground)
+
+        await viewModel.appEnteredBackground()
+        XCTAssertEqual(controller.hostAwayCalls, [true])
+        await viewModel.appBecameActive()
+        XCTAssertEqual(controller.hostAwayCalls, [true, false])
+    }
+
+    func test_backgroundWhileDisconnected_stillTellsTheIPhone() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try await makeConnectedViewModel(controller)
+        await startPlaying(viewModel)
+        await viewModel.handle(.reconnecting)
+
+        await viewModel.appEnteredBackground()
+        XCTAssertEqual(controller.hostAwayCalls, [true])
+    }
+
+    func test_backgroundBeforeTheSessionStarts_tellsNobody() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try await makeConnectedViewModel(controller)
+
+        await viewModel.appEnteredBackground()
+        await viewModel.appBecameActive()
+        XCTAssertTrue(controller.hostAwayCalls.isEmpty)
+    }
+
+    func test_backgroundAfterTheSessionFinished_tellsNobody() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try await makeConnectedViewModel(controller)
+        await startPlaying(viewModel)
+        await viewModel.send(.tapPause)
+        await viewModel.send(.tapBackToMenu)
+
+        await viewModel.appEnteredBackground()
+        XCTAssertTrue(controller.hostAwayCalls.isEmpty)
+    }
+
+    func test_repeatedBackground_isSentOnce() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try await makeConnectedViewModel(controller)
+        await startPlaying(viewModel)
+
+        await viewModel.appEnteredBackground()
+        await viewModel.appEnteredBackground()
+        XCTAssertEqual(controller.hostAwayCalls, [true])
+    }
+
+    func test_leavingTheScreenWhileAway_bringsTheIPadBack() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try await makeConnectedViewModel(controller)
+        await startPlaying(viewModel)
+        await viewModel.appEnteredBackground()
+
+        await viewModel.onDisappear()
+        XCTAssertEqual(controller.hostAwayCalls, [true, false])
     }
 
     func test_controllerDisconnectingOutsideASession_changesNothing() async throws {

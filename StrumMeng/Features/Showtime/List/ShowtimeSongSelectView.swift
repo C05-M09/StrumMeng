@@ -38,7 +38,7 @@ struct ShowtimeSongSelectView: View {
         static let sideSize: CGFloat = 1100
         static let sideFeet: CGFloat = 820
         /// Distance between the middle character and each neighbour.
-        static let sideSpacing: CGFloat = 350
+        static let sideSpacing: CGFloat = 400
         /// Darkening for side characters (negative brightness and reduced exposure) instead of reducing opacity.
         static let sideBrightness: Double = -0.38
         static let sideExposure: Color = Color(white: 0.62)
@@ -128,12 +128,13 @@ struct ShowtimeSongSelectView: View {
                         .zIndex(Layer.foreground)
 
                     if !isDetailShown {
-                        Text("Swipe character to choose a song")
+                        Text("Swipe character to\nchoose a song")
                             .font(ShowtimeStyle.body(34))
                             .foregroundStyle(.white)
                             .multilineTextAlignment(.center)
+                            .shadow(color: AppColors.brownInk.opacity(0.75), radius: 3, x: 0, y: 4)
                             .frame(width: 520)
-                            .position(x: 980, y: 916)
+                            .position(x: 1010, y: 920)
                             .transition(.opacity)
                             .zIndex(Layer.foreground)
                     }

@@ -373,6 +373,43 @@ final class CompanionViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.state, .enteringCode(""))
     }
 
+    // MARK: iPad left mid-session
+
+    func test_iPadLeavingMidSession_showsThePopup_andItClosesWhenTheIPadIsBack() async {
+        let (viewModel, client, _) = makeViewModel()
+        viewModel.appear()
+
+        client.emitHostLeftSession(true)
+        await waitUntil { viewModel.state == .ipadDisconnected }
+        XCTAssertEqual(viewModel.state, .ipadDisconnected)
+
+        client.emit(.connected(latencyMs: 8))
+        await waitUntil { viewModel.state == .connected }
+        XCTAssertEqual(viewModel.state, .connected)
+        viewModel.stop()
+    }
+
+    func test_enterCode_onThePopup_unpairsAndForgetsTheCode() async throws {
+        let (viewModel, client, store) = makeViewModel(state: .ipadDisconnected,
+                                                       saved: try XCTUnwrap(PairCode("482913")))
+
+        viewModel.send(.disconnect)
+        await waitUntil { client.unpairCount == 1 }
+
+        XCTAssertEqual(client.unpairCount, 1)
+        XCTAssertNil(store.enteredPairCode)
+        XCTAssertEqual(viewModel.state, .enteringCode(""))
+    }
+
+    func test_whileTheIPadIsGone_aSwipeIsNotSent() async {
+        let (viewModel, client, _) = makeViewModel(state: .ipadDisconnected)
+
+        viewModel.swipe(dx: CompanionViewModel.swipeThreshold)
+        for _ in 0..<100 { await Task.yield() }
+
+        XCTAssertTrue(client.sentStrums.isEmpty)
+    }
+
     // MARK: Background
 
     func test_goingToTheBackground_tellsTheIPad_andComingBack_too() async {

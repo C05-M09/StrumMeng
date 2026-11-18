@@ -26,13 +26,19 @@ func reduce(_ state: CompanionState, _ event: CompanionEvent) -> CompanionState 
     case (.notFound, .deleteDigit):
         return .enteringCode("")
 
-    case (.connecting, .linkConnected), (.reconnecting, .linkConnected):
+    // Coming back closes the iPad-disconnected popup by itself.
+    case (.connecting, .linkConnected), (.reconnecting, .linkConnected), (.ipadDisconnected, .linkConnected):
         return .connected
 
     case (.connected, .linkLost):
         return .reconnecting
 
-    case (.connecting, .disconnect), (.connected, .disconnect), (.reconnecting, .disconnect):
+    case (.connected, .hostLeftSession), (.reconnecting, .hostLeftSession):
+        return .ipadDisconnected
+
+    // Enter Code on the popup is Unpair: back to typing a code.
+    case (.connecting, .disconnect), (.connected, .disconnect), (.reconnecting, .disconnect),
+         (.ipadDisconnected, .disconnect):
         return .enteringCode("")
 
     default:

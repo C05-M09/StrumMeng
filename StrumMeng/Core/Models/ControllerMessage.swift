@@ -16,6 +16,10 @@ nonisolated enum ControllerMessage: Codable, Sendable, Equatable {
     /// iPad → iPhone. The iPhone sends strums only between startSession and stopSession.
     case startSession
     case stopSession
+    /// iPad → iPhone: the iPad app went to the background in the middle of a session. The iPhone
+    /// shows that the iPad is gone; the iPad answers no ping until it is back, so the iPhone cannot
+    /// mistake the seconds before iOS suspends the iPad for a return.
+    case hostAway
     /// iPhone → iPad. Sent several times over UDP; `id` lets the iPad drop the copies.
     /// `hostTime` is when the finger moved, already on the iPad host clock, or nil while the
     /// clocks are not synced yet (the iPad then falls back to the arrival time).

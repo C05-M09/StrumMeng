@@ -89,4 +89,33 @@ final class CompanionReducerTests: XCTestCase {
         XCTAssertEqual(reduce(.connecting("482913"), .deleteDigit), .connecting("482913"))
         XCTAssertEqual(reduce(.connected, .typeDigit(1)), .connected)
     }
+
+    // MARK: iPad left mid-session
+
+    func test_iPadLeavingMidSession_showsIPadDisconnected() {
+        XCTAssertEqual(reduce(.connected, .hostLeftSession), .ipadDisconnected)
+        XCTAssertEqual(reduce(.reconnecting, .hostLeftSession), .ipadDisconnected)
+    }
+
+    func test_iPadLeaving_beforePairing_isIgnored() {
+        XCTAssertEqual(reduce(.enteringCode("48"), .hostLeftSession), .enteringCode("48"))
+        XCTAssertEqual(reduce(.connecting("482913"), .hostLeftSession), .connecting("482913"))
+    }
+
+    func test_iPadDisconnected_staysWhileTheLinkIsLost() {
+        XCTAssertEqual(reduce(.ipadDisconnected, .linkLost), .ipadDisconnected)
+    }
+
+    func test_iPadComingBack_closesThePopup() {
+        XCTAssertEqual(reduce(.ipadDisconnected, .linkConnected), .connected)
+    }
+
+    func test_enterCode_goesBackToTypingACode() {
+        XCTAssertEqual(reduce(.ipadDisconnected, .disconnect), .enteringCode(""))
+    }
+
+    func test_iPadDisconnected_ignoresTheKeypad() {
+        XCTAssertEqual(reduce(.ipadDisconnected, .typeDigit(4)), .ipadDisconnected)
+        XCTAssertEqual(reduce(.ipadDisconnected, .confirmCode), .ipadDisconnected)
+    }
 }

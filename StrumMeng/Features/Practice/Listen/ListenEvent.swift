@@ -5,4 +5,8 @@ enum ListenEvent: Equatable {
     case historyChecked(hasRecords: Bool)
     case historyCheckFailed(String)
     case failed(String)
+    /// The iPhone dropped. Only matters while the example plays or is paused.
+    case controllerDisconnected
+    /// Ready after a full loop, but with no iPhone to play on.
+    case readyWithoutController
 }

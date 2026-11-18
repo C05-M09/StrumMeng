@@ -11,6 +11,7 @@ extension CompanionViewModel {
 private struct PreviewControllerClient: ControllerClient {
     var connectionStates: AsyncStream<ControllerConnectionState> { AsyncStream { $0.finish() } }
     var sessionActive: AsyncStream<Bool> { AsyncStream { $0.finish() } }
+    var hostLeftSession: AsyncStream<Bool> { AsyncStream { $0.finish() } }
     func connect(pairCode: PairCode) async {}
     func send(_ direction: StrumDirection, touchTime: TimeInterval) async {}
     func disconnect() async {}

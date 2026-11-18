@@ -18,6 +18,8 @@ nonisolated struct HostMessageHandler: Sendable {
 
     /// Set by the link from setSessionActive. Strums outside a session are dropped.
     var sessionActive = false
+    /// Set by the link from setHostAway. While the iPad is away, pings go unanswered.
+    var isHostAway = false
     private(set) var controllerName: String?
     /// Latency the iPhone reported in its latest ping.
     private(set) var latencyMs: Double?
@@ -41,13 +43,14 @@ nonisolated struct HostMessageHandler: Sendable {
             return .controllerAway
         case let .ping(sentAt, latencyMs):
             if let latencyMs { self.latencyMs = latencyMs }
+            guard !isHostAway else { return .ignore }
             return .reply(.pong(sentAt: sentAt, receivedAt: arrival, sessionActive: sessionActive))
         case let .strum(id, direction, hostTime):
             // De-duplicate first, so the copies of a dropped strum are dropped too.
             guard deduplicator.isNew(id), sessionActive else { return .ignore }
             let time = StrumTimeResolver.hostTime(claimed: hostTime, arrivedAt: arrival)
             return .strum(StrumEvent(id: id, direction: direction, time: time))
-        case .startSession, .stopSession, .pong:
+        case .startSession, .stopSession, .hostAway, .pong:
             // iPad → iPhone messages; never expected here.
             return .ignore
         }

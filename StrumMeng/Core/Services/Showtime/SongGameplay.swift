@@ -12,4 +12,6 @@ protocol SongGameplay: AnyObject {
     func onAppear()
     func onDisappear() async
     func send(_ event: PracticeEvent) async
+    func appEnteredBackground() async
+    func appBecameActive() async
 }

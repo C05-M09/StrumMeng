@@ -72,6 +72,12 @@ actor BonjourControllerLink: ControllerLink {
         sendWithCopies(active ? .startSession : .stopSession)
     }
 
+    func setHostAway(_ away: Bool) async {
+        guard handler.isHostAway != away else { return }
+        handler.isHostAway = away
+        if away { sendWithCopies(.hostAway) }
+    }
+
     func stop() async {
         livenessTask?.cancel()
         livenessTask = nil

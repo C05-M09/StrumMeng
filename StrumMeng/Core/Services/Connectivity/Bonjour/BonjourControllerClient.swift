@@ -17,6 +17,7 @@ actor BonjourControllerClient: ControllerClient {
     private nonisolated let queue = DispatchSerialQueue(label: "StrumMeng.BonjourControllerClient", qos: .userInteractive)
     private nonisolated let stateBroadcast = AsyncBroadcast<ControllerConnectionState>(latest: .unpaired)
     private nonisolated let sessionBroadcast = AsyncBroadcast<Bool>(latest: false)
+    private nonisolated let hostLeftBroadcast = AsyncBroadcast<Bool>(latest: false)
 
     private var pairCode: PairCode?
     private var browser: NWBrowser?
@@ -39,6 +40,7 @@ actor BonjourControllerClient: ControllerClient {
 
     nonisolated var connectionStates: AsyncStream<ControllerConnectionState> { stateBroadcast.stream() }
     nonisolated var sessionActive: AsyncStream<Bool> { sessionBroadcast.stream() }
+    nonisolated var hostLeftSession: AsyncStream<Bool> { hostLeftBroadcast.stream() }
 
     /// - Parameter deviceName: shown on the iPad. Passed in because reading it needs UIKit.
     init(deviceName: String) {
@@ -96,8 +98,8 @@ actor BonjourControllerClient: ControllerClient {
         isAway = false
         guard isReady else { return }
         guard handler.isAlive(now: HostClock.now()) else {
-            // Gone long enough for the iPad to drop us: find it again.
-            connectionLost()
+            // Gone long enough for the iPad to drop us: find it again. This iPhone left, not the iPad.
+            connectionLost(hostLeft: false)
             return
         }
         greetAndPing()
@@ -111,6 +113,7 @@ actor BonjourControllerClient: ControllerClient {
         pairCode = nil
         rejected = []
         hasEverConnected = false
+        setHostLeft(false)
         stateBroadcast.yield(.unpaired)
     }
 
@@ -172,9 +175,9 @@ actor BonjourControllerClient: ControllerClient {
             if !isAway { greetAndPing() }
         case let .waiting(error), let .failed(error):
             if case .tls = error { rejected.insert(endpoint) }
-            connectionLost()
+            connectionLost(hostLeft: handler.sessionActive)
         case .cancelled:
-            connectionLost()
+            connectionLost(hostLeft: handler.sessionActive)
         default:
             break
         }
@@ -183,10 +186,13 @@ actor BonjourControllerClient: ControllerClient {
     private func handshakeTimedOut(_ candidate: NWConnection, endpoint: NWEndpoint) {
         guard candidate === connection, !isReady else { return }
         rejected.insert(endpoint)
-        connectionLost()
+        connectionLost(hostLeft: false)
     }
 
-    private func connectionLost() {
+    /// - Parameter hostLeft: the iPad went quiet in the middle of a session (crashed, battery, or
+    ///   left before its hostAway arrived), so the player is told the iPad is gone.
+    private func connectionLost(hostLeft: Bool) {
+        if hostLeft { setHostLeft(true) }
         dropConnection()
         stateBroadcast.yield(hasEverConnected ? .reconnecting : .searching)
         // Browsing stopped once connected; the iPad may also have a new address now.
@@ -240,7 +246,7 @@ actor BonjourControllerClient: ControllerClient {
     private func pingAndCheckLiveness(count: Int) -> Duration? {
         let now = HostClock.now()
         guard handler.isAlive(now: now) else {
-            connectionLost()
+            connectionLost(hostLeft: handler.sessionActive)
             return nil
         }
         send(handler.pingMessage(sentAt: now))
@@ -261,15 +267,23 @@ actor BonjourControllerClient: ControllerClient {
     private func handle(_ data: Data, arrivedAt arrival: TimeInterval) {
         guard let message = try? ControllerMessage(data: data) else { return }
         let wasActive = handler.sessionActive
+        let wasHostAway = handler.isHostAway
         handler.receive(message, arrivedAt: arrival)
+        if handler.isHostAway, !wasHostAway { setHostLeft(true) }
         if handler.sessionActive != wasActive {
             sessionBroadcast.yield(handler.sessionActive)
             // Switch to the fast play rate now rather than after the current (up to 1 s) wait.
             if handler.sessionActive { startPinging() }
         }
-        if case .pong = message, let latencyMs = handler.clock.latencyMs {
+        // While the iPad is away only a pong to a newer ping says it is back.
+        if case .pong = message, !handler.isHostAway, let latencyMs = handler.clock.latencyMs {
+            setHostLeft(false)
             stateBroadcast.yield(.connected(latencyMs: latencyMs))
         }
+    }
+
+    private func setHostLeft(_ left: Bool) {
+        if hostLeftBroadcast.latest != left { hostLeftBroadcast.yield(left) }
     }
 
     private func send(_ message: ControllerMessage) {

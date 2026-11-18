@@ -48,20 +48,22 @@ struct ShowtimeSongDetailCard: View {
             .offset(x: 184, y: 56)
 
             if !patterns.isEmpty {
-                // Stack of 3 pattern cards from Assets.xcassets/Songs
-                ForEach(Array(patterns.enumerated()), id: \.element.id) { index, pattern in
-                    let isActive = pattern.id == currentPatternID
-                    let leading = isActive ? Self.activeLeading : Self.inactiveLeading
-                    let top = Self.cardTop(for: index, isActive: isActive)
+                // Stack of 3 pattern cards from Assets.xcassets/Songs with spacing so they never overlap
+                VStack(alignment: .leading, spacing: Self.cardSpacing) {
+                    ForEach(Array(patterns.enumerated()), id: \.element.id) { index, pattern in
+                        let isActive = pattern.id == currentPatternID
+                        let leading = isActive ? Self.activeLeading : Self.inactiveLeading
 
-                    patternCardView(pattern: pattern, isActive: isActive)
-                        .offset(x: leading, y: top)
-                        .zIndex(isActive ? 10 : Double(5 - index))
-                        .animation(.spring(response: 0.35, dampingFraction: 0.82), value: isActive)
-                        .onTapGesture {
-                            onSelectPattern?(pattern.id)
-                        }
+                        patternCardView(pattern: pattern, isActive: isActive)
+                            .offset(x: leading)
+                            .zIndex(isActive ? 10 : Double(5 - index))
+                            .onTapGesture {
+                                onSelectPattern?(pattern.id)
+                            }
+                    }
                 }
+                .animation(.spring(response: 0.35, dampingFraction: 0.82), value: currentPatternID)
+                .offset(x: 0, y: Self.cardsTop)
 
                 // Chord banner below the 3 pattern cards (positioned right above the title box)
                 chordBannerView
@@ -115,11 +117,11 @@ struct ShowtimeSongDetailCard: View {
     }
 
     // Active card: larger, longer, extends to left edge of wood wall
-    private static let activeWidth: CGFloat = 672
+    private static let activeWidth: CGFloat = 675
     private static let activeLeading: CGFloat = 0
 
     // Inactive card: narrower, flushed with left edge, wood tone
-    private static let inactiveWidth: CGFloat = 572
+    private static let inactiveWidth: CGFloat = 575
     private static let inactiveLeading: CGFloat = 0
 
     // Fallback constants
@@ -127,17 +129,15 @@ struct ShowtimeSongDetailCard: View {
     private static let artworkLeading: CGFloat = 39
     private static let artworkTop: CGFloat = 250
 
-    /// Vertical positions for the 3 pattern cards:
-    /// Card 0 is at 195, Card 1 at 320, Card 2 at 445. Active card is slightly raised by 6 pt.
-    private static func cardTop(for index: Int, isActive: Bool) -> CGFloat {
-        let base = 195 + CGFloat(index) * 122
-        return isActive ? base - 6 : base
-    }
+    /// Vertical layout for the 3 pattern cards: -4 cancels the SVG's ~3–4 pt transparent bottom padding
+    /// so card borders sit flush without overlapping any inner content.
+    private static let cardsTop: CGFloat = 195
+    private static let cardSpacing: CGFloat = -4
 
-    /// Chord banner is positioned lower down (y = 660) between Card 3 and the bottom Title Box (y = 794).
+    /// Chord banner is positioned lower down (y = 678) between Card 3 and the bottom Title Box (y = 794).
     private static let chordBannerWidth: CGFloat = 642
     private static let chordBannerLeading: CGFloat = 20
-    private static let chordBannerTop: CGFloat = 660
+    private static let chordBannerTop: CGFloat = 678
 }
 
 /// Right side of the detail card: the records card.

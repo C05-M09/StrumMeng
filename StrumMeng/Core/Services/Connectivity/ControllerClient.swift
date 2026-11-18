@@ -7,6 +7,10 @@ protocol ControllerClient: Sendable {
     var connectionStates: AsyncStream<ControllerConnectionState> { get }
     /// Whether the iPad has a session playing. Every subscriber first receives the current value.
     var sessionActive: AsyncStream<Bool> { get }
+    /// Whether the iPad left in the middle of a session (its app went to the background, or the
+    /// link dropped while a session was playing) and is not back yet. Every subscriber first
+    /// receives the current value.
+    var hostLeftSession: AsyncStream<Bool> { get }
     /// Starts looking for the iPad with this code and keeps reconnecting until disconnect().
     func connect(pairCode: PairCode) async
     /// Sends one strum. Dropped while no session is playing or no iPad is connected.

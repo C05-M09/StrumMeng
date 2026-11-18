@@ -27,6 +27,15 @@ final class ShowtimeViewModelTests: XCTestCase {
         await model.disappear()
     }
 
+    func test_backgroundAndReturn_arePassedToTheGameplay() async {
+        let (model, _, game) = make()
+        await model.appEnteredBackground()
+        await model.appBecameActive()
+        XCTAssertEqual(game.backgroundCalls, 1)
+        XCTAssertEqual(game.activeCalls, 1)
+        await model.disappear()
+    }
+
     private func make(connected: Bool = true, songIndex: Int = 0) -> (ShowtimeViewModel, FakeSongDemoPlayer, FakeSongGameplay) {
         let demo = FakeSongDemoPlayer()
         let game = FakeSongGameplay()
@@ -398,6 +407,9 @@ private final class FakeSongGameplay: SongGameplay {
     var onStateChanged: ((PracticeState) -> Void)?
     var onConnectionChanged: ((Bool) -> Void)?
     var readyCalls = 0; var restartCalls = 0; var disappears = 0
+    var backgroundCalls = 0; var activeCalls = 0
+    func appEnteredBackground() async { backgroundCalls += 1 }
+    func appBecameActive() async { activeCalls += 1 }
     func onAppear() {}
     func onDisappear() async { disappears += 1 }
     func change(_ state: PracticeState) { self.state = state; onStateChanged?(state) }

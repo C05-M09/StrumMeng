@@ -68,6 +68,11 @@ struct PracticePlaySessionView: View {
         .onDisappear { Task { await viewModel.onDisappear() } }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { send(.appMovedToBackground) }
+            switch phase {
+            case .background: Task { await viewModel.appEnteredBackground() }
+            case .active: Task { await viewModel.appBecameActive() }
+            default: break
+            }
         }
     }
 

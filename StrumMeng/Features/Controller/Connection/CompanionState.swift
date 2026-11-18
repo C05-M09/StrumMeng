@@ -9,4 +9,7 @@ enum CompanionState: Equatable {
     case connected
     /// The iPad was lost after connecting. The pad stays up while the link looks for it again.
     case reconnecting
+    /// The iPad left in the middle of a session (its app went to the background, or it went quiet
+    /// while playing). The link keeps looking for it; Enter Code is the way out if it never returns.
+    case ipadDisconnected
 }

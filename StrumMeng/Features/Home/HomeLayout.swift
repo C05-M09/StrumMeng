@@ -44,7 +44,7 @@ enum HomeLayout {
     static let guidebookAsset = "Button_Guidebook_Normal"
     static let guidebookPressedAsset = "Button_Guidebook_Pressed"
     
-    static let coverAnimationPrefix = "1_cover for animation_"
+    static let coverAnimationPrefix = "Comp 1_"
     static let coverAnimationFrameCount = 105     // 00000 ... 00104
     static let coverAnimationFPS: Double = 24     // SESUAIKAN: kecepatan animasi
 }
