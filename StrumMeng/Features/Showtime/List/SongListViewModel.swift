@@ -74,6 +74,9 @@ final class SongListViewModel {
     /// Called when selecting a song, passing both the songID and the selected patternID.
     var onSongWithPatternSelected: ((String, String) -> Void)?
 
+    /// Called when selecting a record from the song's records list.
+    var onRecordRequested: ((SessionResult) -> Void)?
+
     func activePatternID(for songID: String) -> String {
         selectedPatternIDs[songID] ?? ShowtimePatternCatalog.defaultPatternID(for: songID)
     }
@@ -161,6 +164,10 @@ final class SongListViewModel {
         case .tapBack:
             player?.stop()
             onBackRequested()
+
+        case .selectRecord(let result):
+            player?.stop()
+            onRecordRequested?(result)
         }
     }
 

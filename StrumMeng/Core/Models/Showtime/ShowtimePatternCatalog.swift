@@ -151,7 +151,11 @@ enum ShowtimePatternCatalog {
 
     static func patternInfo(forID id: String) -> ShowtimePatternInfo? {
         for list in songPatterns.values {
-            if let found = list.first(where: { $0.id == id }) {
+            if let found = list.first(where: {
+                $0.id.caseInsensitiveCompare(id) == .orderedSame ||
+                $0.name.caseInsensitiveCompare(id) == .orderedSame ||
+                $0.assetName.caseInsensitiveCompare(id) == .orderedSame
+            }) {
                 return found
             }
         }

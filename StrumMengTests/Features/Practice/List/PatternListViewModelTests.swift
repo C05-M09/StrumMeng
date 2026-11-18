@@ -187,6 +187,31 @@ final class PatternListViewModelTests: XCTestCase {
         XCTAssertEqual(sut.state.selectedBPM, 80, "BPM terakhir yang dimainkan sudah tercatat")
     }
 
+    func test_selectRecord_routesToSummary() {
+        var selectedRecord: SessionResult?
+        let sut = PatternListViewModel(
+            onListenRequested: { _, _ in },
+            onBackRequested: {},
+            onRecordRequested: { selectedRecord = $0 }
+        )
+        let sample = SessionResult(
+            id: UUID(),
+            patternID: "foundation",
+            songID: nil,
+            bpm: 80,
+            accuracy: 0.95,
+            perfectCount: 20,
+            tooEarlyCount: 1,
+            missCount: 0,
+            createdAt: .now,
+            beatEvents: []
+        )
+
+        sut.send(.selectRecord(sample))
+
+        XCTAssertEqual(selectedRecord, sample)
+    }
+
     private func makeViewModel<S: Sequence>(patterns: S) -> PatternListViewModel
     where S.Element == StrumPattern {
         PatternListViewModel(

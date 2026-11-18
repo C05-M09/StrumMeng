@@ -8,4 +8,6 @@ enum SongListEvent: Equatable {
     /// The user chose the song on screen (Play on the detail card).
     case selectSong
     case tapBack
+    /// The user tapped a record row to view its summary.
+    case selectRecord(SessionResult)
 }

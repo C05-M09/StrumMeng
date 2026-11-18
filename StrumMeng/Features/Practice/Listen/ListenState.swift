@@ -27,4 +27,11 @@ enum ListenState: Equatable {
         default: false
         }
     }
+
+    var showsTrackingRing: Bool {
+        switch self {
+        case .listening, .paused: true
+        default: false
+        }
+    }
 }

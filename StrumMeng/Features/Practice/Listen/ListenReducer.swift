@@ -1,8 +1,14 @@
 func reduce(_ state: ListenState, _ event: ListenEvent) -> ListenState {
     switch (state, event) {
-    case (_, .back), (.instructions, .instructionsNext):
+    case (_, .back):
         return .departed
-    case let (.listening(step, true), .ready), let (.historyFailed(step, _), .retryHistory):
+    case (.information, .showGuidance):
+        return .instructions(step: 0)
+    case (.instructions, .instructionsNext):
+        return .listening(step: 0, completed: false)
+    case let (.listening(_, completed), .ready) where completed:
+        return .departed
+    case let (.historyFailed(step, _), .retryHistory):
         return .checkingHistory(step: step)
     case let (.checkingHistory(step), .historyChecked(hasRecords)):
         return hasRecords ? .departed : .instructions(step: step)

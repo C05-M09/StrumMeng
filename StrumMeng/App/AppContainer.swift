@@ -13,10 +13,11 @@ final class AppContainer {
     /// One menu music and button click player for the whole app, so the music keeps its place
     /// between screens.
     private let menuSounds: any MenuSoundService
-    private let results = SessionResultStore()
+    let results = SessionResultStore()
     private let songCatalog: any SongCatalog
     private let enablesHomeGuidance: Bool
     private let homeGuidanceStore: any HomeGuidanceStore
+    private let practiceGuidanceStore: any PracticeGuidanceStore
     /// The one pattern list of the app, so Retry can hand it the chosen tempo.
     private weak var patternListViewModel: PatternListViewModel?
     /// The one song list of the app, so its records can be reloaded after a session.
@@ -52,12 +53,14 @@ final class AppContainer {
         menuSounds: (any MenuSoundService)? = nil,
         pairingIntroductionStore: (any PairingIntroductionStore)? = nil,
         homeGuidanceStore: (any HomeGuidanceStore)? = nil,
+        practiceGuidanceStore: (any PracticeGuidanceStore)? = nil,
         controllerLink: (any ControllerLink)? = nil,
         songCatalog: (any SongCatalog)? = nil,
         showtimeSongPlayer: (any ShowtimeSongPlayer)? = nil
     ) {
         self.router = router
         self.homeGuidanceStore = homeGuidanceStore ?? UserDefaultsHomeGuidanceStore()
+        self.practiceGuidanceStore = practiceGuidanceStore ?? (inMemory ? InMemoryPracticeGuidanceStore() : UserDefaultsPracticeGuidanceStore())
         self.controllerLink = controllerLink
         self.songCatalog = songCatalog ?? DefaultSongCatalog()
         self.customShowtimeSongPlayer = showtimeSongPlayer
@@ -154,6 +157,9 @@ final class AppContainer {
             self?.selectedShowtimePatternID = patternID
             router?.push(.showtime(songID: songID))
         }
+        viewModel.onRecordRequested = { [weak self] result in
+            self?.showSummary(for: result)
+        }
         songListViewModel = viewModel
         return viewModel
     }
@@ -204,7 +210,11 @@ final class AppContainer {
     /// Replay of a finished Showtime run, as in Practice: the stored colours, every recorded swipe on
     /// the chord it sounded in the game, the metronome and the song's recording. nil for an unknown song.
     func makeShowtimeReplayViewModel(result: SessionResult) -> ReplayViewModel? {
-        guard let song = songCatalog.songs.first(where: { $0.id == result.songID }) else { return nil }
+        guard var song = songCatalog.songs.first(where: { $0.id == result.songID }) else { return nil }
+        if let chosenPattern = PatternCatalog.pattern(forID: result.patternID) {
+            song.patternID = chosenPattern.id
+            song.strokes = chosenPattern.strokes
+        }
         let timeline = SongTimeline(song: song)
         let backingTrack = AVSongBackingTrack()
         // The same ending as the game, so Replay fades and stops the song on the last node too.
@@ -224,6 +234,7 @@ final class AppContainer {
             bpm: bpm,
             player: SynthListenPlayer(sound: guitarSound),
             history: sessionHistory ?? UnavailableSessionRepository(),
+            guidanceStore: practiceGuidanceStore,
             controller: sharedControllerLink(),
             onSetUpDevice: { [weak router] in router?.presentSessionDeviceSetup() },
             onReady: { [weak router] in router?.push(.play(patternID: pattern.id, bpm: bpm)) },
@@ -267,6 +278,16 @@ final class AppContainer {
         router.replaceLast(with: .summary(sessionID: result.id))
     }
 
+    func sessionResult(for id: UUID) -> SessionResult? {
+        results.result(for: id)
+    }
+
+    /// Opens the Summary screen for a clicked record directly, without the intro overlay and without retry.
+    func showSummary(for result: SessionResult) {
+        results.add(result)
+        router.push(.summary(sessionID: result.id, showIntroOverlay: false, canRetry: false))
+    }
+
     /// nil if the session is unknown (it never finished in this app session).
     func makeSummaryViewModel(sessionID: UUID) -> SummaryViewModel? {
         guard let result = results.result(for: sessionID) else { return nil }
@@ -277,7 +298,8 @@ final class AppContainer {
                 self?.navigate(from: result, to: destination)
             },
             makeReplayViewModel: { [guitar = guitarSound, metronome = metronomeSound] result in
-                ReplayViewModel(result: result, guitar: guitar, metronome: metronome)
+                let pattern = PatternCatalog.pattern(forID: result.patternID)
+                return ReplayViewModel(result: result, pattern: pattern, guitar: guitar, metronome: metronome)
             }
         )
     }
@@ -295,6 +317,41 @@ final class AppContainer {
             reloadRecords()
         case .replay:
             // Shown inside SummaryView.
+            break
+        }
+    }
+
+    func showtimeSongInfo(for result: SessionResult) -> ShowtimeSongInfo {
+        if let songID = result.songID, let song = songCatalog.songs.first(where: { $0.id == songID }) {
+            return ShowtimeSongInfo(song: song)
+        }
+        return .fallback(for: result)
+    }
+
+    /// nil if the session is unknown (it never finished in this app session).
+    func makeShowtimeSummaryViewModel(sessionID: UUID) -> ShowtimeSummaryViewModel? {
+        guard let result = results.result(for: sessionID) else { return nil }
+        return ShowtimeSummaryViewModel(
+            result: result,
+            repository: repository ?? UnavailableSessionRepository(),
+            onNavigate: { [weak self] destination in
+                self?.navigateShowtime(from: result, to: destination)
+            }
+        )
+    }
+
+    private func navigateShowtime(from result: SessionResult, to destination: ShowtimeSummaryDestination) {
+        switch destination {
+        case .retry:
+            if let songID = result.songID {
+                router.popTo(.showtimeList)
+                router.push(.showtime(songID: songID))
+                reloadShowtimeRecords()
+            }
+        case .backToMain:
+            router.popTo(.showtimeList)
+            reloadShowtimeRecords()
+        case .replay:
             break
         }
     }
@@ -327,6 +384,9 @@ final class AppContainer {
             },
             onBackRequested: { [weak router] in
                 router?.pop()
+            },
+            onRecordRequested: { [weak self] result in
+                self?.showSummary(for: result)
             }
         )
         patternListViewModel = viewModel

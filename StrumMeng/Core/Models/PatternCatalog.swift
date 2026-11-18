@@ -51,7 +51,10 @@ enum PatternCatalog {
 
     /// Lookup a pattern by its stable id slug. Checks standard patterns, then Showtime-specific patterns.
     static func pattern(forID id: String) -> StrumPattern? {
-        all.first { $0.id == id } ?? ShowtimePatternCatalog.pattern(forID: id)
+        all.first {
+            $0.id.caseInsensitiveCompare(id) == .orderedSame ||
+            $0.name.caseInsensitiveCompare(id) == .orderedSame
+        } ?? ShowtimePatternCatalog.pattern(forID: id)
     }
 
     static var foundation: StrumPattern { all[0] }

@@ -11,6 +11,7 @@ import SwiftUI
 /// No view model, so every state can have its own #Preview.
 struct RecordsContentView: View {
     let state: RecordsViewState
+    var onSelectRecord: ((SessionResult) -> Void)? = nil
 
     private enum Layout {
         static let rowHeight: CGFloat = 95
@@ -22,7 +23,8 @@ struct RecordsContentView: View {
         static let fadeTop: CGFloat = 16
         static let fadeBottom: CGFloat = Layout.peek
         /// Space between the row content and the scroll indicator.
-        static let scrollTrailingInset: CGFloat = 28
+        /// Set to 0 so the divider line extends fully to the right with equal left and right spacing.
+        static let scrollTrailingInset: CGFloat = 0
         static let headerSpacing: CGFloat = 4
         static let dividerHeight: CGFloat = 1
         static let sectionTitleSize: CGFloat = 30
@@ -60,8 +62,16 @@ struct RecordsContentView: View {
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         ForEach(rows) { row in
-                            RecordRowView(model: row)
-                                .frame(height: Layout.rowHeight)
+                            Button {
+                                onSelectRecord?(row.result)
+                            } label: {
+                                RecordRowView(model: row)
+                                    .frame(height: Layout.rowHeight)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(RecordRowButtonStyle())
+                            .disabled(onSelectRecord == nil)
+
                             Rectangle()
                                 .fill(AppColors.recordOutline)
                                 .frame(height: Layout.dividerHeight)
@@ -117,13 +127,22 @@ struct RecordsContentView: View {
     }
 }
 
+private struct RecordRowButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .opacity(configuration.isPressed ? 0.65 : 1.0)
+            .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+            .clicksWhenPressed(configuration.isPressed)
+    }
+}
+
 #if DEBUG
 /// Sample rows that mirror the Figma reference, for previews only.
 private extension RecordRowModel {
     static let previewSamples: [RecordRowModel] = [
         (90, 80, 1, 0, 4),
         (80, 70, 1, 1, 5),
-        (70, 80, 1, 0, 6),
+        (100, 80, 0, 0, 0),
         (70, 90, 13, 1, 6),
         (60, 60, 8, 2, 7)
     ].enumerated().map { index, sample in

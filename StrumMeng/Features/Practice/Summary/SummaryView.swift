@@ -9,6 +9,7 @@ import SwiftUI
 
 struct SummaryView: View {
     let viewModel: SummaryViewModel
+    let canRetry: Bool
     var onNavigate: ((SummaryDestination) -> Void)?
     @State private var activeReplayResult: SessionResult?
     @State private var isShowingFeedbackOverlay: Bool
@@ -18,11 +19,14 @@ struct SummaryView: View {
     init(
         viewModel: SummaryViewModel,
         showIntroOverlay: Bool = true,
+        canRetry: Bool = true,
         onNavigate: ((SummaryDestination) -> Void)? = nil
     ) {
         self.viewModel = viewModel
+        self.canRetry = canRetry
         self.onNavigate = onNavigate
         self._isShowingFeedbackOverlay = State(initialValue: showIntroOverlay)
+        self._isGarageOpen = State(initialValue: !showIntroOverlay)
     }
 
     var body: some View {
@@ -105,10 +109,12 @@ struct SummaryView: View {
         .persistentSystemOverlays(.hidden)
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
-            // Started with the shutter, which waits 0.1 s; the sound's own run-up covers that.
-            playSoundEffect(.garage)
-            withAnimation(.spring(response: 0.58, dampingFraction: 0.86).delay(0.10)) {
-                isGarageOpen = true
+            if !isGarageOpen {
+                // Started with the shutter, which waits 0.1 s; the sound's own run-up covers that.
+                playSoundEffect(.garage)
+                withAnimation(.spring(response: 0.58, dampingFraction: 0.86).delay(0.10)) {
+                    isGarageOpen = true
+                }
             }
         }
         .task {
@@ -165,7 +171,7 @@ struct SummaryView: View {
 //        )
 //    }
 
-    // MARK: - Left Column Elements
+    // MARK: - Right Column Elements
     @ViewBuilder
     private var rightColumnElements: some View {
         let pattern = PatternCatalog.pattern(forID: viewModel.result.patternID)
@@ -210,18 +216,20 @@ struct SummaryView: View {
         // 3. Tombol REPLAY & RETRY (di bawah area teal)
         // 💡 Atur posisi y untuk menaikkan/menurunkan kedua tombol ini
         VStack(spacing: 8) {
-            Button {
-                viewModel.send(.tapRetry)
-            } label: {
-                EmptyView()
-            }
-            .buttonStyle(
-                AssetButtonStyle(
-                    normalAssetName: "Button_Retry_Normal",
-                    pressedAssetName: "Button_Retry_Pressed",
-                    size: CGSize(width: 360, height: 104)
+            if canRetry {
+                Button {
+                    viewModel.send(.tapRetry)
+                } label: {
+                    EmptyView()
+                }
+                .buttonStyle(
+                    AssetButtonStyle(
+                        normalAssetName: "Button_Retry_Normal",
+                        pressedAssetName: "Button_Retry_Pressed",
+                        size: CGSize(width: 360, height: 104)
+                    )
                 )
-            )
+            }
 
             Button {
                 viewModel.send(.tapReplay)
@@ -236,12 +244,12 @@ struct SummaryView: View {
                 )
             )
         }
-        .frame(width: 760)
+        .frame(width: 760, height: 216, alignment: .bottom)
         .position(x: 1133, y: 860)
 
     }
 
-    // MARK: - Right Column Elements (Tanpa Background Tambahan)
+    // MARK: - Left Column Elements (Tanpa Background Tambahan)
     @ViewBuilder
     private var leftColumnElements: some View {
         let result = viewModel.result
@@ -406,5 +414,23 @@ private struct PreviewSessionRepository: SessionRepository {
     let vm = SummaryViewModel(result: sampleResult, repository: repo)
     let _ = vm.send(.tapRetry)
     SummaryView(viewModel: vm, showIntroOverlay: false)
+}
+
+#Preview("Summary from Records (No Retry, Replay Only)", traits: .landscapeLeft) {
+    let repo = PreviewSessionRepository()
+    let sampleResult = SessionResult(
+        id: UUID(),
+        patternID: "foundation",
+        songID: nil,
+        bpm: 80,
+        accuracy: 1.0,
+        perfectCount: 40,
+        tooEarlyCount: 0,
+        missCount: 0,
+        createdAt: Date(),
+        beatEvents: []
+    )
+    let vm = SummaryViewModel(result: sampleResult, repository: repo)
+    SummaryView(viewModel: vm, showIntroOverlay: false, canRetry: false)
 }
 
