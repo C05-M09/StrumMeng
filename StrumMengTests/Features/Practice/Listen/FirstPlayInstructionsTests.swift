@@ -37,15 +37,16 @@ final class FirstPlayInstructionsTests: XCTestCase {
         XCTAssertEqual(model.state, .departed)
     }
 
-    func test_readyBeforeACompleteLoopDoesNotQueryHistory() async {
+    func test_readyBeforeACompleteLoop_doesNotGoOn_andHistoryIsAskedOnlyOnceEarly() async {
         let history = TestHistory(hasRecords: false)
         let model = makeModel(player: InstructionPlayer(), history: history)
         defer { model.stop() }
         model.send(.next)
         model.send(.ready)
-        await Task.yield()
+        for _ in 0..<100 { await Task.yield() }
+        // Asked once when the example started; Ready before a full loop asks nothing more.
         let calls = await history.calls
-        XCTAssertEqual(calls, 0)
+        XCTAssertEqual(calls, 1)
         XCTAssertEqual(model.state, .listening(step: 0, completed: false))
     }
 
@@ -84,6 +85,41 @@ final class FirstPlayInstructionsTests: XCTestCase {
         XCTAssertEqual(backs, 1)
         XCTAssertEqual(starts, 0)
         XCTAssertEqual(model.state, .departed)
+    }
+
+    func test_historyAnsweredWhileListening_readyGoesOnWithoutWaiting() async {
+        let history = TestHistory(hasRecords: true)
+        let player = InstructionPlayer()
+        var starts = 0
+        let model = makeModel(player: player, history: history, ready: { starts += 1 })
+        defer { model.stop() }
+        model.send(.next)
+        // The example plays for a while; the early question is answered meanwhile.
+        for _ in 0..<100 { await Task.yield() }
+        player.elapsed = 3
+        model.refreshProgress()
+
+        model.send(.ready)
+
+        // Decided in the same update: no checkingHistory ("Getting ready") in between.
+        XCTAssertEqual(model.state, .departed)
+        XCTAssertEqual(starts, 1)
+        let calls = await history.calls
+        XCTAssertEqual(calls, 1)
+    }
+
+    func test_historyAnsweredWhileListening_firstPlayShowsInstructionsAtOnce() async {
+        let player = InstructionPlayer()
+        let model = makeModel(player: player, history: TestHistory(hasRecords: false))
+        defer { model.stop() }
+        model.send(.next)
+        for _ in 0..<100 { await Task.yield() }
+        player.elapsed = 3
+        model.refreshProgress()
+
+        model.send(.ready)
+
+        XCTAssertEqual(model.state, .instructions(step: 0))
     }
 
     func test_reducerIgnoresStaleHistoryAndPrematureNext() {

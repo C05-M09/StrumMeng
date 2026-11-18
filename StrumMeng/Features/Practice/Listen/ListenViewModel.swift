@@ -13,6 +13,10 @@ final class ListenViewModel {
     @ObservationIgnored private let onBack: () -> Void
     @ObservationIgnored private var progressTask: Task<Void, Never>?
     @ObservationIgnored private var historyTask: Task<Void, Never>?
+    /// The history question asked as soon as the example starts, so Ready already knows the
+    /// answer and goes on without a "Getting ready" screen. Kept until it fails.
+    @ObservationIgnored private var historyLookup: Task<Bool, Error>?
+    @ObservationIgnored private var knownHasRecords: Bool?
 
     init(pattern: StrumPattern, bpm: Int, player: ListenPatternPlayer,
          history: any SessionHistoryChecking,
@@ -30,6 +34,7 @@ final class ListenViewModel {
         state = reduce(state, event)
         switch event {
         case .next where previous == .information:
+            lookUpHistoryEarly()
             startPlayback()
         case .restart where state != previous:
             startPlayback()
@@ -64,17 +69,38 @@ final class ListenViewModel {
         player.stop()
     }
 
+    private func lookUpHistoryEarly() {
+        guard historyLookup == nil, knownHasRecords == nil else { return }
+        let lookup = Task { [history] in try await history.hasSavedSessions() }
+        historyLookup = lookup
+        Task { [weak self] in
+            guard let hasRecords = try? await lookup.value else { return }
+            self?.knownHasRecords = hasRecords
+        }
+    }
+
     private func checkHistory() {
         stop()
-        historyTask = Task { [weak self, history] in
+        // Usually answered while the example played: decide now, in the same update as Ready.
+        if let knownHasRecords {
+            send(.historyChecked(hasRecords: knownHasRecords))
+            return
+        }
+        // Otherwise wait for the question already asked (or ask it, after a failure).
+        let lookup = historyLookup ?? Task { [history] in try await history.hasSavedSessions() }
+        historyLookup = lookup
+        historyTask = Task { [weak self] in
             do {
-                let hasRecords = try await history.hasSavedSessions()
+                let hasRecords = try await lookup.value
                 try Task.checkCancellation()
+                self?.knownHasRecords = hasRecords
                 self?.send(.historyChecked(hasRecords: hasRecords))
             } catch is CancellationError {
                 return
             } catch {
                 guard !Task.isCancelled else { return }
+                // Ask again on Try again rather than reusing the failed answer.
+                self?.historyLookup = nil
                 self?.send(.historyCheckFailed("Your practice history couldn’t be checked. Please try again."))
             }
         }
