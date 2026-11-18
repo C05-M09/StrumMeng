@@ -62,6 +62,12 @@ final class PlayViewModel {
     /// Whether the clock has started for the current session. Ready tapped before the iPhone
     /// connected waits as disconnected without starting it, so Resume must start it fresh.
     @ObservationIgnored private var hasStartedClock = false
+    /// The link has told this screen at least once whether the iPhone is connected. It sends its
+    /// current state right after onAppear subscribes, but asynchronously.
+    @ObservationIgnored private var hasConnectionState = false
+    /// Ready tapped before that first state (Listen's Ready opens Play and taps it at once): it
+    /// waits for the state instead of calling the iPhone missing.
+    @ObservationIgnored private var isReadyWaitingForConnectionState = false
     /// The iPhone was told the iPad left in the middle of this session.
     @ObservationIgnored private var isHostAway = false
     @ObservationIgnored private let tolerance: ToleranceConfig
@@ -293,8 +299,13 @@ final class PlayViewModel {
         // iPhone dropped out of waits for it, even when on-screen swipes could carry on.
         if case .countIn = next, requiresController || previous == .disconnected,
            !isControllerConnected {
+            guard previous == .ready else { return }
+            if controller != nil, !hasConnectionState {
+                isReadyWaitingForConnectionState = true
+                return
+            }
             // Ready without the iPhone shows why nothing starts, and Resume once it connects.
-            if previous == .ready { state = reduce(previous, .readyWithoutController) }
+            state = reduce(previous, .readyWithoutController)
             return
         }
         state = next
@@ -421,15 +432,25 @@ final class PlayViewModel {
     /// A controller that stops being connected while counting in, playing or paused stops the
     /// session as `.disconnected`, instead of judging the strums it can no longer send as Miss.
     func handle(_ connection: ControllerConnectionState) async {
+        hasConnectionState = true
         if case .connected = connection {
             // Arrives with every ping; only a real change should notify observers.
             if !isControllerConnected { isControllerConnected = true }
+            await sendWaitingReady()
             return
         }
         isControllerConnected = false
+        await sendWaitingReady()
         // A session played on the iPad screen alone carries on without the iPhone.
         guard requiresController || sessionUsesController else { return }
         await send(.controllerDisconnected)
+    }
+
+    /// Ready tapped before the first connection state: now it counts in, or waits as disconnected.
+    private func sendWaitingReady() async {
+        guard isReadyWaitingForConnectionState else { return }
+        isReadyWaitingForConnectionState = false
+        await send(.tapReady)
     }
 
     /// Judges every beat whose window ended before `time`, minus the arrival grace: a strum
