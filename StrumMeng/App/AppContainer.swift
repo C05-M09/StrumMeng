@@ -17,6 +17,7 @@ final class AppContainer {
     private let songCatalog: any SongCatalog
     private let enablesHomeGuidance: Bool
     private let homeGuidanceStore: any HomeGuidanceStore
+    private let practiceGuidanceStore: any PracticeGuidanceStore
     /// The one pattern list of the app, so Retry can hand it the chosen tempo.
     private weak var patternListViewModel: PatternListViewModel?
     /// The one song list of the app, so its records can be reloaded after a session.
@@ -48,12 +49,14 @@ final class AppContainer {
         menuSounds: (any MenuSoundService)? = nil,
         pairingIntroductionStore: (any PairingIntroductionStore)? = nil,
         homeGuidanceStore: (any HomeGuidanceStore)? = nil,
+        practiceGuidanceStore: (any PracticeGuidanceStore)? = nil,
         controllerLink: (any ControllerLink)? = nil,
         songCatalog: (any SongCatalog)? = nil,
         showtimeSongPlayer: (any ShowtimeSongPlayer)? = nil
     ) {
         self.router = router
         self.homeGuidanceStore = homeGuidanceStore ?? UserDefaultsHomeGuidanceStore()
+        self.practiceGuidanceStore = practiceGuidanceStore ?? (inMemory ? InMemoryPracticeGuidanceStore() : UserDefaultsPracticeGuidanceStore())
         self.controllerLink = controllerLink
         self.songCatalog = songCatalog ?? DefaultSongCatalog()
         self.customShowtimeSongPlayer = showtimeSongPlayer
@@ -227,6 +230,7 @@ final class AppContainer {
             bpm: bpm,
             player: SynthListenPlayer(sound: guitarSound),
             history: sessionHistory ?? UnavailableSessionRepository(),
+            guidanceStore: practiceGuidanceStore,
             onReady: { [weak router] in router?.push(.play(patternID: pattern.id, bpm: bpm)) },
             onBack: { [weak router] in router?.popTo(.practiceList) }
         )

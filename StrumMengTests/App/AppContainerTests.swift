@@ -287,6 +287,20 @@ final class AppContainerTests: XCTestCase {
         XCTAssertEqual(router.path, [.practiceList])
     }
 
+    func test_makeListenViewModel_usesInjectedPracticeGuidanceStore() {
+        let store = InMemoryPracticeGuidanceStore(hasCompletedGuidance: false)
+        let container = AppContainer(router: router, inMemory: true, practiceGuidanceStore: store)
+        let pattern = PatternCatalog.foundation
+        let listen = container.makeListenViewModel(pattern: pattern, bpm: 80)
+
+        listen.send(.next)
+        XCTAssertEqual(listen.state, .instructions(step: 0))
+
+        listen.send(.instructionsNext)
+        XCTAssertEqual(listen.state, .listening(step: 0, completed: false))
+        XCTAssertTrue(store.hasCompletedGuidance)
+    }
+
     // MARK: - Guidebook
 
     func test_guidebookViewModel_dismiss_callsInjectedAction() {

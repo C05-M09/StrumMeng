@@ -134,7 +134,7 @@ struct ListenView: View {
                     .font(AppTypography.dmMono(size: 32)).foregroundStyle(AppColors.cream)
                     .position(x: x, y: ListenLayout.countY)
             }
-            if viewModel.state != .information {
+            if viewModel.state.showsTrackingRing {
                 Circle().stroke(AppColors.perfect, lineWidth: 5)
                     .frame(width: ListenLayout.ring, height: ListenLayout.ring)
                     .position(x: ListenLayout.firstX + CGFloat(viewModel.state.step) * ListenLayout.slot,
@@ -236,13 +236,12 @@ struct ListenView: View {
     ListenPreviewFactory.make(events: [.next, .progress(step: 3, completed: true)], elapsed: 1.125)
 }
 #Preview("04 · First Play instructions", traits: .landscapeLeft) {
-    ListenPreviewFactory.make(events: [.next, .progress(step: 2, completed: true), .ready,
-                                       .historyChecked(hasRecords: false)])
+    ListenPreviewFactory.make(events: [.showGuidance])
 }
-#Preview("04 · Pause", traits: .landscapeLeft) {
+#Preview("05 · Pause", traits: .landscapeLeft) {
     ListenPreviewFactory.make(events: [.next, .progress(step: 3, completed: false), .pause])
 }
-#Preview("05 · Playback error", traits: .landscapeLeft) {
+#Preview("06 · Playback error", traits: .landscapeLeft) {
     ListenPreviewFactory.make(events: [.failed("The guitar example couldn’t play. Please try again.")])
 }
 #endif

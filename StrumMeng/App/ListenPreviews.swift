@@ -3,10 +3,22 @@ import SwiftUI
 
 @MainActor
 enum ListenPreviewFactory {
-    static func make(events: [ListenEvent], elapsed: TimeInterval = 0) -> ListenView {
+    static func make(
+        events: [ListenEvent],
+        elapsed: TimeInterval = 0,
+        guidanceStore: (any PracticeGuidanceStore)? = nil
+    ) -> ListenView {
         AppFontRegistrar.registerFonts()
-        let model = ListenViewModel(pattern: PatternCatalog.all[1], bpm: 80,
-                                    player: ListenPreviewPlayer(elapsed: elapsed), history: ListenPreviewHistory(), onReady: {}, onBack: {})
+        let store = guidanceStore ?? InMemoryPracticeGuidanceStore(hasCompletedGuidance: true)
+        let model = ListenViewModel(
+            pattern: PatternCatalog.all[1],
+            bpm: 80,
+            player: ListenPreviewPlayer(elapsed: elapsed),
+            history: ListenPreviewHistory(),
+            guidanceStore: store,
+            onReady: {},
+            onBack: {}
+        )
         for event in events { model.send(event) }
         model.refreshProgress()
         return ListenView(viewModel: model)
