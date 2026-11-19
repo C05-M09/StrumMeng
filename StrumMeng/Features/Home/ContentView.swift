@@ -98,6 +98,7 @@ struct ContentView: View {
         }
         // Every iPad screen below plays its UI sounds through this (clicks, garage, pop-ups...).
         .environment(\.playSoundEffect, container.soundEffectAction)
+        .environment(\.setSummaryMusic, container.summaryMusicAction)
         .task { await container.startControllerLink() }
         // Each pattern starts at the tempo it was last played at. Loaded once here, not on the
         // list's appear, so it never overwrites a tempo the player is adjusting.
