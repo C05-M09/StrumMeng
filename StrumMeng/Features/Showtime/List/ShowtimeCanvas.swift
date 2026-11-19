@@ -32,12 +32,12 @@ struct ShowtimeCanvas<Content: View>: View {
     var body: some View {
         GeometryReader { geometry in
             let reference = AppLayout.referenceSize
-            let scale = min(geometry.size.width / reference.width,
-                            geometry.size.height / reference.height)
+            let sx = geometry.size.width / reference.width
+            let sy = geometry.size.height / reference.height
             content
                 .frame(width: reference.width, height: reference.height)
                 .clipped()
-                .scaleEffect(scale)
+                .scaleEffect(x: sx, y: sy)
                 .frame(width: geometry.size.width, height: geometry.size.height)
         }
         .ignoresSafeArea()

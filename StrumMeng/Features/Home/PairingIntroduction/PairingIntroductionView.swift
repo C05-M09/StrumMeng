@@ -8,7 +8,8 @@ struct PairingIntroductionView: View {
     var body: some View {
         GeometryReader { proxy in
             let size = AppLayout.referenceSize
-            let scale = max(proxy.size.width / size.width, proxy.size.height / size.height)
+            let sx = proxy.size.width / size.width
+            let sy = proxy.size.height / size.height
             ZStack {
                 AppColors.brownInk.opacity(PairingIntroductionLayout.scrimOpacity)
                 Image("Listen_Box").resizable()
@@ -53,7 +54,7 @@ struct PairingIntroductionView: View {
                     .modifier(entrance(.buttons))
             }
             .frame(width: size.width, height: size.height)
-            .scaleEffect(scale)
+            .scaleEffect(x: sx, y: sy)
             .frame(width: proxy.size.width, height: proxy.size.height)
             .clipped()
         }

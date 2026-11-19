@@ -17,30 +17,19 @@ struct HomeView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let scale = max(
-                proxy.size.width / AppLayout.referenceSize.width,
-                proxy.size.height / AppLayout.referenceSize.height
-            )
+            let sx = proxy.size.width / AppLayout.referenceSize.width
+            let sy = proxy.size.height / AppLayout.referenceSize.height
 
             ZStack {
-                FrameAnimationView(
-                    framePrefix: HomeLayout.coverAnimationPrefix,
-                    frameCount: HomeLayout.coverAnimationFrameCount,
-                    framesPerSecond: HomeLayout.coverAnimationFPS
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipped()
-                .ignoresSafeArea()
-
                 content
                     .frame(
                         width: AppLayout.referenceSize.width,
                         height: AppLayout.referenceSize.height
                     )
-                    .scaleEffect(scale)
+                    .scaleEffect(x: sx, y: sy)
                     .frame(
-                        width: AppLayout.referenceSize.width * scale,
-                        height: AppLayout.referenceSize.height * scale
+                        width: proxy.size.width,
+                        height: proxy.size.height
                     )
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -63,6 +52,16 @@ struct HomeView: View {
 
     private var content: some View {
         ZStack {
+            FrameAnimationView(
+                framePrefix: HomeLayout.coverAnimationPrefix,
+                frameCount: HomeLayout.coverAnimationFrameCount,
+                framesPerSecond: HomeLayout.coverAnimationFPS
+            )
+            .frame(
+                width: AppLayout.referenceSize.width,
+                height: AppLayout.referenceSize.height
+            )
+
             menuButton(HomeLayout.practice, "Practice") {
                 viewModel.send(.tapPractice)
             }

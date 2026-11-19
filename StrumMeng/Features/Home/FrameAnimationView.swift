@@ -34,7 +34,6 @@ struct FrameAnimationView: View {
     private func frameImage(at index: Int) -> some View {
         Image(framePrefix + String(format: "%05d", index))
             .resizable()
-            .scaledToFill()
     }
 
     /// Which frame to show at `date`, looping forever.

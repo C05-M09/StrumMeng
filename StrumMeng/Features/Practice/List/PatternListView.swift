@@ -5,28 +5,29 @@ struct PatternListView: View {
     
     var body: some View {
         GeometryReader { proxy in
-            let scale = max(
-                proxy.size.width / AppLayout.referenceSize.width,
-                proxy.size.height / AppLayout.referenceSize.height
-            )
+            let sx = proxy.size.width / AppLayout.referenceSize.width
+            let sy = proxy.size.height / AppLayout.referenceSize.height
             
             ZStack {
-                Image("Practice_BG")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .ignoresSafeArea()
-                
-                content
-                    .frame(
-                        width: AppLayout.referenceSize.width,
-                        height: AppLayout.referenceSize.height
-                    )
-                    .scaleEffect(scale)
-                    .frame(
-                        width: AppLayout.referenceSize.width * scale,
-                        height: AppLayout.referenceSize.height * scale
-                    )
+                ZStack {
+                    Image("Practice_BG")
+                        .resizable()
+                        .frame(
+                            width: AppLayout.referenceSize.width,
+                            height: AppLayout.referenceSize.height
+                        )
+                    
+                    content
+                }
+                .frame(
+                    width: AppLayout.referenceSize.width,
+                    height: AppLayout.referenceSize.height
+                )
+                .scaleEffect(x: sx, y: sy)
+                .frame(
+                    width: proxy.size.width,
+                    height: proxy.size.height
+                )
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
