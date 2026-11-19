@@ -7,10 +7,8 @@ struct OptionView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let scale = max(
-                proxy.size.width / AppLayout.referenceSize.width,
-                proxy.size.height / AppLayout.referenceSize.height
-            )
+            let sx = proxy.size.width / AppLayout.referenceSize.width
+            let sy = proxy.size.height / AppLayout.referenceSize.height
 
             ZStack {
                 // Placeholder until the Option background artwork is in the assets.
@@ -23,10 +21,10 @@ struct OptionView: View {
                         width: AppLayout.referenceSize.width,
                         height: AppLayout.referenceSize.height
                     )
-                    .scaleEffect(scale)
+                    .scaleEffect(x: sx, y: sy)
                     .frame(
-                        width: AppLayout.referenceSize.width * scale,
-                        height: AppLayout.referenceSize.height * scale
+                        width: proxy.size.width,
+                        height: proxy.size.height
                     )
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
