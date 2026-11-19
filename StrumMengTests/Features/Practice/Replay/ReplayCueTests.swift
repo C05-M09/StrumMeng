@@ -62,15 +62,13 @@ final class ReplayCueTests: XCTestCase {
     }
 
     func test_miss_playsWrongStrumDirection() {
-        // Step 0 pattern note is .down, so a miss plays the wrong direction: .up
+        // Step 0 pattern note is .down. A miss without strum (offsetMs: nil) makes NO sound.
         let strumsWithoutOffset = cues([BeatEvent(stepIndex: 0, result: .miss, offsetMs: nil)])
             .filter { if case .strum = $0.sound { true } else { false } }
 
-        XCTAssertEqual(strumsWithoutOffset, [
-            ReplayCue(time: 0, sound: .strum(.up))
-        ])
+        XCTAssertEqual(strumsWithoutOffset, [])
 
-        // Step 1 pattern note is .up, so a miss plays .down
+        // Step 1 pattern note is .up, so a wrong-direction strum (offsetMs: -30) plays .down
         let strumsWithOffset = cues([BeatEvent(stepIndex: 1, result: .miss, offsetMs: -30)])
             .filter { if case .strum = $0.sound { true } else { false } }
 
