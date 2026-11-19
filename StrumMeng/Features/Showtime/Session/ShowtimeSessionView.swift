@@ -14,8 +14,8 @@ struct ShowtimeSessionView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let scale = min(geometry.size.width / ShowtimeLayout.size.width,
-                            geometry.size.height / ShowtimeLayout.size.height)
+            let sx = geometry.size.width / ShowtimeLayout.size.width
+            let sy = geometry.size.height / ShowtimeLayout.size.height
             ZStack {
                 AppColors.brownInk.ignoresSafeArea()
                 TimelineView(.animation(minimumInterval: ShowtimeLayout.frameInterval,
@@ -23,7 +23,7 @@ struct ShowtimeSessionView: View {
                     content
                 }
                 .frame(width: ShowtimeLayout.size.width, height: ShowtimeLayout.size.height)
-                .scaleEffect(scale)
+                .scaleEffect(x: sx, y: sy)
                 .frame(width: geometry.size.width, height: geometry.size.height)
 
                 if isShowingBanner, case .finished(let result) = viewModel.state {

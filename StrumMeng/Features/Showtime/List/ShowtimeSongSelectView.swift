@@ -134,7 +134,7 @@ struct ShowtimeSongSelectView: View {
                             .multilineTextAlignment(.center)
                             .shadow(color: AppColors.brownInk.opacity(0.75), radius: 3, x: 0, y: 4)
                             .frame(width: 520)
-                            .position(x: 1010, y: 920)
+                            .position(x: 965, y: 920)
                             .transition(.opacity)
                             .zIndex(Layer.foreground)
                     }
@@ -280,7 +280,10 @@ struct ShowtimeSongSelectView: View {
         guard !isDetailShown || offset == 0 else { return }
         switch offset {
         case 0:
-            if !isDetailShown { isDetailShown = true }
+            if !isDetailShown {
+                playSoundEffect(.button)
+                isDetailShown = true
+            }
         case 1:
             viewModel.send(.swipeLeft)
         case -1:
@@ -349,6 +352,7 @@ struct ShowtimeSongSelectView: View {
  
     private func titlePlaque(_ song: Song) -> some View {
         let width: CGFloat = isDetailShown ? 787 : 644
+        let leftShift: CGFloat = isDetailShown ? 0 : 90
         let lines = titleLines(for: song)
         return ZStack(alignment: .trailing) {
             Image(ShowtimeAssets.titleBox)
@@ -382,7 +386,7 @@ struct ShowtimeSongSelectView: View {
             .padding(.trailing, 50)
         }
         .frame(width: width, height: 180)
-        .position(x: width / 2, y: 884)
+        .position(x: width / 2 - leftShift, y: 884)
     }
  
 

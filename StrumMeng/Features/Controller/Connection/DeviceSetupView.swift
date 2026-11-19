@@ -8,7 +8,8 @@ struct DeviceSetupView: View {
     var body: some View {
         GeometryReader { proxy in
             let size = AppLayout.referenceSize
-            let scale = max(proxy.size.width / size.width, proxy.size.height / size.height)
+            let sx = proxy.size.width / size.width
+            let sy = proxy.size.height / size.height
 
             ZStack {
                 Image("Play_BG").resizable()
@@ -31,7 +32,7 @@ struct DeviceSetupView: View {
                 }
             }
             .frame(width: size.width, height: size.height)
-            .scaleEffect(scale)
+            .scaleEffect(x: sx, y: sy)
             .frame(width: proxy.size.width, height: proxy.size.height)
             .clipped()
         }

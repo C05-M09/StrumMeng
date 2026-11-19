@@ -28,8 +28,38 @@ final class MenuMusicPolicyTests: XCTestCase {
         XCTAssertFalse(MenuMusicPolicy.playsMusic(on: .play(patternID: "p", bpm: 80), isAppActive: true))
     }
 
-    func test_summary_pausesMusic() {
+    func test_summary_pausesMusic_untilTheSummaryShows() {
         XCTAssertFalse(MenuMusicPolicy.playsMusic(on: .summary(sessionID: sessionID), isAppActive: true))
+    }
+
+    func test_summary_playsMusic_whileTheSummaryShows() {
+        XCTAssertTrue(MenuMusicPolicy.playsMusic(
+            on: .summary(sessionID: sessionID), isAppActive: true, isShowingSummary: true
+        ))
+    }
+
+    func test_showtimeSummary_playsMusic_whileTheSummaryShows() {
+        XCTAssertTrue(MenuMusicPolicy.playsMusic(
+            on: .showtime(songID: "dummy-twinkle"), isAppActive: true, isShowingSummary: true
+        ))
+    }
+
+    func test_summary_inactiveApp_pausesMusic() {
+        XCTAssertFalse(MenuMusicPolicy.playsMusic(
+            on: .summary(sessionID: sessionID), isAppActive: false, isShowingSummary: true
+        ))
+    }
+
+    func test_listenAndPlay_pauseMusic_evenIfASummaryReportedShowing() {
+        XCTAssertFalse(MenuMusicPolicy.playsMusic(
+            on: .listen(patternID: "p", bpm: 80), isAppActive: true, isShowingSummary: true
+        ))
+        XCTAssertFalse(MenuMusicPolicy.playsMusic(
+            on: .play(patternID: "p", bpm: 80), isAppActive: true, isShowingSummary: true
+        ))
+        XCTAssertFalse(MenuMusicPolicy.playsMusic(
+            on: .showtimeList, isAppActive: true, isShowingSummary: true
+        ))
     }
 
     func test_inactiveApp_pausesMusic_evenOnHome() {

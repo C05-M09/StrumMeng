@@ -6,6 +6,7 @@ struct ShowtimeSongDetailCard: View {
     let song: Song
     var activePatternID: String = ""
     var onSelectPattern: ((String) -> Void)? = nil
+    @Environment(\.playSoundEffect) private var playSoundEffect
 
     private var patterns: [ShowtimePatternInfo] {
         ShowtimePatternCatalog.patterns(forSongID: song.id)
@@ -58,6 +59,7 @@ struct ShowtimeSongDetailCard: View {
                             .offset(x: leading)
                             .zIndex(isActive ? 10 : Double(5 - index))
                             .onTapGesture {
+                                playSoundEffect(.button)
                                 onSelectPattern?(pattern.id)
                             }
                     }

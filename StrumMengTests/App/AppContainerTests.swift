@@ -156,6 +156,54 @@ final class AppContainerTests: XCTestCase {
         XCTAssertEqual(sounds.startMusicCount, 0)
     }
 
+    func test_summaryShowing_onSummaryRoute_startsTheMusic() {
+        let sounds = MockMenuSoundService()
+        let container = AppContainer(router: router, menuSounds: sounds)
+        router.path = [.practiceList, .summary(sessionID: UUID())]
+        container.updateMenuMusic(for: router.path, isAppActive: true)
+
+        container.summaryMusicAction(true)
+
+        XCTAssertEqual(sounds.startMusicCount, 1)
+    }
+
+    func test_replayOpening_overTheSummary_pausesTheMusic() {
+        let sounds = MockMenuSoundService()
+        let container = AppContainer(router: router, menuSounds: sounds)
+        router.path = [.practiceList, .summary(sessionID: UUID())]
+        container.updateMenuMusic(for: router.path, isAppActive: true)
+        container.summaryMusicAction(true)
+        let pausesBefore = sounds.pauseMusicCount
+
+        container.summaryMusicAction(false)
+
+        XCTAssertEqual(sounds.pauseMusicCount, pausesBefore + 1)
+        XCTAssertEqual(sounds.startMusicCount, 1)
+    }
+
+    func test_showtimeSummaryShowing_startsTheMusic() {
+        let sounds = MockMenuSoundService()
+        let container = AppContainer(router: router, menuSounds: sounds)
+        router.path = [.showtimeList, .showtime(songID: "dummy-twinkle")]
+        container.updateMenuMusic(for: router.path, isAppActive: true)
+        XCTAssertEqual(sounds.startMusicCount, 0)
+
+        container.summaryMusicAction(true)
+
+        XCTAssertEqual(sounds.startMusicCount, 1)
+    }
+
+    func test_summaryShowing_whileAppIsInactive_keepsTheMusicPaused() {
+        let sounds = MockMenuSoundService()
+        let container = AppContainer(router: router, menuSounds: sounds)
+        router.path = [.practiceList, .summary(sessionID: UUID())]
+        container.updateMenuMusic(for: router.path, isAppActive: false)
+
+        container.summaryMusicAction(true)
+
+        XCTAssertEqual(sounds.startMusicCount, 0)
+    }
+
     func test_updateMenuMusic_whenAppIsInactive_pausesTheMusic() {
         let sounds = MockMenuSoundService()
         let container = AppContainer(router: router, menuSounds: sounds)

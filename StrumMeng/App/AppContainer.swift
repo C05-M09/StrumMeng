@@ -45,6 +45,9 @@ final class AppContainer {
     /// Play, so it does not have to wait for the link's first state before counting in.
     private var isControllerLinkConnected: Bool?
     private var controllerStateTask: Task<Void, Never>?
+    /// Inputs to `MenuMusicPolicy` besides the route, kept so either can change on its own.
+    private var isAppActive = true
+    private var isShowingSummary = false
 
     init(
         router: AppRouter,
@@ -98,10 +101,30 @@ final class AppContainer {
         return SoundEffectAction { effect in sounds.play(effect) }
     }
 
+    /// Lets the Practice and Showtime summaries turn the menu music on while they show, and off
+    /// while Replay is open. Put in the environment by ContentView.
+    var summaryMusicAction: SummaryMusicAction {
+        SummaryMusicAction { [weak self] isShowingSummary in
+            self?.setShowingSummary(isShowingSummary)
+        }
+    }
+
     /// Plays or pauses the menu music for the screen on top. Called whenever the route stack or the
     /// app's active state changes; `MenuMusicPolicy` decides.
     func updateMenuMusic(for path: [AppRoute], isAppActive: Bool) {
-        if MenuMusicPolicy.playsMusic(on: path.last, isAppActive: isAppActive) {
+        self.isAppActive = isAppActive
+        applyMenuMusic(top: path.last)
+    }
+
+    /// What a summary view reported last; the route alone cannot tell (see `SummaryMusicAction`).
+    func setShowingSummary(_ isShowingSummary: Bool) {
+        guard self.isShowingSummary != isShowingSummary else { return }
+        self.isShowingSummary = isShowingSummary
+        applyMenuMusic(top: router.path.last)
+    }
+
+    private func applyMenuMusic(top: AppRoute?) {
+        if MenuMusicPolicy.playsMusic(on: top, isAppActive: isAppActive, isShowingSummary: isShowingSummary) {
             menuSounds.startMusic()
         } else {
             menuSounds.pauseMusic()

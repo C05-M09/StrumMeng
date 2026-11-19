@@ -38,8 +38,8 @@ struct ListenView: View {
     
     var body: some View {
         GeometryReader { geometry in
-            let scale = max(geometry.size.width / ListenLayout.size.width,
-                            geometry.size.height / ListenLayout.size.height)
+            let sx = geometry.size.width / ListenLayout.size.width
+            let sy = geometry.size.height / ListenLayout.size.height
             ZStack {
                 Image("Play_BG").resizable()
                 header
@@ -81,7 +81,7 @@ struct ListenView: View {
                 }
             }
             .frame(width: ListenLayout.size.width, height: ListenLayout.size.height)
-            .scaleEffect(scale)
+            .scaleEffect(x: sx, y: sy)
             .frame(width: geometry.size.width, height: geometry.size.height)
             .clipped()
         }
