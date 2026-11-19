@@ -314,9 +314,16 @@ final class PlayViewModelTests: XCTestCase {
 
         await viewModel.send(.tapResume)
         XCTAssertEqual(viewModel.state, .countIn(3))
+        // Before the first tick arrives, countInBeatProgress is nil so the callout waits for beat 3
+        XCTAssertNil(viewModel.screenModel().countInBeatProgress)
+
         // During count-in, songTime stays frozen as-is at 0.12s
         for n in 30...35 {
             tick(viewModel, n)
+            if n == 30 {
+                // On the first tick, countInStartTime is set and progress starts at 0 (pop animation)
+                XCTAssertEqual(viewModel.screenModel().countInBeatProgress ?? -1, 0, accuracy: 1e-9)
+            }
             XCTAssertEqual(viewModel.screenModel().songTime, 0.12, accuracy: 1e-9)
         }
 

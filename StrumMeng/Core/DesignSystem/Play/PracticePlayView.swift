@@ -182,15 +182,17 @@ struct PracticePlayView: View {
                 // Only the number's pop animation needs the per-frame time.
                 TimelineView(.animation(minimumInterval: Self.frameInterval, paused: !isAnimating)) { _ in
                     let frame = liveModel()
-                    let progress = frame.countInBeatProgress ?? PlayTimeline.countInBeatProgress(
+                    let progress = frame.countInBeatProgress ?? (isAnimating ? nil : PlayTimeline.countInBeatProgress(
                         songTime: frame.songTime,
                         slotInterval: frame.slotInterval,
-                        leadInSlots: frame.leadInSlots)
-                    PlayCalloutView(
-                        text: "\(number)",
-                        fontSize: 140 * layout.unit,
-                        beatProgress: progress)
-                        .position(layout.calloutCenter)
+                        leadInSlots: frame.leadInSlots))
+                    if let progress {
+                        PlayCalloutView(
+                            text: "\(number)",
+                            fontSize: 140 * layout.unit,
+                            beatProgress: progress)
+                            .position(layout.calloutCenter)
+                    }
                 }
             }
             .allowsHitTesting(false)
