@@ -21,6 +21,7 @@ struct ShowtimeSummaryView: View {
     @State private var isShowingFeedbackOverlay: Bool
     @State private var isGarageOpen: Bool = false
     @Environment(\.playSoundEffect) private var playSoundEffect
+    @Environment(\.setSummaryMusic) private var setSummaryMusic
 
     init(
         viewModel: ShowtimeSummaryViewModel,
@@ -105,6 +106,11 @@ struct ShowtimeSummaryView: View {
         .task {
             await viewModel.onAppear()
         }
+        // Menu music plays on the summary, and pauses while Replay plays the song and guitar.
+        .onChange(of: activeReplayResult == nil, initial: true) { _, isShowingSummary in
+            setSummaryMusic(isShowingSummary)
+        }
+        .onDisappear { setSummaryMusic(false) }
         .onChange(of: viewModel.state) { _, newState in
             if case .navigating(let destination) = newState {
                 if case .replay(let result) = destination {
