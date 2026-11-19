@@ -319,6 +319,15 @@ final class PlayViewModelTests: XCTestCase {
             tick(viewModel, n)
             XCTAssertEqual(viewModel.screenModel().songTime, 0.12, accuracy: 1e-9)
         }
+
+        // Tick 36: countdown finished, playing resumes at pausedTime 0.12s
+        tick(viewModel, 36)
+        XCTAssertEqual(viewModel.state, .playing)
+        XCTAssertEqual(viewModel.screenModel().songTime, 0.12, accuracy: 1e-9)
+
+        // Tick 37: playing progresses smoothly without jumping to the step integer grid!
+        tick(viewModel, 37)
+        XCTAssertEqual(viewModel.screenModel().songTime, 0.12 + step, accuracy: 1e-9)
     }
 
     func test_restartFromPause_discardsTheSession() async throws {

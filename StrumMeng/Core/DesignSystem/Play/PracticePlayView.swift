@@ -82,6 +82,7 @@ struct PracticePlayView: View {
                 TimelineView(.animation(minimumInterval: Self.frameInterval, paused: !isAnimating)) { _ in
                     board(layout, liveModel())
                 }
+                .transaction { $0.animation = nil }
                 header(layout, model)
                 veil(layout, model)
             }
