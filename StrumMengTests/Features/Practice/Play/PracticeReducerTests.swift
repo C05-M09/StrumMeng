@@ -88,6 +88,7 @@ final class PracticeReducerTests: XCTestCase {
     func test_backToMenu_returnsToIdle() {
         for state in [PracticeState.listening, .ready, .paused, .disconnected, .finished(result)] {
             XCTAssertEqual(reduce(state, .tapBackToMenu), .idle)
+            XCTAssertEqual(reduce(state, .tapBackToListen), .idle)
         }
     }
 

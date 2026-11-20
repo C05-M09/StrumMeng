@@ -66,6 +66,15 @@ final class ShowtimeReducerTests: XCTestCase {
         XCTAssertEqual(reduce(.exited, .next), .exited)
         XCTAssertEqual(reduce(.exited, .restart), .exited)
     }
+    func test_backToListenRestoresListenOrReadyStage() {
+        XCTAssertEqual(reduce(.paused(.listening(3), .connection), .backToListen), .listening(3))
+        XCTAssertEqual(reduce(.paused(.ready, .connection), .backToListen), .ready)
+        XCTAssertEqual(reduce(.paused(.countIn(2), .connection), .backToListen), .ready)
+        XCTAssertEqual(reduce(.paused(.playing, .connection), .backToListen), .ready)
+        XCTAssertEqual(reduce(.countIn(2), .backToListen), .ready)
+        XCTAssertEqual(reduce(.playing, .backToListen), .ready)
+    }
+
     func test_illegalAndLateEventsCannotSkipPreviewOrFinishPausedSessions() {
         let finished = result
         for state in [ShowtimeState.intro, .listening(7), .ready, .paused(.playing, .user)] {

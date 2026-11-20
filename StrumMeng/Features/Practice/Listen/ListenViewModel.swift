@@ -44,6 +44,10 @@ final class ListenViewModel {
 
     /// Follows the iPhone for as long as the screen is up.
     func appear() {
+        if state == .departed {
+            state = .listening(step: 0, completed: true)
+            startPlayback()
+        }
         guard controllerTask == nil, let states = controller?.connectionStates else { return }
         controllerTask = Task { [weak self] in
             for await connection in states { self?.handle(connection) }
@@ -64,7 +68,6 @@ final class ListenViewModel {
             return
         }
         isControllerConnected = false
-        send(.controllerDisconnected)
     }
 
     /// Set Up Device from the disconnected popup; the example stays paused underneath.
@@ -131,6 +134,8 @@ final class ListenViewModel {
             if case .listening = previous, case .disconnected = state { player.pause(); progressTask?.cancel() }
         case .readyWithoutController:
             if case .disconnected = state, state != previous { player.pause(); progressTask?.cancel() }
+        case .dismissDisconnected:
+            if case .listening = state, state != previous { player.resume(); observeProgress() }
         case .retryHistory:
             if case .checkingHistory = state, state != previous { checkHistory() }
         case .historyChecked(let hasRecords):

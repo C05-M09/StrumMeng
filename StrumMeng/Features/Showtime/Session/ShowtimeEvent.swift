@@ -4,6 +4,6 @@ enum ShowtimeEvent {
     case previewFinished
     case selectPattern(Int)
     case countdown(Int), firstBeat
-    case pause(ShowtimePauseReason), resume, restart, back
+    case pause(ShowtimePauseReason), resume, restart, back, backToListen
     case completed(SessionResult)
 }

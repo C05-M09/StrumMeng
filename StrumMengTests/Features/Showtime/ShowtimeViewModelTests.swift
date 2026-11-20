@@ -315,19 +315,24 @@ final class ShowtimeViewModelTests: XCTestCase {
         XCTAssertFalse(model.canReady)
         await model.disappear()
     }
-    func test_connectionCallbackMutesPreviewAndRepeatedDisconnectStillKeepsItMuted() async {
+    func test_disconnectWhileListening_doesNotPauseDemo_andOnlyReadyChecksConnection() async {
         let (model, demo, game) = make()
         await model.send(.next)
         XCTAssertTrue(demo.isPlaying)
-        let paused = expectation(description: "Disconnected pause")
-        withObservationTracking { _ = model.state } onChange: { paused.fulfill() }
+
         game.isControllerConnected = false
         game.onConnectionChanged?(false)
-        await fulfillment(of: [paused], timeout: 2)
-        XCTAssertEqual(model.state, .paused(.listening(0), .connection))
-        XCTAssertFalse(demo.isPlaying)
-        XCTAssertGreaterThan(demo.pauses, 0)
-        await model.send(.pause(.connection))
+        for _ in 0..<10 { await Task.yield() }
+
+        XCTAssertEqual(model.state, .listening(0))
+        XCTAssertFalse(model.isControllerConnected)
+        XCTAssertTrue(demo.isPlaying)
+        XCTAssertEqual(demo.pauses, 0)
+
+        await model.send(.previewFinished)
+        XCTAssertEqual(model.state, .ready)
+        await model.send(.ready)
+        XCTAssertEqual(model.state, .paused(.ready, .connection))
         XCTAssertFalse(demo.isPlaying)
         await model.disappear()
     }
@@ -373,6 +378,71 @@ final class ShowtimeViewModelTests: XCTestCase {
         XCTAssertGreaterThan(game.disappears, 0)
         await model.disappear()
     }
+
+    func test_backToListen_returnsFromDisconnectedToListen_andAllowsReadyAgain() async {
+        let demo = FakeSongDemoPlayer(); let game = FakeSongGameplay(); var exits = 0
+        let model = ShowtimeViewModel(song: DummySongCatalog().songs[0], demo: demo, gameplay: game,
+                                     repository: MockSessionRepository(), onBack: { exits += 1 })
+        model.appear()
+        await model.send(.next)
+        await model.send(.previewFinished)
+        await model.send(.ready)
+        game.change(.playing)
+        game.isControllerConnected = false
+        game.onConnectionChanged?(false)
+        game.change(.disconnected)
+        XCTAssertEqual(model.state, .paused(.playing, .connection))
+
+        await model.send(.backToListen)
+
+        XCTAssertEqual(model.state, .ready)
+        XCTAssertTrue(model.isListening)
+        XCTAssertEqual(exits, 0)
+        XCTAssertEqual(game.resetToReadyCalls, 1)
+        XCTAssertEqual(game.state, .ready)
+        XCTAssertGreaterThan(demo.starts, 1)
+
+        // Reconnect and tap Ready again: gameplay must start cleanly without getting stuck.
+        game.isControllerConnected = true
+        game.onConnectionChanged?(true)
+        await model.send(.ready)
+        XCTAssertEqual(model.state, .countIn(3))
+        XCTAssertEqual(game.readyCalls, 2)
+        XCTAssertEqual(game.state, .countIn(3))
+        await model.disappear()
+    }
+
+    func test_readyWhileDisconnected_thenBackToListen_thenReadyAgain() async {
+        let (model, demo, game) = make(connected: false)
+        await model.send(.next)
+        await model.send(.previewFinished)
+
+        // Tap Ready while disconnected -> modal over Listen
+        await model.send(.ready)
+        XCTAssertEqual(model.state, .paused(.ready, .connection))
+        XCTAssertFalse(demo.isPlaying)
+
+        // Tap Back on modal -> returns to Listen with demo running
+        await model.send(.backToListen)
+        XCTAssertEqual(model.state, .ready)
+        XCTAssertTrue(demo.isPlaying)
+        XCTAssertEqual(demo.resumes, 1)
+
+        // Tap Ready again while still disconnected -> modal shows again
+        await model.send(.ready)
+        XCTAssertEqual(model.state, .paused(.ready, .connection))
+
+        // Reconnect, resume to Listen, then tap Ready -> starts gameplay
+        game.isControllerConnected = true
+        game.onConnectionChanged?(true)
+        await model.send(.resume)
+        XCTAssertEqual(model.state, .ready)
+        await model.send(.ready)
+        XCTAssertEqual(model.state, .countIn(3))
+        XCTAssertEqual(game.readyCalls, 1)
+        XCTAssertEqual(game.state, .countIn(3))
+        await model.disappear()
+    }
 }
 
 @MainActor
@@ -406,7 +476,7 @@ private final class FakeSongGameplay: SongGameplay {
     var frameLeadInSlots = 0
     var onStateChanged: ((PracticeState) -> Void)?
     var onConnectionChanged: ((Bool) -> Void)?
-    var readyCalls = 0; var restartCalls = 0; var disappears = 0
+    var readyCalls = 0; var restartCalls = 0; var resetToReadyCalls = 0; var disappears = 0
     var backgroundCalls = 0; var activeCalls = 0
     func appEnteredBackground() async { backgroundCalls += 1 }
     func appBecameActive() async { activeCalls += 1 }
@@ -417,6 +487,10 @@ private final class FakeSongGameplay: SongGameplay {
         if case .tapReady = event { readyCalls += 1 }
         if case .tapRestart = event { restartCalls += 1 }
         change(reduce(state, event))
+    }
+    func resetToReady() async {
+        resetToReadyCalls += 1
+        change(.ready)
     }
     func screenModel() -> PlayScreenModel {
         PlayScreenModel(title: "Song", bpm: 80, duration: 60, slotInterval: 0.375, songTime: frameSongTime,

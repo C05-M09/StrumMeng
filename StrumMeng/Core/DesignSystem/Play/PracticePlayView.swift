@@ -24,6 +24,7 @@ struct PracticePlayView: View {
     private let onResume: () -> Void
     private let onRestart: () -> Void
     private let onBackToMenu: () -> Void
+    private let onBackToListen: () -> Void
     private let onSetUpDevice: () -> Void
 
     /// A still frame (previews, the hit-animation gallery, a caller with its own timeline).
@@ -37,10 +38,13 @@ struct PracticePlayView: View {
          onResume: @escaping () -> Void = {},
          onRestart: @escaping () -> Void = {},
          onBackToMenu: @escaping () -> Void = {},
+         onBackToListen: (() -> Void)? = nil,
          onSetUpDevice: @escaping () -> Void = {}) {
+        let backToListen = onBackToListen ?? onBackToMenu
         self.init(isAnimating: false, liveModel: { model }, backgroundAssetName: backgroundAssetName,
                   titleFontScale: titleFontScale, titleLineSpacing: titleLineSpacing, bpmColor: bpmColor, onReady: onReady,
-                  onPause: onPause, onResume: onResume, onRestart: onRestart, onBackToMenu: onBackToMenu, onSetUpDevice: onSetUpDevice)
+                  onPause: onPause, onResume: onResume, onRestart: onRestart, onBackToMenu: onBackToMenu,
+                  onBackToListen: backToListen, onSetUpDevice: onSetUpDevice)
     }
 
     /// A live session: `liveModel` is read every frame while `isAnimating`, for the moving parts only.
@@ -55,6 +59,7 @@ struct PracticePlayView: View {
          onResume: @escaping () -> Void = {},
          onRestart: @escaping () -> Void = {},
          onBackToMenu: @escaping () -> Void = {},
+         onBackToListen: (() -> Void)? = nil,
          onSetUpDevice: @escaping () -> Void = {}) {
         self.bpmColor = bpmColor
         self.titleLineSpacing = titleLineSpacing
@@ -67,6 +72,7 @@ struct PracticePlayView: View {
         self.onResume = onResume
         self.onRestart = onRestart
         self.onBackToMenu = onBackToMenu
+        self.onBackToListen = onBackToListen ?? onBackToMenu
         self.onSetUpDevice = onSetUpDevice
     }
 
@@ -209,6 +215,8 @@ struct PracticePlayView: View {
             ZStack {
                 AppColors.brownInk.opacity(0.65)
                 ControllerDisconnectedOverlay(unit: layout.unit, isReconnected: isReconnected,
+                                              backButtonPosition: layout.pauseCenter,
+                                              onBack: onBackToListen,
                                               onResume: onResume, onSetUpDevice: onSetUpDevice)
                     .transition(.scale(scale: 0.9).combined(with: .opacity))
             }

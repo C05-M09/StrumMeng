@@ -34,7 +34,7 @@ struct PairingIntroductionView: View {
                         Text("Let's pair your iPhone with this iPad\nbefore we start strumming!")
                             .font(AppTypography.dmMono(size: PairingIntroductionLayout.copyFontSize))
                             .foregroundStyle(AppColors.brownInk)
-                        Text("Tap Next when you’re ready.")
+                        Text("Tap 'NEXT' when you’re ready.")
                             .font(AppTypography.dmMono(size: PairingIntroductionLayout.hintFontSize))
                             .foregroundStyle(AppColors.yellowAccent)
                     }

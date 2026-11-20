@@ -41,7 +41,9 @@ func reduce(_ state: PracticeState, _ event: PracticeEvent) -> PracticeState {
         return .ready
 
     case (.listening, .tapBackToMenu), (.ready, .tapBackToMenu), (.paused, .tapBackToMenu),
-         (.disconnected, .tapBackToMenu), (.finished, .tapBackToMenu):
+         (.disconnected, .tapBackToMenu), (.finished, .tapBackToMenu),
+         (.listening, .tapBackToListen), (.ready, .tapBackToListen), (.paused, .tapBackToListen),
+         (.disconnected, .tapBackToListen), (.finished, .tapBackToListen):
         return .idle
 
     default:

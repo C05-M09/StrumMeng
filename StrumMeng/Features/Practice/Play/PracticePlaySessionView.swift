@@ -36,6 +36,7 @@ struct PracticePlaySessionView: View {
                     onResume: { send(.tapResume) },
                     onRestart: { send(.tapRestart) },
                     onBackToMenu: { send(.tapBackToMenu) },
+                    onBackToListen: { send(.tapBackToListen) },
                     onSetUpDevice: { viewModel.requestDeviceSetup() }
                 )
 

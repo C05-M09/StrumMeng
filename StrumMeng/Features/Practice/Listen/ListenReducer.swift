@@ -20,7 +20,8 @@ func reduce(_ state: ListenState, _ event: ListenEvent) -> ListenState {
         return .listening(step: step, completed: finished || completed)
     case let (.listening(step, completed), .pause):
         return .paused(step: step, completed: completed)
-    case let (.paused(step, completed), .resume), let (.disconnected(step, completed), .resume):
+    case let (.paused(step, completed), .resume), let (.disconnected(step, completed), .resume),
+         let (.disconnected(step, completed), .dismissDisconnected):
         return .listening(step: step, completed: completed)
     // Like Showtime's listen stage: the iPhone must be there before Play, and a drop stops the example.
     case let (.listening(step, completed), .controllerDisconnected),

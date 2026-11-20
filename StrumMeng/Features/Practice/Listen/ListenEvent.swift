@@ -9,4 +9,6 @@ enum ListenEvent: Equatable {
     case controllerDisconnected
     /// Ready after a full loop, but with no iPhone to play on.
     case readyWithoutController
+    /// Dismiss the disconnected popup and return to listening.
+    case dismissDisconnected
 }

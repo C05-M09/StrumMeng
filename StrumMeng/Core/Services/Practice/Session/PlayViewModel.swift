@@ -79,6 +79,7 @@ final class PlayViewModel {
     @ObservationIgnored private let currentDate: () -> Date
     @ObservationIgnored private let onFinished: (SessionResult) -> Void
     @ObservationIgnored private let onExit: () -> Void
+    @ObservationIgnored private let onBackToListen: () -> Void
     @ObservationIgnored private let onSetUpDevice: () -> Void
     @ObservationIgnored private let finishesAtDurationBoundary: Bool
     @ObservationIgnored private var endBoundaryReached = false
@@ -177,6 +178,7 @@ final class PlayViewModel {
          currentDate: @escaping () -> Date = Date.init,
          onFinished: @escaping (SessionResult) -> Void = { _ in },
          onExit: @escaping () -> Void = {},
+         onBackToListen: @escaping () -> Void = {},
          onSetUpDevice: @escaping () -> Void = {}) {
         self.pattern = pattern
         self.bpm = bpm
@@ -204,6 +206,7 @@ final class PlayViewModel {
         self.currentDate = currentDate
         self.onFinished = onFinished
         self.onExit = onExit
+        self.onBackToListen = onBackToListen
         self.onSetUpDevice = onSetUpDevice
         self.finishBreak = finishBreak
         self.finishesAtDurationBoundary = finishesAtDurationBoundary
@@ -298,6 +301,21 @@ final class PlayViewModel {
         await appBecameActive()
     }
 
+    /// Stops any active or paused gameplay session and restores `.ready` so Showtime can return
+    /// to Listen and start a fresh run when Ready is tapped again.
+    func resetToReady() async {
+        isReadyWaitingForConnectionState = false
+        sessionUsesController = false
+        isWrappingUp = false
+        finishTask?.cancel()
+        backingTrack?.stop()
+        metronome?.cancelClicks()
+        await clock.stop()
+        await controller?.setSessionActive(false)
+        resetSession()
+        state = .ready
+    }
+
     // MARK: Events from the View
 
     func send(_ event: PracticeEvent) async {
@@ -351,6 +369,12 @@ final class PlayViewModel {
             resetSession()
             await clock.stop()
             onExit()
+        case (.tapBackToListen, .idle):
+            backingTrack?.stop()
+            metronome?.cancelClicks()
+            resetSession()
+            await clock.stop()
+            onBackToListen()
         default:
             break
         }

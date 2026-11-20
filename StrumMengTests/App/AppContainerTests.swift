@@ -143,6 +143,16 @@ final class AppContainerTests: XCTestCase {
         XCTAssertEqual(sounds.pauseMusicCount, 0)
     }
 
+    func test_updateMenuMusic_onDeviceSetup_startsTheMusic() {
+        let sounds = MockMenuSoundService()
+        let container = AppContainer(router: router, menuSounds: sounds)
+
+        container.updateMenuMusic(for: [.deviceSetup], isAppActive: true)
+
+        XCTAssertEqual(sounds.startMusicCount, 1)
+        XCTAssertEqual(sounds.pauseMusicCount, 0)
+    }
+
     func test_updateMenuMusic_onListen_pausesTheMusic() {
         let sounds = MockMenuSoundService()
         let container = AppContainer(router: router, menuSounds: sounds)

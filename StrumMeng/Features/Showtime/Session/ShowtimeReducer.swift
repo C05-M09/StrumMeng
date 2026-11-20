@@ -22,6 +22,8 @@ func reduce(_ state: ShowtimeState, _ event: ShowtimeEvent) -> ShowtimeState {
     case (.paused(.listening, _), .restart), (.paused(.ready, _), .restart),
          (.finished, .restart): return .listening(0)
     case (.paused(.countIn, _), .restart), (.paused(.playing, _), .restart): return .countIn(3)
+    case (.paused(.listening(let step), _), .backToListen): return .listening(step)
+    case (.paused, .backToListen), (.countIn, .backToListen), (.playing, .backToListen): return .ready
     case (.playing, .completed(let result)): return .finished(result)
     case (.exited, _): return .exited
     case (_, .back): return .exited

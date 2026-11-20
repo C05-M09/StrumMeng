@@ -52,6 +52,8 @@ struct ListenView: View {
                 if case .disconnected = viewModel.state {
                     AppColors.brownInk.opacity(0.65)
                     ControllerDisconnectedOverlay(unit: 1, isReconnected: viewModel.isControllerConnected,
+                                                  backButtonPosition: CGPoint(x: 110, y: 109),
+                                                  onBack: { viewModel.send(.dismissDisconnected) },
                                                   onResume: { viewModel.send(.resume) },
                                                   onSetUpDevice: { viewModel.requestDeviceSetup() })
                 }
