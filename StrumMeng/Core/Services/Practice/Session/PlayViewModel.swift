@@ -114,6 +114,8 @@ final class PlayViewModel {
     @ObservationIgnored private var frozenSongTime: TimeInterval?
     /// Exact song time at the moment pause was tapped, so resume continues with zero jump.
     @ObservationIgnored private var pausedSongTime: TimeInterval?
+    /// Difference between pausedSongTime and (resumeStep * stepInterval), so songTime continues smoothly.
+    @ObservationIgnored private var resumeTimeOffset: TimeInterval = 0
     /// Session time of the latest swipe in a running session, judged or not (the ring reacts to it).
     @ObservationIgnored private var lastStrumSongTime: TimeInterval?
     /// Session time of the latest extra swipe, which turns the ring the Miss colour.
@@ -331,11 +333,13 @@ final class PlayViewModel {
             await controller?.setSessionActive(true)
             await clock.resume()
         case (_, .paused):
+            freezePausedTimeIfNeeded()
             await controller?.setSessionActive(false)
             await pause()
         case (_, .disconnected):
             // From the pause menu the session is already stopped.
             guard previous != .paused else { break }
+            freezePausedTimeIfNeeded()
             await controller?.setSessionActive(false)
             await pause()
         case (.tapRestart, .ready):
@@ -401,6 +405,7 @@ final class PlayViewModel {
             }
             if let pausedTime = pausedSongTime {
                 anchorTime = tick.expectedTime - pausedTime
+                resumeTimeOffset = pausedTime - Double(resumeStep) * stepInterval
             }
             frozenSongTime = nil
             pausedSongTime = nil
@@ -409,7 +414,7 @@ final class PlayViewModel {
             playStep(tick)
         case .playing:
             scheduleClick(forStep: tick.index + 1 - stepOffset, at: tick.expectedTime + stepInterval)
-            anchorTime = tick.expectedTime - Double(tick.index - stepOffset) * stepInterval
+            anchorTime = tick.expectedTime - (Double(tick.index - stepOffset) * stepInterval + resumeTimeOffset)
             playStep(tick)
         default:
             break
@@ -640,14 +645,19 @@ final class PlayViewModel {
         }
     }
 
+    private func freezePausedTimeIfNeeded() {
+        guard frozenSongTime == nil else { return }
+        let time = currentSongTime()
+        frozenSongTime = time
+        pausedSongTime = time
+    }
+
     private func pause() async {
+        freezePausedTimeIfNeeded()
         windowTask?.cancel()
         backingTrack?.stop()
         metronome?.cancelClicks()
         await clock.pause()
-        let time = currentSongTime()
-        frozenSongTime = time
-        pausedSongTime = time
         apply(engine.close(upTo: now() - strumArrivalGrace))
         // Beats still open when the player paused are played again after the re-count.
         let dropped = engine.discardOpenBeats()
@@ -678,6 +688,7 @@ final class PlayViewModel {
         countInStartTime = nil
         stepOffset = Self.countInSteps + leadInSteps
         resumeStep = 0
+        resumeTimeOffset = 0
         nextStep = 0
         anchorTime = nil
         frozenSongTime = nil
