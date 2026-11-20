@@ -18,14 +18,17 @@ struct PlayScreenLayout: Equatable {
     let unit: CGFloat
     let size: CGSize
 
-    // Header (the wooden box is part of Play_BG; only the text and buttons are drawn)
+    // Header (the wooden box is part of Play_BG; matches ListenView's header metrics)
     let pauseCenter: CGPoint
     let pauseSize: CGFloat
     let titleCenter: CGPoint
     let titleMaxWidth: CGFloat
     let titleFontSize: CGFloat
+    let titleOutlineWidth: CGFloat
+    let titleLineSpacing: CGFloat
     let bpmFontSize: CGFloat
     let bpmTrailing: CGFloat
+    let bpmCenter: CGPoint
     let bpmCenterY: CGFloat
 
     // Board (frame, panel and lane are part of Play_BG)
@@ -52,14 +55,17 @@ struct PlayScreenLayout: Equatable {
         let u = min(sx, sy)
         unit = u
 
-        pauseCenter = CGPoint(x: 106 * sx, y: 104 * sy)
-        pauseSize = 86 * u
-        titleCenter = CGPoint(x: 690 * sx, y: 100 * sy)
-        titleMaxWidth = 640 * u               // scales with the font, so titles wrap the same on every iPad
-        titleFontSize = 60 * u
-        bpmFontSize = 42 * u
+        pauseCenter = CGPoint(x: 110 * sx, y: 109 * sy)
+        pauseSize = 90 * u
+        titleCenter = CGPoint(x: 688 * sx, y: 100 * sy)
+        titleMaxWidth = 790 * u               // matches ListenView's width and scales with the font
+        titleFontSize = 66 * u
+        titleOutlineWidth = 6 * u
+        titleLineSpacing = -20 * u
+        bpmFontSize = 44 * u
         bpmTrailing = 71 * sx
-        bpmCenterY = 104 * sy
+        bpmCenter = CGPoint(x: 1210 * sx, y: 105 * sy)
+        bpmCenterY = 105 * sy
 
         laneRect = CGRect(x: 120 * sx, y: 309 * sy, width: 1140 * sx, height: 474 * sy)
         laneCornerRadius = 16 * u

@@ -45,6 +45,7 @@ final class ReplayViewModelTests: XCTestCase {
 
         let screen = vm.screenModel()
         XCTAssertEqual(screen.phase, .ready)
+        XCTAssertEqual(screen.titleLines, ["FOUNDATION", "STRUM"])
         XCTAssertNil(screen.lastJudgement)
         XCTAssertTrue(screen.nodes.allSatisfy { $0.judgement == nil })
     }

@@ -103,48 +103,14 @@ struct PracticePlayView: View {
     // MARK: Header (static)
 
     private func header(_ layout: PlayScreenLayout, _ model: PlayScreenModel) -> some View {
-        ZStack(alignment: .topLeading) {
-            assetButton("Pause", normal: "Button_Pause_Normal", pressed: "Button_Pause_Pressed",
-                        size: CGSize(width: 90 * layout.unit, height: 98 * layout.unit),
-                        action: onPause)
-                .position(layout.pauseCenter)
-
-            Group {
-                if let spacing = titleLineSpacing, let lines = model.titleLines {
-                    VStack(spacing: spacing * layout.unit) {
-                        ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
-                            titleText(line.uppercased(), layout: layout)
-                        }
-                    }
-                } else {
-                    titleText(model.title.uppercased(), layout: layout)
-                }
-            }
-            .minimumScaleFactor(0.5)
-            .frame(maxWidth: layout.titleMaxWidth)
-            .position(layout.titleCenter)
-
-            Text("BPM \(model.bpm)")
-                .font(AppFont.mono(layout.bpmFontSize))
-                .foregroundStyle(bpmColor ?? AppColor.ink)
-                .fixedSize()
-                .frame(width: layout.size.width - layout.bpmTrailing, alignment: .trailing)
-                .position(x: (layout.size.width - layout.bpmTrailing) / 2, y: layout.bpmCenterY)
-        }
-    }
-
-    private func titleText(_ text: String, layout: PlayScreenLayout) -> some View {
-        OutlinedText(text: text, font: AppFont.display(layout.titleFontSize * titleFontScale),
-                     foregroundColor: AppColor.titleText, outlineColor: AppColor.ink,
-                     outlineWidth: layout.titleFontSize * 0.07, shadowColor: .clear,
-                     shadowOffset: .zero, alignment: .center)
-    }
-
-    private func assetButton(_ label: String, normal: String, pressed: String, size: CGSize,
-                             action: @escaping () -> Void) -> some View {
-        Button(label, action: action).buttonStyle(AssetButtonStyle(
-            normalAssetName: normal, pressedAssetName: pressed, size: size))
-        .accessibilityLabel(label)
+        PlayScreenHeader(
+            layout: layout,
+            model: model,
+            titleFontScale: titleFontScale,
+            titleLineSpacing: titleLineSpacing,
+            bpmColor: bpmColor,
+            onPause: onPause
+        )
     }
 
     // MARK: Board (every frame)

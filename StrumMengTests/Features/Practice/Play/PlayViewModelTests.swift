@@ -69,6 +69,7 @@ final class PlayViewModelTests: XCTestCase {
         let model = try makeViewModel().screenModel()
         XCTAssertEqual(model.phase, .ready)
         XCTAssertEqual(model.title, "Syncopation Strum")
+        XCTAssertEqual(model.titleLines, ["SYNCOPATION", "STRUM"])
         XCTAssertEqual(model.bpm, 80)
         XCTAssertEqual(model.duration, 30, accuracy: 1e-9)       // 10 × 8 steps × 0.375 s
         XCTAssertEqual(model.nodes.count, 80)

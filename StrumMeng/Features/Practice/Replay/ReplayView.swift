@@ -20,12 +20,17 @@ struct ReplayView: View {
     var onDismiss: (() -> Void)?
     /// Showtime replays on its own stage, with the BPM in white as in its game.
     private let backgroundAssetName: String
+    private let titleFontScale: CGFloat
+    private let titleLineSpacing: CGFloat?
     private let bpmColor: Color?
 
-    init(viewModel: ReplayViewModel, backgroundAssetName: String = "Play_BG", bpmColor: Color? = nil,
-         onDismiss: (() -> Void)? = nil) {
+    init(viewModel: ReplayViewModel, backgroundAssetName: String = "Play_BG",
+         titleFontScale: CGFloat = 1, titleLineSpacing: CGFloat? = nil,
+         bpmColor: Color? = nil, onDismiss: (() -> Void)? = nil) {
         _viewModel = State(initialValue: viewModel)
         self.backgroundAssetName = backgroundAssetName
+        self.titleFontScale = titleFontScale
+        self.titleLineSpacing = titleLineSpacing
         self.bpmColor = bpmColor
         self.onDismiss = onDismiss
     }
@@ -77,10 +82,13 @@ struct ReplayView: View {
     // MARK: - Header
 
     private func header(_ layout: PlayScreenLayout, _ model: PlayScreenModel) -> some View {
-        let u = layout.unit
-        return ZStack(alignment: .topLeading) {
-            // Tombol Pause di pojok kiri atas (sesuai ListenView & Play)
-            Button("Pause") {
+        PlayScreenHeader(
+            layout: layout,
+            model: model,
+            titleFontScale: titleFontScale,
+            titleLineSpacing: titleLineSpacing,
+            bpmColor: bpmColor,
+            onPause: {
                 withAnimation(.easeOut(duration: 0.2)) {
                     if viewModel.state == .playing {
                         viewModel.send(.pause)
@@ -89,38 +97,7 @@ struct ReplayView: View {
                     }
                 }
             }
-            .buttonStyle(
-                AssetButtonStyle(
-                    normalAssetName: "Button_Pause_Normal",
-                    pressedAssetName: "Button_Pause_Pressed",
-                    size: CGSize(width: 90 * (layout.pauseSize / 86), height: 98 * (layout.pauseSize / 86))
-                )
-            )
-            .position(layout.pauseCenter)
-
-            // Judul Replay & Nama Pattern di tengah atas
-            OutlinedText(
-                text: "REPLAY: \(model.title.uppercased())",
-                font: AppFont.display(layout.titleFontSize * 0.85),
-                foregroundColor: AppColor.titleText,
-                outlineColor: AppColor.ink,
-                outlineWidth: layout.titleFontSize * 0.06,
-                shadowColor: .clear,
-                shadowOffset: .zero,
-                alignment: .center
-            )
-            .minimumScaleFactor(0.5)
-            .frame(maxWidth: layout.titleMaxWidth)
-            .position(layout.titleCenter)
-
-            // Indikator BPM di kanan atas
-            Text("BPM \(model.bpm)")
-                .font(AppFont.mono(layout.bpmFontSize))
-                .foregroundStyle(bpmColor ?? AppColor.ink)
-                .fixedSize()
-                .frame(width: layout.size.width - layout.bpmTrailing, alignment: .trailing)
-                .position(x: (layout.size.width - layout.bpmTrailing) / 2, y: layout.bpmCenterY)
-        }
+        )
     }
 
     // MARK: - Board (Rel Panah, Waktu & Progress Bar)

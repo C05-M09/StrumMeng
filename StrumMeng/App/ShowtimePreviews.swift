@@ -73,8 +73,7 @@ private struct ShowtimePlayPreview: View {
             duration: timeline.duration, slotInterval: timeline.slotInterval, songTime: 5,
             phase: phase, nodes: nodes, lastJudgement: nil, chordLabels: timeline.chordLabels,
             titleLines: TitleLineWrapping.lines(for: timeline.song.title)),
-            backgroundAssetName: "Showtime_Assets/Showtime_BG", titleFontScale: 0.8,
-            titleLineSpacing: ShowtimeLayout.titleLineSpacing, bpmColor: AppColors.white)
+            backgroundAssetName: "Showtime_Assets/Showtime_BG", bpmColor: AppColors.white)
     }
 }
 #endif

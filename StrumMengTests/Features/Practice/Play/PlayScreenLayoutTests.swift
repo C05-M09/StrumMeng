@@ -9,6 +9,20 @@ final class PlayScreenLayoutTests: XCTestCase {
         XCTAssertEqual(PlayScreenLayout(size: PlayScreenLayout.designSize).unit, 1, accuracy: 1e-9)
     }
 
+    func test_atDesignSize_headerMatchesListenBenchmark() {
+        XCTAssertEqual(ipad13.pauseCenter, CGPoint(x: 110, y: 109))
+        XCTAssertEqual(ipad13.pauseSize, 90)
+        XCTAssertEqual(ipad13.titleCenter, CGPoint(x: 688, y: 100))
+        XCTAssertEqual(ipad13.titleMaxWidth, 790)
+        XCTAssertEqual(ipad13.titleFontSize, 66)
+        XCTAssertEqual(ipad13.titleOutlineWidth, 6)
+        XCTAssertEqual(ipad13.titleLineSpacing, ListenLayout.titleLineSpacing)
+        XCTAssertEqual(ipad13.bpmFontSize, 44)
+        XCTAssertEqual(ipad13.bpmCenter, CGPoint(x: 1210, y: 105))
+        XCTAssertEqual(TitleLineWrapping.patternLines(for: "Foundation Strum"), ["FOUNDATION", "STRUM"])
+        XCTAssertEqual(TitleLineWrapping.headerLines(for: "Driving Pop Strum"), ["DRIVING POP", "STRUM"])
+    }
+
     func test_atDesignSize_theLaneMatchesTheDarkAreaOfPlayBG() {
         XCTAssertEqual(ipad13.laneRect, CGRect(x: 120, y: 309, width: 1140, height: 474))
     }
