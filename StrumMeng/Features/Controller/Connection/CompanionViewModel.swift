@@ -7,6 +7,8 @@ import Observation
 final class CompanionViewModel {
     /// Finger travel for one strum, in points, the same as on-screen swipes on the iPad.
     static let swipeThreshold: Double = 12
+    /// Minimum horizontal gravity (in g) before flipping which portrait edge counts as Down.
+    static let gravityFlipThreshold: Double = 0.25
     /// The longest believable gap between a touch and its handling, as in PlayViewModel.
     private static let maxTouchDelay: TimeInterval = 0.1
 
@@ -14,6 +16,9 @@ final class CompanionViewModel {
     private(set) var lastStrum: StrumDirection?
     /// Goes up on every strum, so the same direction twice still animates.
     private(set) var strumCount = 0
+    /// True when device gravity indicates the left edge of the portrait screen faces the floor
+    /// (`gravity.x < 0`), so swiping left is `.down` and swiping right is `.up`.
+    private(set) var isLeftEdgeDown = false
 
     @ObservationIgnored private let client: any ControllerClient
     @ObservationIgnored private let pairCodes: any PairCodeStore
@@ -156,12 +161,30 @@ final class CompanionViewModel {
         }
     }
 
+    /// Updates which portrait edge faces the floor based on horizontal gravity (`gravity.x` in g).
+    /// When the left edge faces the floor (`x <= -gravityFlipThreshold`), `isLeftEdgeDown` becomes
+    /// `true` so strumming toward the floor is always `.down` and toward the ceiling is always `.up`.
+    func updateGravity(x: Double) {
+        let next: Bool
+        if x <= -Self.gravityFlipThreshold {
+            next = true
+        } else if x >= Self.gravityFlipThreshold {
+            next = false
+        } else {
+            return
+        }
+        guard next != isLeftEdgeDown else { return }
+        isLeftEdgeDown = next
+        tracker.reset()
+    }
+
     /// The pad is held in portrait with the strings running up the screen, so strumming moves
-    /// across them: right is a down strum, left is an up strum.
+    /// across them: toward the floor edge is a down strum, toward the ceiling edge is an up strum.
     /// - Parameter touchAge: how long ago the touch event happened, so the strum keeps its real time.
     func swipe(dx: Double, touchAge: TimeInterval = 0) {
+        let directedDx = isLeftEdgeDown ? -dx : dx
         guard state == .connected || state == .reconnecting,
-              let direction = tracker.feed(dx, threshold: Self.swipeThreshold) else { return }
+              let direction = tracker.feed(directedDx, threshold: Self.swipeThreshold) else { return }
         lastStrum = direction
         strumCount += 1
         if !isSessionActive {

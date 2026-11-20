@@ -40,6 +40,30 @@ final class CompanionViewModelTests: XCTestCase {
         XCTAssertEqual(client.sentStrums.map(\.direction), [.up])
     }
 
+    func test_whenLeftEdgeFacesFloor_gravityFlipsStrumDirectionSoFloorIsDownAndCeilingIsUp() async {
+        let (viewModel, client, _) = makeViewModel()
+        XCTAssertFalse(viewModel.isLeftEdgeDown)
+
+        // Small tilt below threshold keeps current orientation.
+        viewModel.updateGravity(x: -0.1)
+        XCTAssertFalse(viewModel.isLeftEdgeDown)
+
+        // Left edge facing the floor (gravity.x <= -0.25): swiping left (dx < 0) is now .down,
+        // and swiping right (dx > 0, toward the ceiling) is now .up.
+        viewModel.updateGravity(x: -0.8)
+        XCTAssertTrue(viewModel.isLeftEdgeDown)
+
+        viewModel.swipe(dx: -CompanionViewModel.swipeThreshold)
+        viewModel.swipe(dx: CompanionViewModel.swipeThreshold)
+        await waitUntil { client.sentStrums.count == 2 }
+
+        XCTAssertEqual(client.sentStrums.map(\.direction), [.down, .up])
+
+        // Tilting back so right edge faces the floor restores default mapping.
+        viewModel.updateGravity(x: 0.8)
+        XCTAssertFalse(viewModel.isLeftEdgeDown)
+    }
+
     func test_aStrum_keepsTheTimeOfItsTouchEvent() async throws {
         let (viewModel, client, _) = makeViewModel()
 

@@ -1,3 +1,4 @@
+import CoreMotion
 import SwiftUI
 
 /// iPhone strum pad: each swipe goes to the iPad and shows its direction here.
@@ -11,14 +12,25 @@ struct CompanionTouchpadView: View {
 
     @State private var pulse = false
     @State private var nodeOpacity: Double = 1
+    @State private var motionManager = CMMotionManager()
+
+    private var arrowRotationDegrees: Double {
+        viewModel.isLeftEdgeDown ? 90 : -90
+    }
 
     var body: some View {
         ZStack {
-            // The neck runs up the screen and the sound hole sits at the bottom, so strumming crosses
-            // the strings left and right. Filled, because iPhones differ slightly in shape.
+            // The neck runs up the screen and the sound hole sits at the bottom in the asset.
+            // Flipped so that in both landscape holds, the guitar neck/frets always stay on the
+            // player's left, the thick bass strings stay on top (UP), and the thin treble strings
+            // stay on the bottom (DOWN).
             Image("Companion_Guitar")
                 .resizable()
                 .scaledToFill()
+                .scaleEffect(
+                    x: viewModel.isLeftEdgeDown ? -1 : 1,
+                    y: viewModel.isLeftEdgeDown ? -1 : 1
+                )
                 .ignoresSafeArea()
                 .accessibilityHidden(true)
 
@@ -40,6 +52,8 @@ struct CompanionTouchpadView: View {
             }
             .padding(AppSpacing.m)
         }
+        .onAppear(perform: startGravityTracking)
+        .onDisappear(perform: stopGravityTracking)
         .onChange(of: viewModel.strumCount) {
             pulse = true
             withAnimation(.easeOut(duration: 0.2)) { pulse = false }
@@ -54,6 +68,28 @@ struct CompanionTouchpadView: View {
         }
         // The player's eyes are on the iPad, so the phone confirms each strum by feel.
         .sensoryFeedback(.impact(weight: .light), trigger: viewModel.strumCount)
+    }
+
+    private func startGravityTracking() {
+        guard !motionManager.isDeviceMotionActive else { return }
+        if motionManager.isDeviceMotionAvailable {
+            motionManager.deviceMotionUpdateInterval = 0.1
+            motionManager.startDeviceMotionUpdates(to: .main) { motion, _ in
+                guard let gx = motion?.gravity.x else { return }
+                viewModel.updateGravity(x: gx)
+            }
+        } else if motionManager.isAccelerometerAvailable {
+            motionManager.accelerometerUpdateInterval = 0.1
+            motionManager.startAccelerometerUpdates(to: .main) { data, _ in
+                guard let ax = data?.acceleration.x else { return }
+                viewModel.updateGravity(x: ax)
+            }
+        }
+    }
+
+    private func stopGravityTracking() {
+        motionManager.stopDeviceMotionUpdates()
+        motionManager.stopAccelerometerUpdates()
     }
 
     /// No connection status here: the iPad shows the link state, and a dropped iPad mid-session
@@ -74,7 +110,7 @@ struct CompanionTouchpadView: View {
             if let strum = viewModel.lastStrum {
                 BeatNodeView(arrow: strum == .down ? .down : .up, size: 96)
                     .scaleEffect(pulse ? 1.25 : 1)
-                    .rotationEffect(.degrees(-90))
+                    .rotationEffect(.degrees(arrowRotationDegrees))
                     .opacity(nodeOpacity)
             } else {
                 Text("SWIPE LEFT OR RIGHT\nTO STRUM")
