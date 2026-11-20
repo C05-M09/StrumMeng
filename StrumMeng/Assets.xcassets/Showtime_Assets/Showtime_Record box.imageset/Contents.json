@@ -2,16 +2,12 @@
   "images" : [
     {
       "filename" : "Showtime_Record box-2.svg",
-      "idiom" : "universal",
+      "idiom" : "ipad",
       "scale" : "1x"
     },
     {
-      "idiom" : "universal",
+      "idiom" : "ipad",
       "scale" : "2x"
-    },
-    {
-      "idiom" : "universal",
-      "scale" : "3x"
     }
   ],
   "info" : {
