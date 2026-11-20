@@ -6,6 +6,8 @@ import SwiftUI
 struct ControllerDisconnectedOverlay: View {
     let unit: CGFloat
     let isReconnected: Bool
+    var backButtonPosition: CGPoint? = nil
+    var onBack: (() -> Void)? = nil
     let onResume: () -> Void
     let onSetUpDevice: () -> Void
 
@@ -42,6 +44,20 @@ struct ControllerDisconnectedOverlay: View {
     }
 
     var body: some View {
+        ZStack {
+            card
+
+            if let onBack {
+                BackButton(action: onBack)
+                    .scaleEffect(unit)
+                    .position(backButtonPosition ?? BackButton.referenceCenter)
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.isModal)
+    }
+
+    private var card: some View {
         ZStack {
             Image("Option_Card")
                 .resizable()
@@ -85,8 +101,6 @@ struct ControllerDisconnectedOverlay: View {
             .multilineTextAlignment(.center)
             .animation(.easeOut(duration: 0.2), value: isReconnected)
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityAddTraits(.isModal)
     }
 
     private func assetButton(_ label: String, normal: String, pressed: String,

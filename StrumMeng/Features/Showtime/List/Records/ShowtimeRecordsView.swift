@@ -85,7 +85,7 @@ struct ShowtimeRecordsContentView: View {
                 .tint(AppColors.brownInk)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .empty:
-            message("No playing record yet")
+            message("No records history yet")
         case .failed:
             message("Records couldn't be loaded")
         case .loaded(let rows):

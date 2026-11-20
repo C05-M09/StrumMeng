@@ -11,6 +11,7 @@ final class PlayViewModelTests: XCTestCase {
     private let clock = MockBeatClock()
     private var finished: [SessionResult] = []
     private var exitCount = 0
+    private var backToListenCount = 0
 
     /// Syncopation, "D - D U - U D U": step 0 judged, step 1 a rest.
     private func makeViewModel(patternID: String = "syncopation",
@@ -36,7 +37,8 @@ final class PlayViewModelTests: XCTestCase {
             makeID: { UUID(uuidString: "00000000-0000-0000-0000-000000000001") ?? UUID() },
             currentDate: { Date(timeIntervalSince1970: 0) },
             onFinished: { [unowned self] in self.finished.append($0) },
-            onExit: { [unowned self] in self.exitCount += 1 })
+            onExit: { [unowned self] in self.exitCount += 1 },
+            onBackToListen: { [unowned self] in self.backToListenCount += 1 })
     }
 
     /// Clock tick n: 0...5 are the count-in, tick 6 is session step 0.
@@ -862,6 +864,34 @@ final class PlayViewModelTests: XCTestCase {
         await viewModel.send(.tapBackToMenu)
         XCTAssertEqual(viewModel.state, .idle)
         XCTAssertEqual(exitCount, 1)
+    }
+
+    func test_backToListen_whileDisconnected_leavesTheSessionToListen() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try await makeConnectedViewModel(controller)
+        await startPlaying(viewModel)
+        await viewModel.handle(.reconnecting)
+        await viewModel.send(.tapBackToListen)
+        XCTAssertEqual(viewModel.state, .idle)
+        XCTAssertEqual(backToListenCount, 1)
+        XCTAssertEqual(exitCount, 0)
+    }
+
+    func test_resetToReady_whileDisconnected_restoresReady_andAllowsStartingAgain() async throws {
+        let controller = MockControllerLink()
+        let viewModel = try await makeConnectedViewModel(controller)
+        await startPlaying(viewModel)
+        await viewModel.handle(.reconnecting)
+        XCTAssertEqual(viewModel.state, .disconnected)
+
+        await viewModel.resetToReady()
+        XCTAssertEqual(viewModel.state, .ready)
+        XCTAssertEqual(clock.stopCount, 1)
+
+        await viewModel.handle(.connected(latencyMs: 5))
+        await viewModel.send(.tapReady)
+        XCTAssertEqual(viewModel.state, .countIn(3))
+        XCTAssertEqual(clock.startedBPMs.count, 2)
     }
     // MARK: Sound
 

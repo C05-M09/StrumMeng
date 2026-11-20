@@ -15,4 +15,25 @@ final class ControllerDisconnectedOverlayTests: XCTestCase {
         XCTAssertEqual(ControllerDisconnectedOverlay.visibleDotCount(at: date(step: 2, plus: 0.1)), 2)
         XCTAssertEqual(ControllerDisconnectedOverlay.visibleDotCount(at: date(step: 2, plus: 0.9)), 2)
     }
+
+    func test_overlay_initializesWithBackButton() {
+        var backTapped = false
+        var resumeTapped = false
+        var setUpTapped = false
+
+        let overlay = ControllerDisconnectedOverlay(
+            unit: 1,
+            isReconnected: false,
+            backButtonPosition: CGPoint(x: 106, y: 104),
+            onBack: { backTapped = true },
+            onResume: { resumeTapped = true },
+            onSetUpDevice: { setUpTapped = true }
+        )
+
+        XCTAssertNotNil(overlay)
+        XCTAssertEqual(overlay.backButtonPosition, CGPoint(x: 106, y: 104))
+        XCTAssertNotNil(overlay.onBack)
+        overlay.onBack?()
+        XCTAssertTrue(backTapped)
+    }
 }

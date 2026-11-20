@@ -126,9 +126,9 @@ struct CompanionPairingView: View {
 
     private var hint: [String] {
         switch viewModel.state {
-        case .connecting: ["looking for your ipad", "tap x to cancel"]
+        case .connecting: ["Looking for your iPad", "Tap x to cancel"]
         case .notFound: ["check the code", "and the wifi"]
-        default: ["use the same wifi", "with your ipad"]
+        default: ["Use the same wifi", "with your iPad"]
         }
     }
 

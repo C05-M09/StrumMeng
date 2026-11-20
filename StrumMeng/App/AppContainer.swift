@@ -200,6 +200,7 @@ final class AppContainer {
         let link = sharedControllerLink()
         let gameplay = PlayViewModel(pattern: timeline.sessionPattern, bpm: song.bpm, songID: song.id,
             clock: AudioBeatClock(), input: link, touchInput: nil, controller: link,
+            knownControllerConnection: isControllerLinkConnected,
             requiresController: true, guitar: guitarSound, metronome: metronomeSound,
             // Calibration is not exposed by SettingsStore yet; same zero offset as Practice.
             latencyOffset: 0,
@@ -291,6 +292,7 @@ final class AppContainer {
             },
             onFinished: onFinished ?? { [weak self] result in self?.sessionFinished(result) },
             onExit: { [weak router] in router?.popTo(.practiceList) },
+            onBackToListen: { [weak router] in router?.pop() },
             onSetUpDevice: { [weak router] in router?.presentSessionDeviceSetup() }
         )
     }

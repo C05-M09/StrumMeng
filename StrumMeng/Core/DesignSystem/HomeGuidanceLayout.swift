@@ -3,7 +3,7 @@ import CoreGraphics
 /// Both bubbles size vertically to their content using the same body padding.
 enum HomeGuidanceLayout {
     static let optionWidth: CGFloat = 460
-    static let optionCenter = CGPoint(x: 570, y: 857)
+    static let optionCenter = CGPoint(x: 470, y: 857)
     static let guidebookWidth: CGFloat = 500
     static let guidebookCenter = CGPoint(x: 935, y: 115)
     static let pointerLength: CGFloat = 14

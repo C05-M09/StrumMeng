@@ -41,7 +41,8 @@ final class ShowtimeViewModel {
         gameplay.onConnectionChanged = { [weak self] connected in
             guard let self else { return }
             self.isControllerConnected = connected
-            if !connected {
+            // Listen does not check or interrupt for iPhone disconnection; only Ready and gameplay do.
+            if !connected, !self.isListening {
                 self.connectionPauseTask?.cancel()
                 self.connectionPauseTask = Task { [weak self] in
                     guard !Task.isCancelled else { return }
@@ -180,6 +181,10 @@ final class ShowtimeViewModel {
         case .ready:
             demoTask?.cancel()
             await demo.stop()
+            if !isControllerConnected {
+                state = .paused(.ready, .connection)
+                return
+            }
             guard generation == run else { return }
             await gameplay.send(.tapReady)
         case .pause:
@@ -200,6 +205,25 @@ final class ShowtimeViewModel {
                 guard generation == run else { return }
                 await startPreview()
             } else { await gameplay.send(.tapRestart) }
+        case .backToListen:
+            connectionPauseTask?.cancel(); connectionPauseTask = nil
+            summary = nil
+            await gameplay.resetToReady()
+            if hasPreviewedAllPatterns {
+                state = reduce(state, .previewFinished)
+            }
+            if case .paused(.listening, _) = previous {
+                await demo.resume()
+            } else if case .paused(.ready, _) = previous {
+                await demo.resume()
+            } else {
+                demoTask?.cancel()
+                generation += 1
+                let run = generation
+                await demo.stop()
+                guard generation == run else { return }
+                await startPreview()
+            }
         case .back:
             demoTask?.cancel()
             completedPatternIndices.removeAll()
@@ -218,7 +242,9 @@ final class ShowtimeViewModel {
         case .countIn(let number): state = reduce(state, .countdown(number))
         case .playing: state = reduce(state, .firstBeat)
         case .paused: state = reduce(state, .pause(.user))
-        case .disconnected: state = reduce(state, .pause(.connection))
+        case .disconnected:
+            guard !isListening else { return }
+            state = reduce(state, .pause(.connection))
         case .finished(let result):
             let previous = state
             state = reduce(state, .completed(result))
@@ -242,6 +268,9 @@ final class ShowtimeViewModel {
         var frame = gameplay.screenModel()
         frame.chordLabels = chordLabels
         frame.titleLines = TitleLineWrapping.lines(for: timeline.song.title)
+        if case .paused(_, .connection) = state {
+            return disconnectedFrame(frame)
+        }
         // Before the first clock tick, briefly show the same READY? callout as Practice.
         // The lead-in before the first node comes after the 6-slot count-in.
         if case .countIn = state,
@@ -253,5 +282,14 @@ final class ShowtimeViewModel {
             slotInterval: frame.slotInterval, songTime: frame.songTime, phase: .ready,
             nodes: frame.nodes, lastJudgement: nil, readyLeadTime: frame.readyLeadTime,
             leadInSlots: frame.leadInSlots, chordLabels: frame.chordLabels, titleLines: frame.titleLines)
+    }
+    private func disconnectedFrame(_ frame: PlayScreenModel) -> PlayScreenModel {
+        PlayScreenModel(title: frame.title, bpm: frame.bpm, duration: frame.duration,
+            slotInterval: frame.slotInterval, songTime: frame.songTime,
+            phase: .disconnected(isReconnected: isControllerConnected),
+            nodes: frame.nodes, lastJudgement: frame.lastJudgement, lastStrumTime: frame.lastStrumTime,
+            readyLeadTime: frame.readyLeadTime, leadInSlots: frame.leadInSlots,
+            countInBeatProgress: frame.countInBeatProgress,
+            chordLabels: frame.chordLabels, titleLines: frame.titleLines)
     }
 }

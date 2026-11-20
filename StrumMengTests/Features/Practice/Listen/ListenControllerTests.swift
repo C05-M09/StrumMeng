@@ -82,19 +82,19 @@ final class ListenControllerTests: XCTestCase {
         XCTAssertEqual(readies, 0)
     }
 
-    func test_aDropWhileListening_pausesTheExample() {
+    func test_aDropWhileListening_doesNotPauseOrShowDisconnected() {
         let (model, player) = makeModel()
         model.handle(.connected(latencyMs: 5))
         model.send(.next)
 
         model.handle(.reconnecting)
 
-        XCTAssertEqual(model.state, .disconnected(step: 0, completed: false))
+        XCTAssertEqual(model.state, .listening(step: 0, completed: false))
         XCTAssertFalse(model.isControllerConnected)
-        XCTAssertEqual(player.pauses, 1)
+        XCTAssertEqual(player.pauses, 0)
     }
 
-    func test_aDropFromThePauseMenu_doesNotPauseTwice() {
+    func test_aDropFromThePauseMenu_doesNotShowDisconnected() {
         let (model, player) = makeModel()
         model.handle(.connected(latencyMs: 5))
         model.send(.next)
@@ -102,36 +102,54 @@ final class ListenControllerTests: XCTestCase {
 
         model.handle(.reconnecting)
 
-        XCTAssertEqual(model.state, .disconnected(step: 0, completed: false))
+        XCTAssertEqual(model.state, .paused(step: 0, completed: false))
         XCTAssertEqual(player.pauses, 1)
     }
 
     func test_resume_waitsForTheIPhone_thenContinuesTheExample() {
         let (model, player) = makeModel()
         model.handle(.connected(latencyMs: 5))
-        model.send(.next)
+        finishLoop(model, player)
         model.handle(.reconnecting)
 
+        // Ready without iPhone enters disconnected
+        model.send(.ready)
+        XCTAssertEqual(model.state, .disconnected(step: 0, completed: true))
+
         model.send(.resume)
-        XCTAssertEqual(model.state, .disconnected(step: 0, completed: false))
-        XCTAssertEqual(player.resumes, 0)
+        XCTAssertEqual(model.state, .disconnected(step: 0, completed: true))
 
         model.handle(.connected(latencyMs: 5))
         model.send(.resume)
-        XCTAssertEqual(model.state, .listening(step: 0, completed: false))
+        XCTAssertEqual(model.state, .listening(step: 0, completed: true))
         XCTAssertEqual(player.resumes, 1)
         model.stop()
+    }
+
+    func test_dismissDisconnected_returnsToListeningWithoutLeaving() {
+        let (model, player) = makeModel()
+        model.handle(.connected(latencyMs: 5))
+        finishLoop(model, player)
+        model.handle(.reconnecting)
+
+        model.send(.ready)
+        XCTAssertEqual(model.state, .disconnected(step: 0, completed: true))
+
+        model.send(.dismissDisconnected)
+        XCTAssertEqual(model.state, .listening(step: 0, completed: true))
+        XCTAssertEqual(player.resumes, 1)
     }
 
     func test_setUpDevice_onlyFromTheDisconnectedPopup() {
         var requests = 0
         let (model, player) = makeModel(onSetUpDevice: { requests += 1 })
         model.handle(.connected(latencyMs: 5))
-        model.send(.next)
+        finishLoop(model, player)
         model.requestDeviceSetup()
         XCTAssertEqual(requests, 0)
 
         model.handle(.reconnecting)
+        model.send(.ready)
         model.requestDeviceSetup()
         XCTAssertEqual(requests, 1)
         _ = player
@@ -157,6 +175,27 @@ final class ListenControllerTests: XCTestCase {
         XCTAssertTrue(model.isControllerConnected)
         model.disappear()
     }
+
+    func test_appear_whenReturningFromDeparted_resumesListeningAndPlayback() {
+        let (model, player) = makeModel()
+        model.handle(.connected(latencyMs: 5))
+        finishLoop(model, player)
+        model.send(.ready)
+        XCTAssertEqual(model.state, .departed)
+
+        model.appear()
+
+        XCTAssertEqual(model.state, .listening(step: 0, completed: true))
+        XCTAssertEqual(player.starts, 2) // 1 from finishLoop, 1 from appear
+        XCTAssertTrue(model.state.showsTrackingRing)
+
+        // Verifying pause works
+        model.send(.pause)
+        XCTAssertEqual(model.state, .paused(step: 0, completed: true))
+        XCTAssertEqual(player.pauses, 1)
+
+        model.disappear()
+    }
 }
 
 private struct KnownHistory: SessionHistoryChecking {
@@ -166,9 +205,13 @@ private struct KnownHistory: SessionHistoryChecking {
 @MainActor
 private final class CountingListenPlayer: ListenPatternPlayer {
     var elapsed: TimeInterval = 0
+    private(set) var starts = 0
     private(set) var pauses = 0
     private(set) var resumes = 0
-    func start(pattern: StrumPattern, bpm: Int) throws { elapsed = 0 }
+    func start(pattern: StrumPattern, bpm: Int) throws {
+        starts += 1
+        elapsed = 0
+    }
     func pause() { pauses += 1 }
     func resume() { resumes += 1 }
     func stop() {}

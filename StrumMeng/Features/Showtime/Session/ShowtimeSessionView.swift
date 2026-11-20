@@ -79,6 +79,8 @@ struct ShowtimeSessionView: View {
                     AppColors.brownInk.opacity(ShowtimeLayout.scrimOpacity)
                     if reason == .connection {
                         ControllerDisconnectedOverlay(unit: 1, isReconnected: viewModel.isControllerConnected,
+                            backButtonPosition: CGPoint(x: 110, y: 109),
+                            onBack: { send(.backToListen) },
                             onResume: { send(.resume) }, onSetUpDevice: { viewModel.requestDeviceSetup() })
                     } else {
                         PauseMenuOverlay(unit: 1, onResume: { send(.resume) },
@@ -93,6 +95,7 @@ struct ShowtimeSessionView: View {
                 titleLineSpacing: ShowtimeLayout.titleLineSpacing, bpmColor: AppColors.white,
                 onPause: { send(.pause(.user)) }, onResume: { send(.resume) },
                 onRestart: { send(.restart) }, onBackToMenu: { send(.back) },
+                onBackToListen: { send(.backToListen) },
                 onSetUpDevice: { viewModel.requestDeviceSetup() })
         }
     }
