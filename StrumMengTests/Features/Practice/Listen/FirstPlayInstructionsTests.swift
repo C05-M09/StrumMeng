@@ -4,43 +4,65 @@ import XCTest
 @MainActor
 final class FirstPlayInstructionsTests: XCTestCase {
     func test_emptyHistoryShowsInstructionsAndNextNavigatesOnlyOnce() async {
-        let history = TestHistory(hasRecords: false)
+        let store = InMemoryPracticeGuidanceStore(hasCompletedGuidance: false)
         let player = InstructionPlayer()
         var starts = 0
-        let model = makeModel(player: player, history: history, ready: { starts += 1 })
+        let model = makeModel(player: player, guidanceStore: store, ready: { starts += 1 })
         defer { model.stop() }
-        finishPreview(model, player)
+
+        // 1. First play shows instructions
+        model.send(.next)
+        XCTAssertEqual(model.state, .instructions(step: 0))
+        XCTAssertEqual(starts, 0)
+        XCTAssertFalse(store.hasCompletedGuidance)
+        XCTAssertEqual(player.starts, 0)
+
+        // 2. Next on instructions marks guidance complete, starts playback, and goes to listening
+        model.send(.instructionsNext)
+        model.send(.instructionsNext)
+        XCTAssertEqual(model.state, .listening(step: 0, completed: false))
+        XCTAssertTrue(store.hasCompletedGuidance)
+        XCTAssertEqual(player.starts, 1)
+
+        // 3. Completing loop and tapping ready stops playback and navigates only once
+        player.elapsed = 3
+        model.refreshProgress()
+        XCTAssertTrue(model.state.canProceed)
+
         model.send(.ready)
         model.send(.ready)
         XCTAssertTrue(player.stopped)
-        XCTAssertEqual(model.state, .checkingHistory(step: 0))
-        await waitUntil { model.state == .instructions(step: 0) }
-        XCTAssertEqual(model.state, .instructions(step: 0))
-        XCTAssertEqual(starts, 0)
-        let calls = await history.calls
-        XCTAssertEqual(calls, 1)
-        model.send(.instructionsNext)
-        model.send(.instructionsNext)
         XCTAssertEqual(starts, 1)
         XCTAssertEqual(model.state, .departed)
     }
 
     func test_existingRecordSkipsInstructions() async {
+        let store = InMemoryPracticeGuidanceStore(hasCompletedGuidance: true)
         let player = InstructionPlayer()
         var starts = 0
-        let model = makeModel(player: player, history: TestHistory(hasRecords: true), ready: { starts += 1 })
+        let model = makeModel(player: player, guidanceStore: store, ready: { starts += 1 })
         defer { model.stop() }
-        finishPreview(model, player)
+
+        model.send(.next)
+        XCTAssertEqual(model.state, .listening(step: 0, completed: false))
+        XCTAssertEqual(player.starts, 1)
+
+        player.elapsed = 3
+        model.refreshProgress()
+        XCTAssertTrue(model.state.canProceed)
+
         model.send(.ready)
-        await waitUntil { model.state == .departed }
+        XCTAssertTrue(player.stopped)
         XCTAssertEqual(starts, 1)
         XCTAssertEqual(model.state, .departed)
     }
 
     func test_readyBeforeACompleteLoop_doesNotGoOn_andHistoryIsAskedOnlyOnceEarly() async {
         let history = TestHistory(hasRecords: false)
-        let model = makeModel(player: InstructionPlayer(), history: history)
+        let store = InMemoryPracticeGuidanceStore(hasCompletedGuidance: true)
+        let model = makeModel(player: InstructionPlayer(), guidanceStore: store, history: history)
         defer { model.stop() }
+
         model.send(.next)
         model.send(.ready)
         for _ in 0..<100 { await Task.yield() }
@@ -50,98 +72,71 @@ final class FirstPlayInstructionsTests: XCTestCase {
         XCTAssertEqual(model.state, .listening(step: 0, completed: false))
     }
 
-    func test_historyFailureCanRetryWithoutStartingPlayOrRestartingAudio() async {
-        let history = TestHistory(hasRecords: false, fails: true)
-        let player = InstructionPlayer()
-        var starts = 0
-        let model = makeModel(player: player, history: history, ready: { starts += 1 })
-        defer { model.stop() }
-        finishPreview(model, player)
-        model.send(.ready)
-        await waitUntil { if case .historyFailed = model.state { return true }; return false }
-        guard case .historyFailed = model.state else { return XCTFail("Expected history error") }
-        XCTAssertEqual(starts, 0)
-        await history.allowSuccess()
-        model.send(.retryHistory)
-        await waitUntil { model.state == .instructions(step: 0) }
-        XCTAssertEqual(model.state, .instructions(step: 0))
-        XCTAssertEqual(player.starts, 1)
-    }
-
-    func test_backIgnoresAnInFlightHistoryResult() async {
-        let history = DelayedHistory()
+    func test_backFromInstructions_stopsAndNavigatesBack() async {
+        let store = InMemoryPracticeGuidanceStore(hasCompletedGuidance: false)
         let player = InstructionPlayer()
         var starts = 0
         var backs = 0
-        let model = ListenViewModel(pattern: PatternCatalog.subdivision, bpm: 80,
-            player: player, history: history, onReady: { starts += 1 }, onBack: { backs += 1 })
+        let model = ListenViewModel(
+            pattern: PatternCatalog.subdivision,
+            bpm: 80,
+            player: player,
+            guidanceStore: store,
+            onReady: { starts += 1 },
+            onBack: { backs += 1 }
+        )
         defer { model.stop() }
-        finishPreview(model, player)
-        model.send(.ready)
-        for _ in 0..<1000 { if await history.started { break }; await Task.yield() }
+
+        model.send(.next)
+        XCTAssertEqual(model.state, .instructions(step: 0))
+
         model.send(.back)
-        await history.finish()
-        for _ in 0..<20 { await Task.yield() }
         XCTAssertEqual(backs, 1)
         XCTAssertEqual(starts, 0)
         XCTAssertEqual(model.state, .departed)
     }
 
-    func test_historyAnsweredWhileListening_readyGoesOnWithoutWaiting() async {
-        let history = TestHistory(hasRecords: true)
+    func test_instructionsPersistCompletionAcrossSessions() async {
+        let store = InMemoryPracticeGuidanceStore(hasCompletedGuidance: false)
         let player = InstructionPlayer()
-        var starts = 0
-        let model = makeModel(player: player, history: history, ready: { starts += 1 })
-        defer { model.stop() }
-        model.send(.next)
-        // The example plays for a while; the early question is answered meanwhile.
-        for _ in 0..<100 { await Task.yield() }
-        player.elapsed = 3
-        model.refreshProgress()
+        let model1 = makeModel(player: player, guidanceStore: store)
+        defer { model1.stop() }
 
-        model.send(.ready)
+        model1.send(.next)
+        XCTAssertEqual(model1.state, .instructions(step: 0))
+        model1.send(.instructionsNext)
+        XCTAssertTrue(store.hasCompletedGuidance)
 
-        // Decided in the same update: no checkingHistory ("Getting ready") in between.
-        XCTAssertEqual(model.state, .departed)
-        XCTAssertEqual(starts, 1)
-        let calls = await history.calls
-        XCTAssertEqual(calls, 1)
-    }
+        let model2 = makeModel(player: player, guidanceStore: store)
+        defer { model2.stop() }
 
-    func test_historyAnsweredWhileListening_firstPlayShowsInstructionsAtOnce() async {
-        let player = InstructionPlayer()
-        let model = makeModel(player: player, history: TestHistory(hasRecords: false))
-        defer { model.stop() }
-        model.send(.next)
-        for _ in 0..<100 { await Task.yield() }
-        player.elapsed = 3
-        model.refreshProgress()
-
-        model.send(.ready)
-
-        XCTAssertEqual(model.state, .instructions(step: 0))
+        model2.send(.next)
+        XCTAssertEqual(model2.state, .listening(step: 0, completed: false))
     }
 
     func test_reducerIgnoresStaleHistoryAndPrematureNext() {
         XCTAssertEqual(reduce(ListenState.information, .instructionsNext), .information)
         XCTAssertEqual(reduce(ListenState.departed, .historyChecked(hasRecords: false)), .departed)
         XCTAssertEqual(reduce(ListenState.instructions(step: 4), .progress(step: 5, completed: true)), .instructions(step: 4))
+        XCTAssertEqual(reduce(ListenState.information, .showGuidance), .instructions(step: 0))
+        XCTAssertEqual(reduce(ListenState.instructions(step: 0), .instructionsNext), .listening(step: 0, completed: false))
     }
 
-    private func finishPreview(_ model: ListenViewModel, _ player: InstructionPlayer) {
-        model.send(.next)
-        player.elapsed = 3
-        model.refreshProgress()
-    }
-
-    private func makeModel(player: InstructionPlayer, history: any SessionHistoryChecking,
-                           ready: @escaping () -> Void = {}) -> ListenViewModel {
-        ListenViewModel(pattern: PatternCatalog.subdivision, bpm: 80, player: player,
-                        history: history, onReady: ready, onBack: {})
-    }
-
-    private func waitUntil(_ condition: () -> Bool) async {
-        for _ in 0..<1000 where !condition() { await Task.yield() }
+    private func makeModel(
+        player: InstructionPlayer,
+        guidanceStore: (any PracticeGuidanceStore)? = nil,
+        history: (any SessionHistoryChecking)? = nil,
+        ready: @escaping () -> Void = {}
+    ) -> ListenViewModel {
+        ListenViewModel(
+            pattern: PatternCatalog.subdivision,
+            bpm: 80,
+            player: player,
+            history: history,
+            guidanceStore: guidanceStore ?? InMemoryPracticeGuidanceStore(hasCompletedGuidance: false),
+            onReady: ready,
+            onBack: {}
+        )
     }
 }
 
@@ -156,16 +151,6 @@ private actor TestHistory: SessionHistoryChecking {
         if fails { throw NSError(domain: "TestHistory", code: 1) }
         return hasRecords
     }
-}
-
-private actor DelayedHistory: SessionHistoryChecking {
-    private(set) var started = false
-    private var continuation: CheckedContinuation<Bool, Never>?
-    func hasSavedSessions() async throws -> Bool {
-        started = true
-        return await withCheckedContinuation { continuation = $0 }
-    }
-    func finish() { continuation?.resume(returning: true); continuation = nil }
 }
 
 @MainActor

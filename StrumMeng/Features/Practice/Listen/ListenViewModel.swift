@@ -115,7 +115,7 @@ final class ListenViewModel {
                 guidanceStore.completeGuidance()
                 startPlayback()
             }
-        case .ready:
+        case .ready where previous != .departed:
             if case .departed = state {
                 stop()
                 onReady()
