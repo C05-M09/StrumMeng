@@ -23,6 +23,11 @@ nonisolated enum BonjourParameters {
         if let suite = tls_ciphersuite_t(rawValue: UInt16(TLS_PSK_WITH_AES_128_GCM_SHA256)) {
             sec_protocol_options_append_tls_ciphersuite(tls.securityProtocolOptions, suite)
         }
+        // Every connection must prove the pair code. With resumption on, an iPhone that had been
+        // paired with an iPad resumed that old session and reached it again with another iPad's
+        // code (seen after an Unpair whose goodbye was lost: the old iPad was still waiting for it).
+        sec_protocol_options_set_tls_resumption_enabled(tls.securityProtocolOptions, false)
+        sec_protocol_options_set_tls_tickets_enabled(tls.securityProtocolOptions, false)
         let parameters = NWParameters(dtls: tls, udp: NWProtocolUDP.Options())
         // No AWDL (peer-to-peer Wi-Fi): it makes the radio hop between the router's channel and its
         // own every second or two, which showed up as 30–100 ms latency spikes. Both devices must

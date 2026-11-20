@@ -8,7 +8,7 @@ import Network
 /// message meaning lives in ClientMessageHandler.
 actor BonjourControllerClient: ControllerClient {
     /// A wrong pair code makes the DTLS handshake hang rather than fail, so give up on that iPad
-    /// after this long and try the next one.
+    /// after this long and skip it on the next round.
     private static let handshakeTimeout: Duration = .seconds(4)
     private static let retryDelay: Duration = .milliseconds(500)
     private static let goodbyeFlushDelay: Duration = .milliseconds(30)
@@ -21,7 +21,10 @@ actor BonjourControllerClient: ControllerClient {
 
     private var pairCode: PairCode?
     private var browser: NWBrowser?
+    /// The iPad in use, set once its handshake succeeded.
     private var connection: NWConnection?
+    /// Handshakes still running, one per iPad found (see connectIfNeeded).
+    private var candidates: [NWEndpoint: Candidate] = [:]
     private var isReady = false
     /// iPads that rejected our code (someone else's iPad nearby). Cleared when we run out.
     private var rejected: Set<NWEndpoint> = []
@@ -31,7 +34,6 @@ actor BonjourControllerClient: ControllerClient {
     private var isAway = false
     private var handler = ClientMessageHandler()
     private var pingTask: Task<Void, Never>?
-    private var handshakeTask: Task<Void, Never>?
     private var retryTask: Task<Void, Never>?
 
     nonisolated var unownedExecutor: UnownedSerialExecutor {
@@ -58,24 +60,15 @@ actor BonjourControllerClient: ControllerClient {
         guard isReady, let connection,
               let message = handler.strumMessage(id: UUID(), direction: direction, touchTime: touchTime),
               let data = try? message.encoded() else { return }
-        connection.send(content: data, completion: .idempotent)
-        // Copies spread out a little, because Wi-Fi tends to lose packets in bursts. The iPad
-        // keeps only the first copy that arrives.
-        for delayMs in [3, 8].prefix(ClientMessageHandler.strumCopies - 1) {
-            queue.asyncAfter(deadline: .now() + .milliseconds(delayMs)) {
-                connection.send(content: data, completion: .idempotent)
-            }
-        }
+        sendCopies(data, on: connection)
     }
 
     func unpair() async {
         if isReady, let connection, let data = try? ControllerMessage.goodbye.encoded() {
-            // Several copies, as UDP may lose one. If all are lost the iPad still notices when
-            // the pings stop.
-            for _ in 0..<ClientMessageHandler.strumCopies {
-                connection.send(content: data, completion: .idempotent)
-            }
-            // Give the sends a moment to leave before the connection is cancelled.
+            // If every copy is lost the iPad only sees the pings stop, and waits as Reconnecting
+            // instead of showing its code for the next iPhone.
+            sendCopies(data, on: connection)
+            // Give the copies a moment to leave before the connection is cancelled.
             try? await Task.sleep(for: Self.goodbyeFlushDelay)
         }
         await disconnect()
@@ -87,10 +80,8 @@ actor BonjourControllerClient: ControllerClient {
         pingTask?.cancel()
         pingTask = nil
         guard isReady, let connection, let data = try? ControllerMessage.away.encoded() else { return }
-        // Several copies, as UDP may lose one. If all are lost the iPad notices when the pings stop.
-        for _ in 0..<ClientMessageHandler.strumCopies {
-            connection.send(content: data, completion: .idempotent)
-        }
+        // If all copies are lost the iPad notices when the pings stop.
+        sendCopies(data, on: connection)
     }
 
     func returnFromBackground() async {
@@ -137,56 +128,103 @@ actor BonjourControllerClient: ControllerClient {
         browser = nil
     }
 
+    /// Knocks on every iPad found that has not refused the code yet, all at once. A wrong code
+    /// only fails after the handshake timeout, so trying them one by one took that long per iPad:
+    /// with many StrumMeng iPads on one network (a classroom), the right one was often not reached
+    /// before the iPhone gave up. The first handshake that succeeds wins; the rest are cancelled.
     private func connectIfNeeded() {
         guard connection == nil, let pairCode, let results = browser?.browseResults, !results.isEmpty else { return }
-        guard let ipad = results.first(where: { !rejected.contains($0.endpoint) }) else {
+        let untried = results.map(\.endpoint).filter { !rejected.contains($0) && candidates[$0] == nil }
+        guard !untried.isEmpty else {
             // Every iPad nearby refused the code. Maybe the code was just changed: start over soon.
-            rejected = []
-            scheduleRetry()
+            if candidates.isEmpty {
+                rejected = []
+                scheduleRetry()
+            }
             return
         }
-        let candidate = NWConnection(to: ipad.endpoint, using: BonjourParameters.make(pairCode: pairCode))
-        connection = candidate
-        if !hasEverConnected { stateBroadcast.yield(.pairing) }
-        candidate.stateUpdateHandler = { [weak self, weak candidate] state in
-            guard let candidate else { return }
-            self?.assumeIsolated { $0.connectionChanged(candidate, endpoint: ipad.endpoint, state) }
-        }
-        candidate.start(queue: queue)
-        handshakeTask = Task { [weak self] in
-            try? await Task.sleep(for: Self.handshakeTimeout)
-            guard !Task.isCancelled else { return }
-            await self?.handshakeTimedOut(candidate, endpoint: ipad.endpoint)
+        if candidates.isEmpty, !hasEverConnected { stateBroadcast.yield(.pairing) }
+        for endpoint in untried {
+            startCandidate(to: endpoint, pairCode: pairCode)
         }
     }
 
+    private func startCandidate(to endpoint: NWEndpoint, pairCode: PairCode) {
+        let candidate = NWConnection(to: endpoint, using: BonjourParameters.make(pairCode: pairCode))
+        candidate.stateUpdateHandler = { [weak self, weak candidate] state in
+            guard let candidate else { return }
+            self?.assumeIsolated { $0.connectionChanged(candidate, endpoint: endpoint, state) }
+        }
+        let timeout = Task { [weak self] in
+            try? await Task.sleep(for: Self.handshakeTimeout)
+            guard !Task.isCancelled else { return }
+            // A wrong code makes the handshake hang rather than fail.
+            await self?.candidateFailed(candidate, endpoint: endpoint, wrongCode: true)
+        }
+        candidates[endpoint] = Candidate(connection: candidate, timeout: timeout)
+        candidate.start(queue: queue)
+    }
+
     private func connectionChanged(_ changed: NWConnection, endpoint: NWEndpoint, _ state: NWConnection.State) {
-        guard changed === connection else { return }
+        if changed === connection {
+            switch state {
+            case .waiting, .failed, .cancelled:
+                connectionLost(hostLeft: handler.sessionActive)
+            default:
+                break
+            }
+            return
+        }
+        guard candidates[endpoint]?.connection === changed else { return }
         switch state {
         case .ready:
-            handshakeTask?.cancel()
-            stopBrowsing()
-            isReady = true
-            hasEverConnected = true
-            handler.connectionOpened(at: HostClock.now())
-            sessionBroadcast.yield(false)
-            receiveNext(on: changed)
-            // Connected while the app was on its way out: say hello on return instead.
-            if !isAway { greetAndPing() }
+            adopt(changed, endpoint: endpoint)
         case let .waiting(error), let .failed(error):
-            if case .tls = error { rejected.insert(endpoint) }
-            connectionLost(hostLeft: handler.sessionActive)
+            var wrongCode = false
+            if case .tls = error { wrongCode = true }
+            candidateFailed(changed, endpoint: endpoint, wrongCode: wrongCode)
         case .cancelled:
-            connectionLost(hostLeft: handler.sessionActive)
+            candidateFailed(changed, endpoint: endpoint, wrongCode: false)
         default:
             break
         }
     }
 
-    private func handshakeTimedOut(_ candidate: NWConnection, endpoint: NWEndpoint) {
-        guard candidate === connection, !isReady else { return }
-        rejected.insert(endpoint)
-        connectionLost(hostLeft: false)
+    /// The iPad that knows the code. The other knocks are cancelled.
+    private func adopt(_ ready: NWConnection, endpoint: NWEndpoint) {
+        candidates[endpoint]?.timeout.cancel()
+        candidates[endpoint] = nil
+        cancelCandidates()
+        stopBrowsing()
+        connection = ready
+        isReady = true
+        hasEverConnected = true
+        handler.connectionOpened(at: HostClock.now())
+        sessionBroadcast.yield(false)
+        receiveNext(on: ready)
+        // Connected while the app was on its way out: say hello on return instead.
+        if !isAway { greetAndPing() }
+    }
+
+    /// - Parameter wrongCode: that iPad refused the code, so it is skipped until every iPad has.
+    private func candidateFailed(_ candidate: NWConnection, endpoint: NWEndpoint, wrongCode: Bool) {
+        guard let entry = candidates[endpoint], entry.connection === candidate else { return }
+        entry.timeout.cancel()
+        candidates[endpoint] = nil
+        candidate.cancel()
+        if wrongCode { rejected.insert(endpoint) }
+        guard candidates.isEmpty, connection == nil else { return }
+        stateBroadcast.yield(hasEverConnected ? .reconnecting : .searching)
+        scheduleRetry()
+    }
+
+    private func cancelCandidates() {
+        let pending = candidates.values
+        candidates = [:]
+        for entry in pending {
+            entry.timeout.cancel()
+            entry.connection.cancel()
+        }
     }
 
     /// - Parameter hostLeft: the iPad went quiet in the middle of a session (crashed, battery, or
@@ -203,8 +241,7 @@ actor BonjourControllerClient: ControllerClient {
     private func dropConnection() {
         pingTask?.cancel()
         pingTask = nil
-        handshakeTask?.cancel()
-        handshakeTask = nil
+        cancelCandidates()
         connection?.cancel()
         connection = nil
         isReady = false
@@ -286,8 +323,24 @@ actor BonjourControllerClient: ControllerClient {
         if hostLeftBroadcast.latest != left { hostLeftBroadcast.yield(left) }
     }
 
+    /// Messages that must not get lost go out several times, spread out a little because Wi-Fi
+    /// tends to lose packets in bursts. The iPad acts on the first copy and ignores the rest.
+    private func sendCopies(_ data: Data, on connection: NWConnection) {
+        connection.send(content: data, completion: .idempotent)
+        for delayMs in [3, 8].prefix(ClientMessageHandler.strumCopies - 1) {
+            queue.asyncAfter(deadline: .now() + .milliseconds(delayMs)) {
+                connection.send(content: data, completion: .idempotent)
+            }
+        }
+    }
+
     private func send(_ message: ControllerMessage) {
         guard let connection, let data = try? message.encoded() else { return }
         connection.send(content: data, completion: .idempotent)
+    }
+
+    private struct Candidate {
+        let connection: NWConnection
+        let timeout: Task<Void, Never>
     }
 }
