@@ -14,14 +14,15 @@ struct OptionDeviceRow: View {
                 .foregroundStyle(AppColors.brownInk)
                 .accessibilityHidden(true)
 
-            ChunkyButton(
-                title: "Set Up Device",
-                fontSize: OptionCardLayout.deviceButtonFontSize,
-                width: OptionCardLayout.sliderWidth,
-                height: OptionCardLayout.deviceButtonHeight,
-                hasDropShadow: true,
-                action: onSetUp
-            )
+            Button("Set Up Device", action: onSetUp)
+                .buttonStyle(
+                    AssetButtonStyle(
+                        normalAssetName: "Button_Set Up Device_Normal",
+                        pressedAssetName: "Button_Set Up Device_Pressed",
+                        size: CGSize(width: OptionCardLayout.sliderWidth, height: OptionCardLayout.deviceButtonHeight)
+                    )
+                )
+                .accessibilityLabel("Set Up Device")
         }
     }
 }

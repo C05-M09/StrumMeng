@@ -2,6 +2,21 @@ import Foundation
 
 /// Explicit lines allow negative VStack spacing; Text.lineSpacing cannot tighten a font's leading.
 enum TitleLineWrapping {
+    /// Splits "... Strum" pattern titles so "STRUM" always sits on its own second line, matching Listen.
+    static func patternLines(for title: String) -> [String] {
+        title.uppercased()
+            .replacingOccurrences(of: " STRUM", with: "\nSTRUM")
+            .components(separatedBy: "\n")
+    }
+
+    /// Uses `patternLines` for "... Strum" titles and wraps other titles at `singleLineLimit`.
+    static func headerLines(for title: String) -> [String] {
+        if title.uppercased().contains(" STRUM") {
+            return patternLines(for: title)
+        }
+        return lines(for: title)
+    }
+
     static func lines(for title: String, singleLineLimit: Int = 22) -> [String] {
         let explicit = title.split(separator: "\n").map(String.init)
         if explicit.count > 1 { return explicit }

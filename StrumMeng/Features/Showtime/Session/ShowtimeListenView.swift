@@ -20,10 +20,13 @@ struct ShowtimeListenView: View {
                 ForEach(Array(TitleLineWrapping.lines(for: title).enumerated()), id: \.offset) { _, line in
                     OutlinedText(text: line.uppercased(), font: AppTypography.bungee(size: ShowtimeLayout.titleSize),
                         foregroundColor: AppColors.white, outlineColor: AppColors.brownInk,
-                        outlineWidth: 5, shadowColor: AppColors.brownInk, shadowOffset: .zero, alignment: .center)
+                        outlineWidth: ShowtimeLayout.titleOutlineWidth, shadowColor: AppColors.brownInk, shadowOffset: .zero, alignment: .center)
                 }
-            }.frame(width: 790).position(x: 688, y: 100)
-            Text("BPM \(bpm)").font(AppTypography.dmMono(size: 42))
+            }
+            .minimumScaleFactor(0.5)
+            .frame(maxWidth: 790)
+            .position(x: 688, y: 100)
+            Text("BPM \(bpm)").font(AppTypography.dmMono(size: 44))
                 .foregroundStyle(AppColors.white).position(x: 1210, y: 105)
             Button("Pause", action: onPause)
                 .buttonStyle(AssetButtonStyle(normalAssetName: "Button_Pause_Normal",

@@ -300,6 +300,8 @@ final class AppContainer {
     /// Play becomes Summary, so Back from Summary never returns to the finished session.
     func sessionFinished(_ result: SessionResult) {
         results.add(result)
+        guitarSound.stopStrums()
+        metronomeSound.cancelClicks()
         router.replaceLast(with: .summary(sessionID: result.id))
     }
 

@@ -27,13 +27,15 @@ enum ListenLayout {
 
 struct ListenView: View {
     @State private var viewModel: ListenViewModel
+    var isCurrentScreen: Bool = true
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.playSoundEffect) private var playSoundEffect
     @State private var informationVisible = false
     
-    init(viewModel: ListenViewModel) {
+    init(viewModel: ListenViewModel, isCurrentScreen: Bool = true) {
         _viewModel = State(initialValue: viewModel)
+        self.isCurrentScreen = isCurrentScreen
     }
     
     var body: some View {
@@ -91,6 +93,7 @@ struct ListenView: View {
         .navigationBarBackButtonHidden()
         .statusBarHidden()
         .onAppear {
+            guard isCurrentScreen else { return }
             informationVisible = true
             viewModel.appear()
         }
@@ -107,9 +110,7 @@ struct ListenView: View {
     private var header: some View {
         ZStack {
             VStack(spacing: ListenLayout.titleLineSpacing) {
-                ForEach(viewModel.pattern.name.uppercased()
-                    .replacingOccurrences(of: " STRUM", with: "\nSTRUM")
-                    .components(separatedBy: "\n"), id: \.self) { line in
+                ForEach(Array(TitleLineWrapping.patternLines(for: viewModel.pattern.name).enumerated()), id: \.offset) { _, line in
                     OutlinedText(text: line,
                          font: AppTypography.bungee(size: 66), foregroundColor: AppColors.white,
                          outlineColor: AppColors.brownInk, outlineWidth: 6,
