@@ -37,10 +37,10 @@ The app runs on two devices from one universal target:
 
 - MVP covers Practice, Guidebook, records and Option only\. Showtime is deferred\. Its button appears on<br>Home but does nothing \(no navigation, no "Coming Soon" message\)\.
 - Feedback is by colour only, in real time\. Three results: Perfect, Too Early, Miss\. A strum that is<br>too late counts as Miss\. There is no "Too Late" state and no shape or icon difference between results\.
-- The app judges timing, not chords\. Practice does not require playing a chord\. Strum direction<br>\(down/up\) is known from the swipe, but it is not judged in the MVP \(see §4\.1\)\.
+- The app judges timing and strum direction, not chords\. Practice does not require playing a chord\.<br>Each step must be strummed in its direction \(down/up\); a strum in the wrong direction inside a<br>step's window makes that step a Miss \(see §3\.2\.2 and decision 18\)\.
 - Input is a paired iPhone used as a strum controller \(companion\)\. The player swipes on the iPhone;<br>each strum is sent to the iPad over a local peer\-to\-peer link\. There is no microphone input \(see §4\.2\)\.
 - All patterns are open from the start\. There is a suggested order, but nothing is locked\. Order:<br>Foundation, Subdivision, Syncopation, The Upbeat, Dynamic\.
-- BPM is chosen by the user on the pattern list screen, range 40 to 120 \[Assumption\]\. A session lasts<br>about 1 minute \[Assumption\]\.
+- BPM is chosen by the user on the pattern list screen, range 60 to 120\. A session repeats the selected<br>pattern 10 times; its duration is derived from the pattern's beat count and selected BPM\.
 - Replay shows the previous session again, visually and audibly\. It does not start a new session and<br>does not re\-judge anything\.
 - Retry shows a BPM recommendation\. The user can accept it \(new BPM\) or reject it \(keep the old BPM\)\.<br>The popup appears for every accuracy tier, including "stay at the same BPM"\.
 - "History" means the records shown on each pattern card\. There is no separate history screen\. The<br>card shows the user's records for that pattern, sorted best to worst\. Three are visible, the rest scroll\.
@@ -52,7 +52,7 @@ The app runs on two devices from one universal target:
 
 ### 3\.1 Practice flow \(US 2, US 3\)
 
-Flow: pattern list \(choose pattern and BPM\) → Listen → Ready → count\-in 3\-2\-1 → Play \(about 1 minute\) → Summary\.
+Flow: pattern list \(choose pattern and BPM\) → Listen → Ready → count\-in 3\-2\-1 → Play \(10 pattern repetitions\) → Summary\.
 
 #### 3\.1\.1 Pattern list and BPM
 
@@ -66,15 +66,19 @@ struct StrumPattern: Identifiable, Codable, Sendable, Equatable {
     let name: String
     let strokes: [Stroke]
     let beatLabels: [String]    // "1", "&", "2", "&" ...
+    let beatsPerPattern: Int
     let suggestedOrder: Int
     let defaultBPM: Int
 }
 ```
 
-- PatternCatalog\.all holds the five patterns\. Stroke contents are confirmed with the Designer\.
+- PatternCatalog\.all holds the five confirmed patterns in suggested order: Foundation Strum,
+  Subdivision Strum, Syncopation Strum, The Upbeat Strum, and Driving Pop Strum\.
 - Patterns are stored as stable ids in session records, never as copies, so renaming a pattern updates old records\.
-- PatternListViewModel state: \.loading, \.loaded\(\[PatternCardModel\]\), \.failed\. It owns selectedBPM<br>\(clamped to 40…120\)\.
+- PatternListViewModel owns the selected pattern and selectedBPM\. On this list, BPM changes in steps
+  of 5 and is clamped to 60…120\. Selecting another pattern resets BPM to that pattern's default\.
 - Each card shows name, arrow notation, and the record area \(§3\.3\)\.
+- Each card shows the calculated session duration next to BPM\. Duration is<br>`10 × beatsPerPattern × 60 / BPM` seconds\. Values below one minute are shown in seconds;<br>longer values use minutes and any remaining seconds\.
 - Selecting a pattern routes to Listen with only patternID and bpm, never a large object\.
 
 #### 3\.1\.2 Practice session state machine
@@ -111,6 +115,18 @@ func reduce(_ state: PracticeState, _ event: PracticeEvent) -> PracticeState {
 
 #### 3\.1\.3 Listen screen
 
+US3 implementation: the list routes to Listen's information state, followed by the looping audio
+example. `ListenViewModel` owns `ListenState` and a pure reducer; `ListenPatternPlayer` isolates
+audio output. `SynthListenPlayer` plays the pattern on the synthesised guitar (`GuitarEngine`, a
+C chord for every strum), scheduling each strum a little ahead on the host clock; rest slots stay
+silent, and the time since the first strum drives the marker. Ready unlocks after one full loop and checks saved history. With no records it first
+shows the positioning/feedback modal; Next routes through AppRouter into the existing
+Play session/count-in. Returning users with records proceed directly. Pause preserves playback position; Restart resets the first-loop requirement;
+Back returns to the pattern list. Leaving the screen, backgrounding, or an audio interruption stops
+or pauses playback. Audio files are bundled under Resources/Audio; direction labels follow the
+user-provided mapping, not automatic classification. The current Play route uses the existing
+on-iPad swipe input; controller pairing and finished-session navigation remain separate work.
+
 The user hears the correct pattern before playing\. It can be replayed any number of times, then Next<br>leads to Ready\. PatternPlayer plays the pattern at the chosen BPM \(a guitar sample or click\-accent<br>sound \[Assumption\]; the prototype synthesises the guitar sound on device\) and stops when the user<br>leaves the screen\.
 
 #### 3\.1\.4 Ready, count\-in and Play
@@ -119,7 +135,7 @@ The user hears the correct pattern before playing\. It can be replayed any numbe
 - If the Wi\-Fi Aware session is close to its time limit, it is refreshed after Ready and before the<br>count\-in, and the count\-in waits until the controller is back \(§3\.2\.3\)\.
 - After it, a 3\-2\-1 count\-in aligned to the beat interval at the chosen BPM\. After "1", the session<br>enters playing exactly on the first beat\.
 - Play renders the pattern as a row of beat nodes with a moving beat marker\. The marker is driven by<br>BeatClock ticks, never by its own timer\.
-- The metronome is scheduled by the same BeatClock\. Volume follows SettingsStore\.soundVolume\.
+- The metronome is scheduled by the same BeatClock: on each tick, the next quarter note's click is<br>scheduled on the host clock \(GuitarEngine, MetronomeSound\), and the first beat of a bar is<br>accented\. Every swipe also sounds the synthesised guitar \(a C chord in the swipe's direction,<br>GuitarSound\), in or out of a session\. GuitarSound can also play any chord of GuitarChord\.catalog \(C, G, Em, D, F barre, Am; strum\(\_:chord:at:accent:\)\), and prepare\(chords:\) pre\-renders a song's chords so a chord change never waits for synthesis \(US12\)\. Practice still plays C\. No slider sets their volume yet: the Music slider is the menu music \(§3\.6, decision 21\)\.
 - Beat node colours come from design tokens, not hard\-coded values\.
 
 ### 3\.2 Real\-time feedback engine \(US 1, US 6\)
@@ -152,8 +168,15 @@ struct BeatEvent: Codable, Sendable, Equatable {
     let index: Int
     let expectedTime: TimeInterval
     let strumTime: TimeInterval?          // nil when no strum matched the beat
-    let direction: StrumDirection?        // retained for Replay; not judged in MVP
+    let direction: StrumDirection?        // judged: must match the step's stroke (decision 18)
     let result: BeatResult
+}
+
+/// Every swipe of a session, kept for Replay (decision 24).
+struct RecordedStrum: Codable, Sendable, Equatable {
+    let time: TimeInterval          // session time: seconds after step 0
+    let direction: StrumDirection
+    let isExtra: Bool               // judged no node (decision 23)
 }
 
 struct SessionResult: Codable, Sendable, Equatable {
@@ -162,11 +185,18 @@ struct SessionResult: Codable, Sendable, Equatable {
     let bpm: Int
     let duration: TimeInterval
     let beats: [BeatEvent]
+    let strums: [RecordedStrum]     // empty for records saved before decision 24
 
     var perfectCount: Int { beats.filter { $0.result == .perfect }.count }
     var tooEarlyCount: Int { beats.filter { $0.result == .tooEarly }.count }
-    var missCount: Int { beats.filter { $0.result == .miss }.count }
-    var accuracy: Double { beats.isEmpty ? 0 : Double(perfectCount) / Double(beats.count) }
+    var extraStrumCount: Int { strums.filter(\.isExtra).count }
+    // An extra strum counts as a Miss (decision 23).
+    var missCount: Int { beats.filter { $0.result == .miss }.count + extraStrumCount }
+    // Too Early earns half a point; extra strums raise the divider (decision 23).
+    var accuracy: Double {
+        let scored = beats.count + extraStrumCount
+        return scored == 0 ? 0 : (Double(perfectCount) + 0.5 * Double(tooEarlyCount)) / Double(scored)
+    }
     var offTempoCount: Int { tooEarlyCount + missCount }
 }
 
@@ -175,12 +205,26 @@ enum ControllerConnectionState: Sendable, Equatable {
     case connected(latencyMs: Double)
 }
 
-protocol ControllerLink: Sendable {
+// iPad side. Refines StrumInputService so the game loop can take it in place of on-screen swipes.
+protocol ControllerLink: StrumInputService {
     var connectionStates: AsyncStream<ControllerConnectionState> { get }
     var strums: AsyncStream<StrumEvent> { get }
+    var pairCode: PairCode { get }                 // shown on the iPad, entered once on the iPhone
     func start() async throws
     func refreshIfNeeded() async throws
+    func setSessionActive(_ active: Bool) async    // iPhone sends strums only while true
+    func setHostAway(_ away: Bool) async           // iPad backgrounded mid-session: tell the iPhone
     func stop() async
+}
+
+// iPhone side.
+protocol ControllerClient: Sendable {
+    var connectionStates: AsyncStream<ControllerConnectionState> { get }
+    var sessionActive: AsyncStream<Bool> { get }
+    var hostLeftSession: AsyncStream<Bool> { get } // iPad gone mid-session, not back yet
+    func connect(pairCode: PairCode) async
+    func send(_ direction: StrumDirection, touchTime: TimeInterval) async
+    func disconnect() async
 }
 
 protocol BeatClock: Sendable {
@@ -201,17 +245,25 @@ Every type above has a mock \(MockControllerLink emits scripted strums: on\-time
 - Within the Perfect window of the \(latency\-corrected\) beat time: Perfect\.
 - Before the Perfect window but inside the early window: Too Early\.
 - No strum inside the window, including a strum that arrives too late: Miss\.
+- Direction \(decision 18\): each judged step expects its stroke's direction\. Strums inside the window<br>are read in time order\. A strum in the wrong direction makes the step a Miss at once, even if a<br>right one follows\. A right\-direction strum in the Perfect window makes it Perfect at once\. Rest<br>steps are never judged\.
+- The clock's BeatTick carries no direction, so the view model pairs each tick with the pattern's<br>Stroke as a BeatTarget \(index, expectedTime, direction\) before handing it to the judge\.
 - ToleranceConfig \(perfectWindowMs, earlyWindowMs\) lives in one place so it is easy to tune\. Windows<br>are capped to a fraction of the beat interval so they never overlap at high BPM\. Actual values come<br>from on\-device testing \(§9\)\.
 - FeedbackEngine consumes beatStream and strums and emits each BeatEvent as soon as that beat's window<br>closes, not at the end of the session\. This is what makes colours appear in real time\.
-- SessionResultBuilder collects events and produces a SessionResult on finish\(\)\. A session ended by<br>Restart or Back to Menu produces nothing\.
+- Extra strums \(decision 23\): a strum that judges no node \(a swipe on a rest or in a gap, or a second<br>swipe for the same node\) is listed by FeedbackEngine as extra\. Strums before the first node's window<br>\(the count\-in, and the re\-count after a pause\), strums in the 2\-second break after the last node, and<br>resent copies are never extra\.<br>The hit ring turns the Miss colour the moment an extra swipe arrives \(it judges no node, so<br>only the ring shows it\), and Replay shows the same flash at the swipe's recorded time\.
+- SessionResultBuilder collects events and produces a SessionResult on finish\(\)\. A session ended by<br>Restart or Back to Menu produces nothing\. Accuracy is \(Perfect \+ 0\.5 × Too Early\) / \(nodes \+ extra<br>strums\), and every extra strum adds a Miss: 60 nodes with 10 extra swipes are scored out of 70\.
 
 #### 3\.2\.3 Controller link and strum input
 
-- Gesture \(iPhone\): a swipe with N fingers \(default 2\) past a distance threshold is one strum; the<br>direction comes from the swipe\. Single\-finger touches are ignored so the palm can rest on the screen\.<br>Sensitivity, finger count and invert are controller settings stored on the iPhone\.
-- Transport: Wi\-Fi Aware \(iOS 26\) is the primary path: the devices are paired once with the system<br>pairing UI \(DeviceDiscoveryUI\), then connect directly without a router\. Regular Wi\-Fi via Bonjour<br>with a 6\-digit pair code is the fallback\. Both use the same message format\.
+- Gesture \(iPhone\): a swipe with N fingers \(default 2\) past a distance threshold is one strum; the<br>direction comes from the swipe\. Single\-finger touches are ignored so the palm can rest on the screen\.<br>Sensitivity, finger count and invert are controller settings stored on the iPhone\.<br>Built so far: the iPhone is locked to portrait with the strings running up the screen, so a strum is a one\-finger left or right swipe \(right is down, left is up\)\. CompanionTouchSurface, a UIView, reads UITouch\.timestamp and the coalesced touches and follows the newest finger, so a resting palm does not block the strumming hand\. Each strum gives a light haptic\. Outside a session the iPhone also plays the strum on its own GuitarEngine, using the sessionActive stream as the switch \(decision 20\)\.
+- Transport: Wi\-Fi Aware \(iOS 26\) is the primary path: the devices are paired once with the system<br>pairing UI \(DeviceDiscoveryUI\), then connect directly without a router\. Regular Wi\-Fi via Bonjour<br>with a 6\-digit pair code is the fallback\. Both use the same message format\.<br>Built so far: Bonjour only\. The Wi\-Fi Aware entitlement needs a paid developer team, and the team has only Personal teams\.
 - Messages: UDP\. Each strum is sent several times \(3 copies\) so one lost packet does not lose the<br>strum; the iPad de\-duplicates them inside the link before they become a StrumEvent\.
+- Message format: ControllerMessage \(hello, goodbye, away, hostAway, startSession, stopSession, strum, ping, pong\), JSON over<br>one datagram each\. ping carries the latency the iPhone measured so the iPad can show it; pong<br>repeats whether a session is playing, so a lost startSession/stopSession corrects itself within a<br>second\. Start/stop are also sent as 3 copies\.
+- Session gating: the iPad calls setSessionActive when a session starts or ends\. The iPhone sends<br>strums only while a session is playing, and the iPad also drops any strum outside one\.
+- Structure: what each message means lives in pure, unit\-tested HostMessageHandler \(iPad\) and<br>ClientMessageHandler \(iPhone\)\. Each transport is a thin actor whose executor is its Network<br>callback queue \(BonjourControllerLink, BonjourControllerClient\), verified on real devices\.
+- Bonjour security: UDP with DTLS using a pre\-shared key derived from the 6\-digit PairCode, so only an<br>iPhone that knows the code can connect\. A device that fails the handshake never replaces the<br>connected controller\.
 - Timing: the strum time is when the finger moved on the iPhone, not when the message arrived\. The<br>link measures a clock offset between the two devices with ping/pong \(lowest round trip of recent<br>samples\) and converts the iPhone touch time into iPad host time\. Network delay therefore does not<br>count against the player\.
-- Liveness: the iPhone pings every second\. No message for about 4–5 seconds means disconnected; the<br>link reconnects automatically\.
+- Wi\-Fi: Bonjour runs over the shared Wi\-Fi network only \(`includePeerToPeer = false`\); AWDL channel<br>hopping caused 30–100 ms latency spikes\. The iPhone stops browsing once connected and browses again<br>after a drop\.
+- Liveness: the iPhone pings every second, and every 50 ms while a session is playing so neither<br>Wi\-Fi radio dozes in power save between strums\. No message for about 4–5 seconds means disconnected; the<br>link reconnects automatically\.<br>When the iPhone app goes to the background it sends `away` \(3 copies\) and stops pinging, so the iPad reports \.reconnecting at once and a playing session pauses without collecting Misses while the pings time out\. Pings still in flight are answered but do not make the controller usable again; the hello the iPhone sends on return does\. If it was gone longer than the liveness timeout, the iPhone reconnects as usual\.<br>The other way round, ControllerLink\.setHostAway\(true\) is called when the iPad app goes to the background in the middle of a session: the link sends `hostAway` \(3 copies\) and answers no ping until setHostAway\(false\), so the iPhone cannot take the seconds before iOS suspends the iPad for a return\. The iPhone reports hostLeftSession on hostAway, and also when the link drops while a session is playing \(an iPad that crashed or lost power\); only a pong to a ping sent after hostAway clears it\.
 - Wi\-Fi Aware publishing has a system time limit; when it expires the connection drops\. The link<br>requests a long publish duration, restarts publishing when it expires, and is refreshed before a<br>session starts if it is old \(§3\.1\.4\), never during playing\.
 - Network I/O runs off the main thread\. Strums reach the UI only through AsyncStream consumed on @MainActor\.
 - The link lives for the whole app session, not per practice session, because reconnecting can take<br>several seconds\. Strums that arrive while no session is playing are ignored\.
@@ -222,19 +274,45 @@ Every type above has a mock \(MockControllerLink emits scripted strums: on\-time
 
 ControllerConnectionState machine: \.unpaired, \.pairing, \.searching, \.connected\(latencyMs\),<br>\.reconnecting\. Before the first session the iPad explains how to set up the iPhone \(open the app on<br>the iPhone, pair once\)\. A small indicator on the iPad shows whether a controller is connected; the<br>iPhone shows its own connection status and the measured latency\. The system local\-network / pairing<br>prompts are shown by iOS; if the user declines, a message explains how to allow it in Settings\.
 
+Setup flow as built: AppContainer owns one link, started at launch so a paired iPhone reconnects before Play\. On the iPad, Option → Set Up Device shows the pair code and the connection state \(DeviceSetupState: searching, connected, reconnecting, failed\)\. On the iPhone, CompanionState goes enteringCode → connecting → connected, with notFound and reconnecting\. When the iPad leaves in the middle of a session \(hostLeftSession\), the iPhone shows ipadDisconnected: a popup over the pad that closes by itself when the iPad is back, with Enter Code \(the same as Unpair\) as the way out\. A full code waits for the keypad's check key \(confirmCode\) instead of connecting on the sixth digit, so the player sees the code before it is sent; after notFound the check tries the same code again\. While connecting, the check becomes a cross that cancels \(disconnect\)\. PairCodeStore keeps the iPad's code and the iPhone's last connected code across launches, apart from SettingsStore because these are not settings the player edits\. A typed code gets 10 seconds, because the two sides never say a code is wrong; a saved code has no limit, because the iPad may simply not be open yet\. The iPhone is optional in Play: on\-screen swipes keep working, and only a session started with the iPhone pauses when it drops\.
+
+#### US7: Home guidance after first successful setup
+
+DeviceSetupViewModel invokes an injected onPairedDone callback only when Done is
+accepted in the connected state. AppContainer uses this callback to schedule a
+once-only Home tour through HomeGuidanceStore (separate from SettingsStore and
+PairCodeStore). Home displays Option guidance to the left of Option first, then Guidebook guidance
+to the left of its icon. Both white bubbles use content-driven heights, equal body
+padding, and a small hard shadow to the right and below. A full-canvas tap surface consumes each tap, advances one
+step and never activates the Home buttons beneath it. Guidance has no timeout.
+The tour starts only when Home is visible without Option/Guidebook overlays; if
+setup was opened from Option, close Option to reveal it. Completion is persisted
+only after the second tip. A pending tour survives an app relaunch.
+
+US7 now includes US10's first-launch invitation. The combined first-run flow is:
+Home → Meng invitation → Next → Set Up Device → connected Done → Home → Option tip
+→ Guidebook tip → normal Home. Returning launches skip the invitation and completed
+tour. Separate persisted invitation/tour flags allow interrupted setup to be retried
+from Option without falsely marking the tour complete. AppContainer accepts fake
+stores and a fake ControllerLink so the entire handoff can be tested without Wi-Fi.
+
 ### 3\.3 Results: Summary, Replay, Retry, records \(US 4, US 8\)
 
 #### 3\.3\.1 Summary
 
-Shows pattern, BPM, duration, accuracy \(%\), counts of Perfect, Too Early and Miss, and an "off tempo N<br>times" message \(Too Early plus Miss\)\. No stars in Practice\. Buttons: Replay, Retry, Back to Main\.
+Shows pattern, BPM, duration, accuracy \(%\), counts of Perfect, Too Early and Miss \(Miss includes extra<br>strums, decision 23\), and an "off tempo N times" message \(Too Early plus Miss\)\. No stars in Practice\. Buttons: Replay, Retry, Back to Main\.
 
 SummaryState: \.showing\(SessionResult\), \.showingRecommendation\(RecommendedBPM\), \.navigating\(destination\)\.<br>The session is saved exactly once, when the summary first appears, so re\-appearing never creates a duplicate\.
+
+Flow: when the session ends, Play is replaced by Summary \(Back never returns to a finished session\)\.<br>The summary route carries only the session id; the result waits in SessionResultStore \(App\)\. Retry<br>shows the recommendation, then opens Listen at the chosen BPM, which also becomes the practice list's<br>BPM\. Back to Main, and Back on Listen or Play, return to the practice list\. Replay opens inside Summary<br>and returns to it\. Leaving Summary waits for the save, so the practice list's records include the session\.
 
 #### 3\.3\.2 Replay
 
 Replay plays the previous session again, visually and audibly, from the stored \[BeatEvent\]\. It takes<br>no controller input and does no new judging\. The colour sequence must match the original session exactly\.
 
-Audio is reconstructed, not recorded: the metronome and pattern are re\-scheduled from the stored beat<br>times, and the player's own strums are re\-played as guitar strums at their stored times and<br>directions\. There is no microphone recording to play back\.
+Audio is reconstructed, not recorded: the metronome is re\-scheduled on every quarter note, and the<br>player's own strums are re\-played as guitar strums at their stored times \(ReplayCue, scheduled on the<br>host clock through GuitarSound and MetronomeSound\)\. BeatEvent does not store a strum's direction, so a<br>successful strum takes the direction of its note, while a Miss with a detected strum plays with the wrong<br>strum direction so mistakes are audibly clear during replay, and a Miss with no strum makes no sound\.<br>There is no microphone recording to play back\.
+
+Seek \(decision 22\): the progress bar can be tapped or dragged to jump to any point\. Seek is a ReplayEvent<br>that moves playback without changing the ReplayState; the time maths is pure \(ReplayTimeline\), and sounds<br>are rescheduled from the new position\. Seeking never re\-judges: nodes simply show their stored colours up<br>to the new position\. Overshooting the end while dragging does not end the replay; letting go at the end<br>does\. There is no speed control: dragging the bar covers jumping to a moment\.
 
 #### 3\.3\.3 Retry and BPM recommendation
 
@@ -257,6 +335,7 @@ The result is clamped to 40…120\. Thresholds and deltas live in configuration,
 - Sorted by accuracy, best to worst\. Three records are visible; the rest scroll inside the card\.
 - Pattern never played: an empty state\.
 - The list refreshes when the user returns from a session, without restarting the app\.
+- AppContainer wires one shared SwiftDataSessionRepository into a RecordsViewModel for each pattern. PatternListView passes the selected model into PatternCardView, which embeds RecordsView; its view task reloads records when the card appears. Storage initialization failures show the records error state. Previews use the same schema with in-memory storage.
 - Ties in accuracy are broken by the more recent session \[Assumption\]\.
 
 ### 3\.4 Persistence
@@ -274,6 +353,7 @@ final class PracticeSessionRecord {
     var missCount: Int
     var accuracy: Double
     var beatsData: Data                    // [BeatEvent] encoded as JSON
+    var strumsData: Data?                  // [RecordedStrum] as JSON; schema V2, nil for V1 records
 }
 
 protocol SessionRepository: Sendable {
@@ -285,7 +365,7 @@ protocol SessionRepository: Sendable {
 
 - Beats are stored as one JSON blob per session rather than one @Model row per beat\. It is much<br>simpler for Replay and there is no need to query individual beats\.
 - The ModelContainer is created in App/ and injected into the repository, never into a View\.
-- A VersionedSchema is declared from the first version so later migrations are cheap\.
+- A VersionedSchema is declared from the first version so later migrations are cheap\. SchemaV2 adds<br>the optional strumsData \(decision 24\); SessionMigrationPlan moves V1 stores to V2 with a lightweight<br>stage, and V1 stays frozen\. Old records keep the accuracy they were saved with\.
 - Domain code only sees SessionResult, never PracticeSessionRecord\. A small mapper translates between them\.
 - All access runs on a single, consistent actor context \(@MainActor or a ModelActor\)\. The in\-memory<br>configuration \(isStoredInMemoryOnly: true\) is used in tests and previews\.
 - Records live on the iPad only\. The iPhone controller stores nothing but its own controller settings\.
@@ -297,21 +377,23 @@ Three read\-only pages: Counting Beats, Practice Tempo, How to Strum\. Content i
 ### 3\.6 Home, navigation and Option \(US 7, US 9\)
 
 - Home: Practice, Option, Guidebook icon, and a Showtime button that is visible but has no action\.
-- AppRouter: one @Observable object owning a NavigationPath and a single enum Route \(home,<br>practiceList, listen, ready, play, summary, replay, guidebook, option\)\. Methods: push, pop,<br>popToRoot\. Routes carry ids and primitive values only\. No scattered NavigationLinks\.
+- AppRouter: one @Observable object owning a NavigationPath and a single enum Route \(home,<br>practiceList, listen, ready, play, summary, replay, guidebook, option\)\. Methods: push, pop,<br>popToRoot, replaceLast \(Play → Summary\) and popTo \(back to the practice list\)\. Routes carry ids and primitive values only\. No scattered NavigationLinks\.
 - Back button: one shared BackButton component used on every screen\. No screen is a dead end\.
-- Option: two sliders \(Sound, Sound Effects\), latency calibration, and the controller connection\.
-    - Sound: metronome and pattern example volume\.
-    - Sound Effects: effect volume\.
-    - Controller: connection type \(Wi\-Fi Aware / Wi\-Fi\), pairing, and status\.
+- Option: two sliders \(Music, Sound Effects\), latency calibration, and the controller connection\.
+    - Music: menu background music volume \(SettingsStore\.soundVolume\)\.
+    - Sound Effects: volume of every UI sound effect \(SettingsStore\.sfxVolume\)\.
+    - Controller: connection type \(Wi\-Fi Aware / Wi\-Fi\), pairing, and status\. Built so far: a Set Up Device button that opens the pairing screen \(§3\.2\.4\)\.
     - The Microphone slider in the current design has no function without mic input and should be<br>removed or replaced by the controller section \(design change, needs the Designer\)\.
     - Changes apply immediately, even during a session, and persist across launches\.
+- Menu sounds \(decisions 21 and 25\): MenuSoundService plays the looping background music and the UI sound<br>effects \(SoundEffect: button, garage, guidebookPage, popUp, wheelTick\), through AVMenuSoundService<br>\(AVAudioPlayer, bundled files in Resources/Audio\)\. AppContainer owns one and applies the saved volumes at<br>launch; OptionViewModel sends each slider change to it\. MenuMusicPolicy plays the music on Home \(with<br>Option and Guidebook\), the practice list and the Practice and Showtime summaries, and pauses it on Set Up<br>Device, Listen, Play, Replay and while the app is not active\. Replay opens over the summary in the same<br>route, and the Showtime summary shares the showtime route, so the summary views report when they show<br>through SummaryMusicAction \(an environment action like SoundEffectAction\)\.
+- UI sound effects \(decision 25\): Views play them through the SoundEffectAction in the environment, which<br>ContentView sets from AppContainer\. Every shared button style and AssetPressButton clicks on press<br>\(ButtonPressSound\); Showtime is silenced because it has no action\. The garage plays as the shutter closes<br>after a session and opens on Summary\. guidebookPage plays on each card shuffle\. popUp plays when the<br>end\-of\-session banner, Listen's information, the BPM recommendation and the Replay ready card appear\. The<br>practice wheel ticks once per pattern it passes \(PatternWheelTicks\), while dragging and while settling\.<br>The iPhone controller sets its own action from CompanionViewModel: its keypad and Unpair click \(button<br>sound only, no music, default volume\) except while the iPad has a session playing \(decision 20\)\.
 - Latency calibration: CalibrationState: idle, instructions, measuring\(n/total\), computing,<br>done\(offsetMs\), failed\. The app plays a beat, the user swipes along on the iPhone, the app collects<br>samples \(8 \[Assumption\]\), takes the median difference between strum and beat as the offset, and<br>discards outliers\. Network delay is already removed by the clock offset \(§3\.2\.3\), so this measures<br>audio output delay \(for example Bluetooth headphones\) and the player's perception\. The offset is<br>saved in SettingsStore and used by TimingJudge\. When it appears \(manual only, or also on first<br>launch\) is still undecided\.
 
 ## 4\. Alternatives considered
 
 ### 4\.1 Judging up vs down strokes
 
-Not required\. The feedback is about timing only\. With the companion controller the direction is known<br>exactly from the swipe, so it is cheap to add later as an optional rule in TimingJudge if the team<br>wants it\. It stays out of the MVP\.
+Adopted \(decision 18, replacing decision 14\)\. With the companion controller \(and the on\-iPad swipe<br>input used before it\) the direction is known exactly from the swipe, so TimingJudge checks it: a<br>wrong\-direction strum in a step's window is a Miss\. There is still no "wrong direction" result;<br>the three results stay Perfect, Too Early and Miss\.
 
 ### 4\.2 Microphone input instead of a companion controller
 
@@ -338,7 +420,7 @@ StrumMeng/                         app target
 ├── Core/
 │   ├── Models/                    domain models and shared contracts
 │   ├── Services/
-│   │   ├── Audio/                 BeatClock, Metronome, PatternPlayer
+│   │   ├── Audio/                 BeatClock, Metronome, PatternPlayer, MenuSoundService
 │   │   ├── Connectivity/          ControllerLink, transports, clock sync, de-duplication
 │   │   ├── Practice/              TimingJudge, FeedbackEngine, SessionResultBuilder
 │   │   └── Settings/              SettingsStore
@@ -387,7 +469,7 @@ Tests must pass before a PR is merged\. Dependencies \(controller link, clock, r
 | --- | --- |
 | reduce functions \(all state machines\) | Unit tests for every transition, including illegal ones being ignored and pause then resume then finish |
 | TimingJudge | On\-time, early, no onset, late onset \(Miss\), double onset, positive and negative latency offset |
-| SessionResult | Accuracy, counts, empty beat list \(no divide\-by\-zero\) |
+| SessionResult | Accuracy \(half a point for Too Early, extra strums as Miss\), counts, empty beat list \(no divide\-by\-zero\) |
 | RecommendationPolicy | Boundaries 50, 51, 65, 66, 85, 86, and BPM at the min/max clamp |
 | SessionRepository | Save, fetch, ordering by accuracy, against an in\-memory ModelContainer |
 | ControllerLink | Host\-clock conversion, duplicate packets, ordering, reconnects, and state changes |
@@ -413,7 +495,7 @@ Accepted risk: users with colour\-vision deficiency may find it hard to tell res
 | 4 | ToleranceConfig values | Perfect and early windows must be tuned on a real iPad with a real guitar\. |
 | 5 | Recommendation BPM deltas | Placeholders \(20 / 10 / 0 / \+10\)\. Tune after testing with users\. |
 | 6 | Latency calibration behaviour | Manual only or also on first launch; how many samples; what happens if it fails\. |
-| 7 | Session length and BPM range | 1 minute and 40…120 are assumptions\. |
+| 7 | Session length and BPM range | Resolved: 10 pattern repetitions per session and 60…120 BPM\. |
 | 8 | Connection indicator placement | On Ready, on Play, or both\. |
 | 9 | Xcode / Swift version and language mode | Needed to settle strict concurrency and testing framework\. |
 
@@ -436,9 +518,18 @@ Accepted risk: users with colour\-vision deficiency may find it hard to tell res
 | 11 | Where do settings live? | UserDefaults behind SettingsStore\. |
 | 12 | Is latency calibration in the MVP? | Yes, inside Option\. |
 | 13 | Is the Guidebook in the MVP? | Yes, three pages\. |
-| 14 | Do we detect strum direction? | No for the MVP\. Timing only\. |
+| 14 | Do we detect strum direction? | Superseded by 18\. \(Was: no for the MVP, timing only\.\) |
 | 15 | Who reviews pull requests? | One reviewer\. UI PRs: Ce Gefo\. Code PRs: Axel\. |
 | 16 | Which test framework? | XCTest for now\. May move to Swift Testing if the whole team is on Xcode 16\+\. |
+| 17 | How long is a Practice session? | Repeat the selected pattern 10 times; calculate duration from its beat count and selected BPM\. |
+| 18 | Is strum direction judged? | Yes\. Each step must be strummed in its direction; a wrong\-direction strum inside the step's window makes it a Miss immediately, even if a right one follows\. Results stay Perfect, Too Early, Miss\. |
+| 19 | Where is the iPhone set up? | From Option, on its own Set Up Device screen: Home has no free slot in the hi\-fi\. The iPhone holds portrait and strums with left and right swipes\. |
+| 20 | Does the iPhone make sound? | Only outside a session, so swiping there feels like a guitar\. From the count\-in on, the sound comes from the iPad alone and the iPhone cuts anything still ringing\. The metronome stays on the iPad\. |
+| 21 | What do the Option volume sliders control? | Music sets the menu background music \(SettingsStore\.soundVolume, which first meant the metronome volume\); Sound Effects sets the button click\. The music pauses on Listen, Play and Replay, so the metronome and guitar are heard clearly; it plays again on the Practice and Showtime summaries\. Changes the meaning of a shared contract value: needs team agreement\. |
+| 22 | Can the player jump around in Replay? | Yes: the progress bar can be tapped or dragged to any point\. Colours are never re\-judged\. No speed control: dragging the bar is enough\. |
+| 23 | How is accuracy scored? | Team decision \(2026\-11\-10\): Perfect = 1 point, Too Early = half a point, Miss = 0\. A strum that judges no node \(a swipe on a rest, or a second swipe for one node\) is an extra strum and counts as a Miss, raising the divider: accuracy = \(Perfect \+ 0\.5 × Too Early\) / \(nodes \+ extra strums\)\. Count\-in strums and the break after the last node are free\. |
+| 24 | What does Replay play? | Every swipe of the session at its recorded time and direction, including wrong and extra ones, so the player hears exactly what they played\. Stored as SessionResult\.strums \(schema V2\)\. |
+| 25 | How do Views play UI sounds? | Through one SoundEffectAction in the SwiftUI environment \(like openURL\), set by AppContainer, instead of passing MenuSoundService into every view model\. Clicks, the garage, page turns, pop\-ups and wheel ticks are presentation with no state for a view model to own, and the button styles can click on their own, so new buttons click without extra code\. A narrow exception to "Views never talk to services": the View sees only the action, never the service\. |
 
 ## 11\. Suggested implementation order
 
@@ -473,3 +564,70 @@ The riskiest piece \(link latency and reliability in the real environment\) is m
 - Not configured yet: CI, SwiftLint, SwiftFormat\. Follow the style rules in CLAUDE\.md manually until<br>tooling exists\.
 
 This document is the design reference\. CLAUDE\.md at the repository root is the companion that turns it<br>into day\-to\-day working rules for anyone, human or Claude, writing code here\.
+
+
+### US3: first Play instructions after Ready
+After a full Listen loop, Ready stops the example and checks whether any saved
+session exists. SwiftDataSessionRepository implements the additive read-only
+SessionHistoryChecking capability; SessionRepository's shared contract is unchanged.
+The query has no pattern/song filter, so any saved record skips the introduction.
+An empty history shows positioning and feedback instructions until Next is tapped;
+Next routes to the existing Play/count-in with the same pattern and BPM. No record
+or permanent onboarding flag is written here: abandoning a first session means the
+instructions will appear again while history is empty. History failures offer retry
+and Back instead of treating a storage error as an empty history.
+FirstPlayInstructionsLayout lives alongside FirstPlayInstructionsView in the same
+Swift file so its values can be adjusted while viewing the Canvas. It uses the
+designer’s 2_Guidance artwork. The normal/pressed
+Next button is independently interactive and anchored to the artwork’s bottom-right,
+with insets accounting for its transparent margins.
+The history task is cancelled on leaving Listen and ignores results after cancellation.
+
+### US10: first-launch pairing invitation
+On the iPad host, Home waits 1.5 seconds on the first launch, then presents Meng
+using the shared ListenInformationEntrance animation and Listen illustration assets.
+The welcome remains visible until Next is tapped; taps outside the button do not
+dismiss it. Next asks AppRouter to open the existing deviceSetup route directly.
+Home input is blocked during the introduction. Backgrounding, leaving Home or opening another Home overlay
+cancels the pending presentation; returning starts the appearance delay again.
+PairingIntroductionViewModel owns a pure state reducer and a cancellable task.
+PairingIntroductionStore persists only whether the invitation led to setup; it does
+not claim that pairing succeeded. This separate protocol leaves SettingsStore and
+PairCodeStore contracts intact. Future launches retain Option → Set Up Device.
+The iPhone's existing companion entry flow is unchanged. Preview containers disable
+the invitation so Canvas cannot mutate the persisted first-launch flag.
+
+
+### US7: Home guidance after device setup
+Closing Set Up Device through Back or connected Done schedules the once-only Home
+guidance before the router returns. Pairing success is not required: Option appears
+first, then Guidebook. Unconnected Done keeps setup open without scheduling the tour.
+HomeGuidanceStore persists the pending handoff and ignores scheduling after completion.
+
+
+### US12: Showtime session prototype (scope extension, November 2026)
+The user explicitly authorizes Showtime on this branch, superseding the earlier
+MVP exclusion for this work. See US12_SHOWTIME.md for implemented versus dummy parts.
+SongCatalog isolates sample arrangements. SongDemoPlayer previews individual strumming
+patterns using Practice’s C-chord guitar; Ready activates after every required pattern
+has been heard for a full loop. The disabled Ready artwork remains visible beforehand.
+A pattern selector replaces song duration in Listen, without showing chord labels.
+SongPatternChange and SongChordChange share the song-slot grid. The shared Practice engine
+handles real iPhone timing/direction feedback and disconnects. Reusable session code
+is in Core/Services/Practice/Session; reusable lane/countdown/pause views are in
+Core/DesignSystem/Play, so Features do not depend on one another. The builder adopts
+the owner's backward-compatible songID: String? = nil parameter. AppContainer supplies
+song.id to the shared engine, which passes it directly to SessionResultBuilder; the
+Showtime coordinator no longer copies results to attach identity. Practice retains nil.
+SessionResult and connectivity contracts are unchanged. Showtime results are in memory only; chord synthesis
+and persistent song/visitor-request integration remain owned by parallel work.
+
+
+## Session connection recovery
+
+The disconnected modal offers Resume (disabled until connected) and Set Up Device.
+AppRouter presents the existing device setup view as a full-screen overlay above the current
+navigation stack. This preserves the session ViewModel, paused beat position and preview state;
+it does not trigger session disappearance or stop the shared controller link. Back or Done closes
+only this overlay. Pairing does not resume playback automatically: the player presses Resume.
+Normal Option/onboarding setup continues to use its existing navigation route and Home tour.

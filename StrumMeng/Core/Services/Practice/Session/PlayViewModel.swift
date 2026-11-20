@@ -1,0 +1,752 @@
+import Foundation
+import Observation
+
+/// The game loop of one practice session: Ready, 3-2-1 count-in, play, judge, finish.
+///
+/// BeatClock ticks (one per pattern step, delivered on time) drive the session; strums come from
+/// StrumInputService (on-screen swipes, or the iPhone controller link). FeedbackEngine turns them into BeatEvents the moment each result is final,
+/// and the screen shows them on the nodes. Every position on screen is derived from the clock's
+/// tick times, so the visuals cannot drift from the beat.
+@Observable
+final class PlayViewModel {
+    /// 3-2-1 on quarter notes = 6 steps before the first step of the session.
+    static let countInSteps = 6
+    /// How long to wait for an iPhone strum still on its way over Wi-Fi before closing a window.
+    /// Strums are judged by touch time, but a window closed before the strum arrives would
+    /// already be a Miss. Must stay well below one step (250 ms at 120 BPM).
+    static let controllerStrumArrivalGrace: TimeInterval = 0.15
+
+    /// Default lead-in steps between countdown completion and the first beat, so nodes glide
+    /// in from the right edge and arrive in the hit ring exactly on step 0. Always an even number of
+    /// steps (quarter notes) to keep metronome clicks in musical sync.
+    static func defaultLeadInSteps(bpm: Int) -> Int {
+        let slot = AudioBeatClock.stepInterval(bpm: bpm)
+        let quarters = max(1, Int((PlayScreenLayout.designReadyLeadTime / (slot * 2)).rounded()))
+        return quarters * 2
+    }
+
+    let pattern: StrumPattern
+    let bpm: Int
+    let songID: String?
+
+    /// Integration hooks let another session coordinator observe the shared engine without UI.
+    @ObservationIgnored var onStateChanged: ((PracticeState) -> Void)?
+    @ObservationIgnored var onConnectionChanged: ((Bool) -> Void)?
+    private(set) var state: PracticeState = .ready {
+        didSet { if oldValue != state { onStateChanged?(state) } }
+    }
+    private(set) var beatEvents: [BeatEvent] = []
+    /// Always true without a controller. With one, a session only starts or resumes while it is true.
+    private(set) var isControllerConnected = false {
+        didSet { if oldValue != isControllerConnected { onConnectionChanged?(isControllerConnected) } }
+    }
+
+    var isAnimating: Bool {
+        switch state {
+        case .countIn, .playing: true
+        case .finished: isWrappingUp
+        default: false
+        }
+    }
+
+    @ObservationIgnored private let clock: BeatClock
+    @ObservationIgnored private let input: StrumInputService
+    @ObservationIgnored private let touchInput: TouchStrumInput?
+    @ObservationIgnored private let controller: ControllerLink?
+    @ObservationIgnored private let guitar: (any GuitarSound)?
+    @ObservationIgnored private let metronome: (any MetronomeSound)?
+    @ObservationIgnored private let requiresController: Bool
+    /// Whether the current session started with the controller connected; only such a session
+    /// pauses when the controller drops.
+    @ObservationIgnored private var sessionUsesController = false
+    /// Whether the clock has started for the current session. Ready tapped before the iPhone
+    /// connected waits as disconnected without starting it, so Resume must start it fresh.
+    @ObservationIgnored private var hasStartedClock = false
+    /// The link has told this screen at least once whether the iPhone is connected. It sends its
+    /// current state right after onAppear subscribes, but asynchronously.
+    @ObservationIgnored private var hasConnectionState = false
+    /// Ready tapped before that first state (Listen's Ready opens Play and taps it at once): it
+    /// waits for the state instead of calling the iPhone missing.
+    @ObservationIgnored private var isReadyWaitingForConnectionState = false
+    /// The iPhone was told the iPad left in the middle of this session.
+    @ObservationIgnored private var isHostAway = false
+    @ObservationIgnored private let tolerance: ToleranceConfig
+    @ObservationIgnored private let latencyOffset: TimeInterval
+    @ObservationIgnored private let strumArrivalGrace: TimeInterval
+    @ObservationIgnored private let now: () -> TimeInterval
+    @ObservationIgnored private let waitUntil: (TimeInterval) async -> Void
+    @ObservationIgnored private let makeID: () -> UUID
+    @ObservationIgnored private let currentDate: () -> Date
+    @ObservationIgnored private let onFinished: (SessionResult) -> Void
+    @ObservationIgnored private let onExit: () -> Void
+    @ObservationIgnored private let onBackToListen: () -> Void
+    @ObservationIgnored private let onSetUpDevice: () -> Void
+    @ObservationIgnored private let finishesAtDurationBoundary: Bool
+    @ObservationIgnored private var endBoundaryReached = false
+    @ObservationIgnored private let finishBreak: TimeInterval
+    /// The chord each step sounds when strummed (Showtime); empty = every strum is C (Practice).
+    @ObservationIgnored private let stepChords: [GuitarChord]
+    /// The song's recording under the session (Showtime); nil in Practice.
+    @ObservationIgnored private let backingTrack: (any SongBackingTrack)?
+    @ObservationIgnored private var prepareTask: Task<Void, Never>?
+
+    @ObservationIgnored let stepInterval: TimeInterval
+    @ObservationIgnored let totalSteps: Int
+    @ObservationIgnored let leadInSteps: Int
+    @ObservationIgnored let leadInTime: TimeInterval
+    @ObservationIgnored private let duration: TimeInterval
+    @ObservationIgnored private let laneNodes: [PlayLaneNode]
+
+    @ObservationIgnored private var engine: FeedbackEngine
+    /// Session time (seconds after step 0) at which each step's result appeared, for the animation.
+    @ObservationIgnored private var judgedAt: [Int: TimeInterval] = [:]
+    /// Clock tick index of the first count-in tick of the current count-in.
+    @ObservationIgnored private var countInFirstIndex: Int?
+    /// Expected time of the first count-in tick, for smooth beat progress animations.
+    @ObservationIgnored private var countInStartTime: TimeInterval?
+    /// tick index - step index, fixed at each count-in (it shifts after a resume).
+    @ObservationIgnored private var stepOffset = countInSteps
+    /// The step the next count-in leads into: 0 at the start, the first unjudged step after a pause.
+    @ObservationIgnored private var resumeStep = 0
+    @ObservationIgnored private var nextStep = 0
+    /// Host time at which step 0 sits in the hit ring under the current mapping.
+    @ObservationIgnored private var anchorTime: TimeInterval?
+    /// Session time frozen while paused or finished.
+    @ObservationIgnored private var frozenSongTime: TimeInterval?
+    /// Exact song time at the moment pause was tapped, so resume continues with zero jump.
+    @ObservationIgnored private var pausedSongTime: TimeInterval?
+    /// Difference between pausedSongTime and (resumeStep * stepInterval), so songTime continues smoothly.
+    @ObservationIgnored private var resumeTimeOffset: TimeInterval = 0
+    /// Session time of the latest swipe in a running session, judged or not (the ring reacts to it).
+    @ObservationIgnored private var lastStrumSongTime: TimeInterval?
+    /// Session time of the latest extra swipe, which turns the ring the Miss colour.
+    @ObservationIgnored private var lastExtraStrumSongTime: TimeInterval?
+    /// Every swipe of the running session at its session time, for the result and Replay.
+    @ObservationIgnored private var sessionStrums: [(id: UUID, time: TimeInterval, direction: StrumDirection)] = []
+
+    @ObservationIgnored private var tickTask: Task<Void, Never>?
+    @ObservationIgnored private var strumTask: Task<Void, Never>?
+    @ObservationIgnored private var windowTask: Task<Void, Never>?
+    @ObservationIgnored private var controllerTask: Task<Void, Never>?
+    @ObservationIgnored private var finishTask: Task<Void, Never>?
+    /// True during the break after the last beat: the session is finished but the lane still moves.
+    private(set) var isWrappingUp = false
+
+    /// - Parameters:
+    ///   - controller: the iPhone link when it is the strum source. The view model tells it when a
+    ///     session is running and pauses when it disconnects. Pass the same link as `input` (or
+    ///     merged into it).
+    ///   - requiresController: true when the controller is the only input, so Ready and Resume
+    ///     wait for it. False when on-screen swipes work too: the player may start without the
+    ///     iPhone, and only a session started with it pauses when it drops.
+    ///   - songID: Showtime song identity, passed to the shared result builder; nil for Practice.
+    ///   - guitar: sounds every swipe, in or out of a session, like a real guitar.
+    ///   - metronome: clicks on every quarter note while counting in and playing.
+    ///   - strumArrivalGrace: extra time a window stays open for strums that arrive late (network
+    ///     delay); 0 for on-screen swipes, controllerStrumArrivalGrace for the iPhone.
+    ///   - repetitions: how many times the pattern repeats (PracticeSessionConfig).
+    ///   - stepChords: the chord of every step, so each strum sounds the chord at its place in the
+    ///     song (Showtime). Empty: every strum is C, as Practice never asks for a chord.
+    ///   - backingTrack: the song's recording, started with the count-in so its first beat meets
+    ///     step 0, and stopped on pause, restart and leaving (Showtime).
+    ///   - latencyOffset: from calibration (SettingsStore, later); applied only inside TimingJudge.
+    ///   - now: the host clock.
+    ///   - waitUntil: suspends until a host-clock time; injected so tests control time.
+    init(pattern: StrumPattern,
+         bpm: Int,
+         songID: String? = nil,
+         clock: BeatClock,
+         input: StrumInputService,
+         touchInput: TouchStrumInput?,
+         controller: ControllerLink? = nil,
+         knownControllerConnection: Bool? = nil,
+         requiresController: Bool = true,
+         guitar: (any GuitarSound)? = nil,
+         metronome: (any MetronomeSound)? = nil,
+         tolerance: ToleranceConfig = .standard,
+         latencyOffset: TimeInterval = 0,
+         strumArrivalGrace: TimeInterval = 0,
+         leadInSteps: Int? = nil,
+         repetitions: Int = PracticeSessionConfig.patternRepetitions,
+         finishBreak: TimeInterval = PlayViewModel.finishBreak,
+         finishesAtDurationBoundary: Bool = false,
+         stepChords: [GuitarChord] = [],
+         backingTrack: (any SongBackingTrack)? = nil,
+         now: @escaping () -> TimeInterval,
+         waitUntil: @escaping (TimeInterval) async -> Void,
+         makeID: @escaping () -> UUID = UUID.init,
+         currentDate: @escaping () -> Date = Date.init,
+         onFinished: @escaping (SessionResult) -> Void = { _ in },
+         onExit: @escaping () -> Void = {},
+         onBackToListen: @escaping () -> Void = {},
+         onSetUpDevice: @escaping () -> Void = {}) {
+        self.pattern = pattern
+        self.bpm = bpm
+        self.songID = songID
+        self.clock = clock
+        self.input = input
+        self.touchInput = touchInput
+        self.controller = controller
+        self.requiresController = requiresController
+        self.guitar = guitar
+        self.metronome = metronome
+        isControllerConnected = controller == nil
+        // Practice comes from Listen, which already waited for the iPhone: start from what the link
+        // last said, so Ready counts in at once instead of waiting for the first state.
+        if controller != nil, let knownControllerConnection {
+            isControllerConnected = knownControllerConnection
+            hasConnectionState = true
+        }
+        self.tolerance = tolerance
+        self.latencyOffset = latencyOffset
+        self.strumArrivalGrace = strumArrivalGrace
+        self.now = now
+        self.waitUntil = waitUntil
+        self.makeID = makeID
+        self.currentDate = currentDate
+        self.onFinished = onFinished
+        self.onExit = onExit
+        self.onBackToListen = onBackToListen
+        self.onSetUpDevice = onSetUpDevice
+        self.finishBreak = finishBreak
+        self.finishesAtDurationBoundary = finishesAtDurationBoundary
+        self.stepChords = stepChords
+        self.backingTrack = backingTrack
+
+        stepInterval = AudioBeatClock.stepInterval(bpm: bpm)
+        totalSteps = pattern.strokes.count * max(1, repetitions)
+        duration = Double(totalSteps) * stepInterval
+        let steps = leadInSteps ?? Self.defaultLeadInSteps(bpm: bpm)
+        self.leadInSteps = steps
+        self.leadInTime = Double(steps) * stepInterval
+        stepOffset = Self.countInSteps + steps
+        laneNodes = PlayTimeline.makeNodes(pattern: pattern.strokes.map(Self.arrow(for:)),
+                                           slotInterval: stepInterval, duration: duration)
+        engine = FeedbackEngine(config: tolerance, latencyOffset: latencyOffset, stepInterval: stepInterval)
+    }
+
+    /// Recovery keeps the clock, feedback and lane paused until the player explicitly resumes.
+    func requestDeviceSetup() {
+        guard state == .disconnected else { return }
+        onSetUpDevice()
+    }
+
+    // MARK: Lifecycle
+
+    /// The iPad app went to the background. In the middle of a session (already paused by then)
+    /// the iPhone is told, so it can show that the iPad is gone instead of a dead strum pad.
+    func appEnteredBackground() async {
+        guard isSessionInProgress, !isHostAway else { return }
+        isHostAway = true
+        await controller?.setHostAway(true)
+    }
+
+    /// The iPad app is in front again: the iPhone sees it back once its pings are answered.
+    func appBecameActive() async {
+        guard isHostAway else { return }
+        isHostAway = false
+        await controller?.setHostAway(false)
+    }
+
+    /// A session that has started and not ended: counting in, playing, or stopped part-way.
+    private var isSessionInProgress: Bool {
+        guard hasStartedClock else { return false }
+        switch state {
+        case .countIn, .playing, .paused, .disconnected: return true
+        default: return false
+        }
+    }
+
+    func onAppear() {
+        tickTask?.cancel()
+        strumTask?.cancel()
+        let ticks = clock.beatStream
+        let strums = input.strums
+        tickTask = Task { [weak self] in
+            for await tick in ticks { self?.handle(tick) }
+        }
+        strumTask = Task { [weak self] in
+            for await strum in strums { self?.handle(strum) }
+        }
+        // The song's chords are synthesised before the first strum, so a chord change never waits.
+        var chords: [GuitarChord] = []
+        for chord in stepChords where !chords.contains(chord) { chords.append(chord) }
+        if !chords.isEmpty, let guitar {
+            prepareTask?.cancel()
+            prepareTask = Task { await guitar.prepare(chords: chords) }
+        }
+        if let songID {
+            let strokes = (0..<totalSteps).map { pattern.strokes[$0 % pattern.strokes.count] }
+            backingTrack?.prepare(songID: songID,
+                                  ending: SongBackingTrackEnding.forChart(strokes: strokes,
+                                                                          stepInterval: stepInterval))
+        }
+        controllerTask?.cancel()
+        if let states = controller?.connectionStates {
+            controllerTask = Task { [weak self] in
+                for await connection in states { await self?.handle(connection) }
+            }
+        }
+    }
+
+    /// Leaving the screen discards an unfinished session and stops every task.
+    func onDisappear() async {
+        [tickTask, strumTask, windowTask, controllerTask, finishTask, prepareTask].forEach { $0?.cancel() }
+        isWrappingUp = false
+        backingTrack?.stop()
+        metronome?.cancelClicks()
+        await clock.stop()
+        await controller?.setSessionActive(false)
+        // Leaving the screen ends the session, so the iPad must not stay "away" for the iPhone.
+        await appBecameActive()
+    }
+
+    /// Stops any active or paused gameplay session and restores `.ready` so Showtime can return
+    /// to Listen and start a fresh run when Ready is tapped again.
+    func resetToReady() async {
+        isReadyWaitingForConnectionState = false
+        sessionUsesController = false
+        isWrappingUp = false
+        finishTask?.cancel()
+        backingTrack?.stop()
+        metronome?.cancelClicks()
+        await clock.stop()
+        await controller?.setSessionActive(false)
+        resetSession()
+        state = .ready
+    }
+
+    // MARK: Events from the View
+
+    func send(_ event: PracticeEvent) async {
+        let previous = state
+        let next = reduce(previous, event)
+        guard next != previous else { return }
+        // Counting in without the only input connected would only collect Misses. A session the
+        // iPhone dropped out of waits for it, even when on-screen swipes could carry on.
+        if case .countIn = next, requiresController || previous == .disconnected,
+           !isControllerConnected {
+            guard previous == .ready else { return }
+            if controller != nil, !hasConnectionState {
+                isReadyWaitingForConnectionState = true
+                return
+            }
+            // Ready without the iPhone shows why nothing starts, and Resume once it connects.
+            state = reduce(previous, .readyWithoutController)
+            return
+        }
+        state = next
+        if case .countIn = state {
+            sessionUsesController = controller != nil && isControllerConnected
+        }
+
+        switch (event, state) {
+        case (.tapReady, .countIn), (.tapRestart, .countIn):
+            await startSession()
+        case (.tapResume, .countIn) where !hasStartedClock:
+            // Ready was tapped before the iPhone connected: nothing has run yet.
+            await startSession()
+        case (.tapResume, .countIn):
+            countInFirstIndex = nil
+            await controller?.setSessionActive(true)
+            await clock.resume()
+        case (_, .paused):
+            freezePausedTimeIfNeeded()
+            await controller?.setSessionActive(false)
+            await pause()
+        case (_, .disconnected):
+            // From the pause menu the session is already stopped.
+            guard previous != .paused else { break }
+            freezePausedTimeIfNeeded()
+            await controller?.setSessionActive(false)
+            await pause()
+        case (.tapRestart, .ready):
+            backingTrack?.stop()
+            resetSession()
+        case (.tapBackToMenu, .idle):
+            backingTrack?.stop()
+            metronome?.cancelClicks()
+            resetSession()
+            await clock.stop()
+            onExit()
+        case (.tapBackToListen, .idle):
+            backingTrack?.stop()
+            metronome?.cancelClicks()
+            resetSession()
+            await clock.stop()
+            onBackToListen()
+        default:
+            break
+        }
+    }
+
+    /// The longest believable gap between a touch and its handling. A bigger (or negative) gap means
+    /// the event timestamp is not on the wall clock, so it is ignored rather than trusted.
+    static let maxTouchDelay: TimeInterval = 0.1
+
+    /// After the last beat the nodes keep sliding for this long before Summary opens, so the
+    /// session does not stop dead.
+    static let finishBreak: TimeInterval = 2
+
+    /// - Parameter eventDate: the touch event's own timestamp. When it is plausible, it is turned into
+    ///   host-clock time so a strum keeps its real time even if the main thread handled it a little
+    ///   late; otherwise the strum is timed now.
+    func dragChanged(translation: Double, eventDate: Date) {
+        let delay = currentDate().timeIntervalSince(eventDate)
+        let usable = (0...Self.maxTouchDelay).contains(delay) ? delay : 0
+        touchInput?.dragChanged(translation: translation, at: now() - usable)
+    }
+
+    func dragEnded() {
+        touchInput?.dragEnded()
+    }
+
+    // MARK: Inputs from services (internal so tests can drive them directly)
+
+    func handle(_ tick: BeatTick) {
+        switch state {
+        case .countIn:
+            let first = countInFirstIndex ?? tick.index
+            let lead = resumeStep == 0 ? leadInSteps : 0
+            if countInFirstIndex == nil {
+                countInFirstIndex = first
+                countInStartTime = tick.expectedTime
+                stepOffset = first + Self.countInSteps + lead - resumeStep
+                // Nothing scheduled the first count-in click ahead of time.
+                scheduleClick(forStep: tick.index - stepOffset, at: tick.expectedTime)
+                // The count-in ends at this song time: the lead-in before step 0, or where it paused.
+                backingTrack?.play(fromSongTime: pausedSongTime ?? -leadInTime,
+                                   atHostTime: tick.expectedTime + Double(Self.countInSteps) * stepInterval)
+            }
+            scheduleClick(forStep: tick.index + 1 - stepOffset, at: tick.expectedTime + stepInterval)
+            anchorTime = tick.expectedTime - Double(tick.index - stepOffset) * stepInterval
+            let position = tick.index - first
+            if position < Self.countInSteps {
+                if position > 0, position.isMultiple(of: 2) {
+                    state = reduce(state, .countInTick)
+                }
+                return
+            }
+            if let pausedTime = pausedSongTime {
+                anchorTime = tick.expectedTime - pausedTime
+                resumeTimeOffset = pausedTime - Double(resumeStep) * stepInterval
+            }
+            frozenSongTime = nil
+            pausedSongTime = nil
+            countInStartTime = nil
+            state = reduce(state, .countInDone)
+            playStep(tick)
+        case .playing:
+            scheduleClick(forStep: tick.index + 1 - stepOffset, at: tick.expectedTime + stepInterval)
+            anchorTime = tick.expectedTime - (Double(tick.index - stepOffset) * stepInterval + resumeTimeOffset)
+            playStep(tick)
+        default:
+            break
+        }
+    }
+
+    /// Strums count during the count-in too, because the first beat's early window starts before
+    /// step 0. Outside a running session they are ignored, not judged.
+    func handle(_ strum: StrumEvent) {
+        // Heard straight away, whether or not it is judged, as the chord at its place in the song.
+        guitar?.strum(strum.direction, chord: chord(for: strum), at: nil, accent: 1)
+        switch state {
+        case .countIn, .playing:
+            // The ring reacts when the strum arrives, not at its touch time: an iPhone strum can
+            // arrive after the short pulse would already be over, so it would look undetected.
+            // Judging still uses the touch time.
+            if anchorTime != nil { lastStrumSongTime = currentSongTime() }
+            if isExtra(strum) { lastExtraStrumSongTime = currentSongTime() }
+            record(strum)
+            apply(engine.addStrum(strum))
+            finishIfDone()
+        default:
+            break
+        }
+    }
+
+    /// A controller that stops being connected while counting in, playing or paused stops the
+    /// session as `.disconnected`, instead of judging the strums it can no longer send as Miss.
+    func handle(_ connection: ControllerConnectionState) async {
+        hasConnectionState = true
+        if case .connected = connection {
+            // Arrives with every ping; only a real change should notify observers.
+            if !isControllerConnected { isControllerConnected = true }
+            await sendWaitingReady()
+            return
+        }
+        isControllerConnected = false
+        await sendWaitingReady()
+        // A session played on the iPad screen alone carries on without the iPhone.
+        guard requiresController || sessionUsesController else { return }
+        await send(.controllerDisconnected)
+    }
+
+    /// Ready tapped before the first connection state: now it counts in, or waits as disconnected.
+    private func sendWaitingReady() async {
+        guard isReadyWaitingForConnectionState else { return }
+        isReadyWaitingForConnectionState = false
+        await send(.tapReady)
+    }
+
+    /// Judges every beat whose window ended before `time`, minus the arrival grace: a strum
+    /// touched inside a window may still be on its way.
+    func closeWindows(upTo time: TimeInterval) {
+        apply(engine.close(upTo: time - strumArrivalGrace))
+        finishIfDone()
+    }
+
+    // MARK: Screen
+
+    /// Everything the Play screen draws right now.
+    func screenModel() -> PlayScreenModel {
+        let songTime = currentSongTime()
+        var nodes = laneNodes
+        var last: PlayJudgement?
+        for event in beatEvents where nodes.indices.contains(event.stepIndex) {
+            let judgement = PlayJudgement(feedback: PlayFeedback(event.result),
+                                          time: judgedAt[event.stepIndex] ?? songTime)
+            nodes[event.stepIndex].judgement = judgement
+            if judgement.time <= songTime, judgement.time > last?.time ?? -.infinity {
+                last = judgement
+            }
+        }
+        // An extra swipe judges no node, so it shows on the ring alone.
+        if let extra = lastExtraStrumSongTime, extra <= songTime, extra > last?.time ?? -.infinity {
+            last = PlayJudgement(feedback: .miss, time: extra)
+        }
+        return PlayScreenModel(title: pattern.name, bpm: bpm, duration: duration,
+                               slotInterval: stepInterval, songTime: songTime, phase: phase,
+                               nodes: nodes, lastJudgement: last, lastStrumTime: lastStrumSongTime,
+                               readyLeadTime: leadInTime, leadInSlots: leadInSteps,
+                               countInBeatProgress: currentCountInBeatProgress())
+    }
+
+    private func currentCountInBeatProgress() -> Double? {
+        guard case .countIn = state, let startTime = countInStartTime else { return nil }
+        let quarter = stepInterval * 2
+        guard quarter > 0 else { return 1 }
+        let elapsed = max(0, now() - startTime)
+        let intoBeat = elapsed.truncatingRemainder(dividingBy: quarter)
+        return min(1, max(0, intoBeat / quarter))
+    }
+
+    private var phase: PlayScreenPhase {
+        switch state {
+        case .idle, .listening, .ready: .ready
+        case .countIn(let n): .countIn(n)
+        case .playing, .finished: .playing
+        case .paused: .paused
+        case .disconnected: .disconnected(isReconnected: isControllerConnected)
+        }
+    }
+
+    private func currentSongTime() -> TimeInterval {
+        if let frozenSongTime { return frozenSongTime }
+        if let anchorTime { return now() - anchorTime }
+        return -Double(Self.countInSteps + leadInSteps) * stepInterval
+    }
+
+    // MARK: Game loop
+
+    private func playStep(_ tick: BeatTick) {
+        let step = tick.index - stepOffset
+        guard step >= 0 else { return }
+        apply(engine.close(upTo: tick.expectedTime - strumArrivalGrace))
+        if step < totalSteps {
+            nextStep = step + 1
+            if let direction = Self.direction(for: pattern.strokes[step % pattern.strokes.count]) {
+                let expected = anchorTime.map { $0 + Double(step) * stepInterval } ?? tick.expectedTime
+                apply(engine.addBeat(BeatTarget(index: step, expectedTime: expected,
+                                                direction: direction)))
+            }
+            armWindowTimer()
+        } else {
+            nextStep = totalSteps
+            endBoundaryReached = true
+        }
+        finishIfDone()
+    }
+
+    /// Clicks are scheduled one step ahead (the tick before), so they sound exactly on time. They
+    /// fall on quarter notes (even steps; the count-in's are negative) up to the end of the session,
+    /// and the first beat of each bar is accented.
+    private func scheduleClick(forStep step: Int, at time: TimeInterval) {
+        guard let metronome, step < totalSteps, step.isMultiple(of: 2) else { return }
+        metronome.click(at: time, accent: step >= 0 && step.isMultiple(of: pattern.strokes.count))
+    }
+
+    /// True when a swipe can judge no node: it is outside every node's window, or inside the window of
+    /// a node that is already judged. Decided when the swipe arrives, so the ring turns red at once;
+    /// FeedbackEngine lists the same swipe as extra a little later. Swipes before the next node's
+    /// window (the count-in, or the re-count after a pause) are free.
+    private func isExtra(_ strum: StrumEvent) -> Bool {
+        guard let anchorTime, let firstNode = nextNodeStep(from: resumeStep) else { return false }
+        let time = strum.time - latencyOffset - anchorTime
+        let (perfect, early) = tolerance.windows(stepInterval: stepInterval)
+        guard time >= Double(firstNode) * stepInterval - early else { return false }
+        let lowest = max(0, Int(((time - perfect) / stepInterval).rounded(.down)))
+        let highest = min(totalSteps - 1, Int(((time + early) / stepInterval).rounded(.up)))
+        guard lowest <= highest else { return true }
+        for step in lowest...highest where isNode(step) {
+            let beat = Double(step) * stepInterval
+            if time >= beat - early, time <= beat + perfect {
+                return beatEvents.contains { $0.stepIndex == step }
+            }
+        }
+        return true
+    }
+
+    private func isNode(_ step: Int) -> Bool {
+        Self.direction(for: pattern.strokes[step % pattern.strokes.count]) != nil
+    }
+
+    private func nextNodeStep(from step: Int) -> Int? {
+        guard step < totalSteps else { return nil }
+        return (step..<totalSteps).first(where: isNode)
+    }
+
+    /// Keeps a swipe for Replay at its session time (its touch time, not when it arrived). A resent
+    /// copy is kept once; a swipe before the count-in has a session time is skipped.
+    private func record(_ strum: StrumEvent) {
+        guard let anchorTime, !sessionStrums.contains(where: { $0.id == strum.id }) else { return }
+        sessionStrums.append((strum.id, strum.time - anchorTime, strum.direction))
+    }
+
+    private func apply(_ events: [BeatEvent]) {
+        guard !events.isEmpty else { return }
+        let songTime = currentSongTime()
+        for event in events {
+            judgedAt[event.stepIndex] = songTime
+        }
+        beatEvents.append(contentsOf: events)
+    }
+
+    /// Wakes up when the oldest open window closes, so a Too Early or Miss colour does not wait
+    /// for the next tick (which can be far away during rests).
+    private func armWindowTimer() {
+        windowTask?.cancel()
+        guard let deadline = engine.nextDeadline else { return }
+        windowTask = Task { [weak self, waitUntil, strumArrivalGrace] in
+            await waitUntil(deadline + strumArrivalGrace)
+            guard !Task.isCancelled, let self else { return }
+            self.closeWindows(upTo: self.now())
+            self.armWindowTimer()
+        }
+    }
+
+    private func finishIfDone() {
+        guard state == .playing, nextStep >= totalSteps, engine.openBeats.isEmpty,
+              !finishesAtDurationBoundary || endBoundaryReached else { return }
+        windowTask?.cancel()
+        metronome?.cancelClicks()
+        let extra = Set(engine.extraStrumIDs)
+        let strums = sessionStrums.map {
+            RecordedStrum(time: $0.time, direction: $0.direction, isExtra: extra.contains($0.id))
+        }
+        let result = SessionResultBuilder.build(id: makeID(), patternID: pattern.id, songID: songID, bpm: bpm,
+                                                beatEvents: beatEvents, strums: strums,
+                                                createdAt: currentDate())
+        // .finished from here on: strums in the break are ignored, not judged.
+        state = reduce(state, .sessionEnded(result))
+        Task { [clock, controller] in
+            await clock.stop()
+            await controller?.setSessionActive(false)
+        }
+        guard finishBreak > 0 else {
+            frozenSongTime = currentSongTime()
+            onFinished(result)
+            return
+        }
+        // The song time is not frozen yet, so the nodes keep sliding past the hit line.
+        isWrappingUp = true
+        finishTask = Task { [weak self, waitUntil, now, finishBreak] in
+            await waitUntil(now() + finishBreak)
+            guard !Task.isCancelled, let self else { return }
+            self.frozenSongTime = self.currentSongTime()
+            self.isWrappingUp = false
+            self.onFinished(result)
+        }
+    }
+
+    private func freezePausedTimeIfNeeded() {
+        guard frozenSongTime == nil else { return }
+        let time = currentSongTime()
+        frozenSongTime = time
+        pausedSongTime = time
+    }
+
+    private func pause() async {
+        freezePausedTimeIfNeeded()
+        windowTask?.cancel()
+        backingTrack?.stop()
+        metronome?.cancelClicks()
+        await clock.pause()
+        apply(engine.close(upTo: now() - strumArrivalGrace))
+        // Beats still open when the player paused are played again after the re-count.
+        let dropped = engine.discardOpenBeats()
+        resumeStep = dropped.first?.index ?? nextStep
+        nextStep = resumeStep
+        anchorTime = nil
+        countInFirstIndex = nil
+        countInStartTime = nil
+    }
+
+    private func startSession() async {
+        resetSession()
+        hasStartedClock = true
+        await controller?.setSessionActive(true)
+        await clock.start(bpm: bpm)
+    }
+
+    private func resetSession() {
+        hasStartedClock = false
+        windowTask?.cancel()
+        backingTrack?.stop()
+        engine = FeedbackEngine(config: tolerance, latencyOffset: latencyOffset, stepInterval: stepInterval)
+        beatEvents = []
+        endBoundaryReached = false
+        sessionStrums = []
+        judgedAt = [:]
+        countInFirstIndex = nil
+        countInStartTime = nil
+        stepOffset = Self.countInSteps + leadInSteps
+        resumeStep = 0
+        resumeTimeOffset = 0
+        nextStep = 0
+        anchorTime = nil
+        frozenSongTime = nil
+        pausedSongTime = nil
+        lastStrumSongTime = nil
+        lastExtraStrumSongTime = nil
+    }
+
+    /// The chord of the step nearest to the strum's touch time, so a strum slightly early for a new
+    /// chord already plays it. While paused or finished, the chord where the song stands; before
+    /// step 0 the first chord, after the last step the last one; C when the session has no chords.
+    private func chord(for strum: StrumEvent) -> GuitarChord {
+        guard let last = stepChords.indices.last else { return .c }
+        let songTime = frozenSongTime == nil && anchorTime != nil
+            ? strum.time - latencyOffset - (anchorTime ?? 0)
+            : currentSongTime()
+        let step = Int((songTime / stepInterval).rounded())
+        return stepChords[min(max(step, 0), last)]
+    }
+
+    /// The direction a step must be strummed in; nil for a rest, which is never judged.
+    private static func direction(for stroke: Stroke) -> StrumDirection? {
+        switch stroke {
+        case .down: .down
+        case .up: .up
+        case .rest: nil
+        }
+    }
+
+    nonisolated private static func arrow(for stroke: Stroke) -> BeatNodeView.Arrow? {
+        switch stroke {
+        case .down: .down
+        case .up: .up
+        case .rest: nil
+        }
+    }
+}

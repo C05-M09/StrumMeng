@@ -1,0 +1,415 @@
+//
+//  ReplayViewModel.swift
+//  StrumMeng
+//
+//  Created by Sharon Tan on 29/10/26.
+//
+
+import Foundation
+import Observation
+
+/// ViewModel untuk mengatur jalannya layar Replay (US4).
+///
+/// Tugas utama ViewModel ini:
+/// 1. Memutar ulang sesi latihan yang tersimpan dari `[BeatEvent]` di `SessionResult`.
+/// 2. Menjaga waktu pemutaran (`songTime`) secara akurat tanpa bergantung pada audio mic atau controller input.
+/// 3. Memunculkan feedback warna panah (`.perfect`, `.tooEarly`, `.miss`) pada node yang tepat di waktu yang tepat
+///    tanpa melakukan penilaian ulang (*no re-judging*).
+@MainActor
+@Observable
+final class ReplayViewModel {
+
+    // MARK: - State & Data Sesi
+
+    /// Status layar saat ini (misal: .ready, .playing, .paused, .finished, .dismissed).
+    /// Menggunakan `private(set)` agar hanya bisa diubah melalui fungsi `send(_:)`.
+    private(set) var state: ReplayState = .ready
+
+    /// Hasil sesi latihan yang sedang diputar ulang (berisi rekaman BeatEvent, akurasi, dsb).
+    let result: SessionResult
+
+    /// Pola strumming gitar yang dimainkan (misal: "Foundation Strum").
+    let pattern: StrumPattern
+
+    /// Kecepatan tempo sesi latihan dalam Beat Per Minute (misal: 80 BPM).
+    let bpm: Int
+
+    /// Jarak waktu (detik) antar slot/subdivisi ketukan (misal: pada 80 BPM, 1/8 note = 0.375s).
+    let stepInterval: TimeInterval
+
+    /// Total jumlah step ketukan sepanjang sesi latihan.
+    let totalSteps: Int
+
+    /// Total durasi waktu seluruh sesi dalam detik (`totalSteps * stepInterval`).
+    let duration: TimeInterval
+
+    // MARK: - Manajemen Waktu & Animasi (Private)
+
+    /// Titik waktu awal pemutaran (bernilai negatif sebagai lead-in agar panah muncul dari kanan sebelum beat 0).
+    private let initialSongTime: TimeInterval
+
+    /// Waktu lagu saat pemutaran dijeda (paused) atau saat sebelum mulai play.
+    private var currentSongTime: TimeInterval
+
+    /// Patokan posisi waktu lagu saat tombol Play ditekan/dilanjutkan.
+    private var songTimeAtAnchor: TimeInterval = 0
+
+    /// Waktu jam sistem (host uptime) saat tombol Play ditekan, digunakan untuk menghitung selisih waktu berjalan.
+    private var hostTimeAnchor: TimeInterval?
+
+    /// Daftar seluruh node panah di sepanjang rel lagu (dibuat dari pola stroke pattern).
+    private let laneNodes: [PlayLaneNode]
+
+    /// Closure untuk mendapatkan waktu sistem saat ini. Diinjeksi agar pengetesan (Unit Test) bisa berjalan deterministik.
+    private let now: () -> TimeInterval
+
+    /// Callback yang dipanggil saat user keluar dari layar Replay untuk kembali ke Summary.
+    private let onDismiss: () -> Void
+
+    // MARK: - Sound
+
+    /// How far ahead sounds are handed to the audio engine.
+    static let soundLookahead: TimeInterval = 0.12
+    private static let soundPollInterval: Duration = .milliseconds(25)
+
+    private let guitar: (any GuitarSound)?
+    private let metronome: (any MetronomeSound)?
+    /// The host clock the audio engine schedules on (separate from `now`, which drives song time).
+    private let soundClock: () -> TimeInterval
+    private let cues: [ReplayCue]
+    /// Showtime only: the chord of every step, so each replayed strum sounds the chord it sounded in
+    /// the game. Empty in Practice, which plays C.
+    private let stepChords: [GuitarChord]
+    /// Showtime only: the song's chord names along the lane, as in the game.
+    private let chordLabels: [Int: String]
+    /// Showtime only: the song's recording, kept in step with the replay as in the game.
+    private let backingTrack: (any SongBackingTrack)?
+    private var nextCue = 0
+    private var soundTask: Task<Void, Never>?
+
+    // MARK: - Inisialisasi
+
+    /// Membuat instance ReplayViewModel baru.
+    /// - Parameters:
+    ///   - result: Objek `SessionResult` dari sesi yang baru saja selesai dimainkan.
+    ///   - pattern: Pola ketukan gitar (jika nil, otomatis dicari dari katalog berdasarkan `result.patternID`).
+    ///   - repetitions: Berapa kali pola diulang (default 10 kali sesuai `PracticeSessionConfig`).
+    ///   - now: Penyedia waktu jam sistem (default: `ProcessInfo.processInfo.systemUptime`).
+    ///   - onDismiss: Callback navigasi kembali ke SummaryView saat tombol Back ditekan.
+    init(
+        result: SessionResult,
+        pattern: StrumPattern? = nil,
+        repetitions: Int? = nil,
+        guitar: (any GuitarSound)? = nil,
+        metronome: (any MetronomeSound)? = nil,
+        stepChords: [GuitarChord] = [],
+        chordLabels: [Int: String] = [:],
+        backingTrack: (any SongBackingTrack)? = nil,
+        now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
+        soundClock: @escaping () -> TimeInterval = HostClock.now,
+        onDismiss: @escaping () -> Void = {}
+    ) {
+        self.result = result
+        let resolvedPattern = pattern ?? PatternCatalog.pattern(forID: result.patternID) ?? PatternCatalog.foundation
+        self.pattern = resolvedPattern
+        self.bpm = result.bpm
+        self.now = now
+        self.onDismiss = onDismiss
+        self.guitar = guitar
+        self.metronome = metronome
+        self.soundClock = soundClock
+        self.stepChords = stepChords
+        self.chordLabels = chordLabels
+        self.backingTrack = backingTrack
+        if let guitar, !stepChords.isEmpty {
+            // Usually already made by the game that just finished; this only covers the rest.
+            let chords = stepChords.reduce(into: [GuitarChord]()) { if !$0.contains($1) { $0.append($1) } }
+            Task { await guitar.prepare(chords: chords) }
+        }
+
+        // 1. Hitung interval waktu per slot ketukan berdasarkan BPM
+        let reps = repetitions ?? PracticeSessionConfig.patternRepetitions
+        let interval = PlayTimeline.slotInterval(bpm: result.bpm)
+        self.stepInterval = interval
+
+        // 2. Tentukan total langkah (memastikan cukup untuk menampung event terakhir yang tersimpan)
+        let patternSteps = resolvedPattern.strokes.count * max(1, reps)
+        let maxEventStep = (result.beatEvents.map(\.stepIndex).max() ?? 0) + 1
+        let steps = max(patternSteps, maxEventStep)
+        self.totalSteps = steps
+        self.duration = Double(steps) * interval
+
+        // 3. Pasang lead-in waktu awal di minus beberapa beat agar panah terlihat meluncur dari kanan
+        self.initialSongTime = -PlayScreenLayout.designReadyLeadTime
+        self.currentSongTime = self.initialSongTime
+
+        // 4. Generate daftar visual panah (BeatNodeView) sepanjang rel trek
+        self.laneNodes = PlayTimeline.makeNodes(
+            pattern: resolvedPattern.strokes.map(Self.arrow(for:)),
+            slotInterval: interval,
+            duration: self.duration
+        )
+        self.cues = ReplayCue.cues(for: result, pattern: resolvedPattern,
+                                   stepInterval: interval, totalSteps: steps)
+    }
+
+    // MARK: - Properti Komputasi untuk UI
+
+    /// Menandakan apakah animasi rel panah harus bergerak (hanya saat status `.playing`).
+    var isAnimating: Bool {
+        state == .playing
+    }
+
+    /// Nilai persentase progres sesi (0.0 sampai 1.0) untuk progress bar.
+    var progress: Double {
+        PlayTimeline.progress(songTime: songTime(), duration: duration)
+    }
+
+    /// Label format menit:detik waktu berjalan dan total (contoh: "00:15 / 01:00").
+    var clockLabel: String {
+        PlayTimeline.clockLabel(songTime: songTime(), duration: duration)
+    }
+
+    // MARK: - Pengendali Event (User Actions)
+
+    /// Menerima dan memproses aksi pengguna (misal: tombol play, pause, restart, back).
+    /// Mengalirkan event ke fungsi murni `reduce(state, event)` untuk menentukan state baru.
+    func send(_ event: ReplayEvent) {
+        // Seek moves playback without changing the state, so it is handled here.
+        if case let .seek(progress) = event {
+            seek(toProgress: progress)
+            return
+        }
+
+        let previous = state
+        state = reduce(previous, event)
+        guard state != previous || event == .restart else { return }
+
+        switch (previous, state) {
+        case (_, .playing):
+            // Memulai atau melanjutkan pemutaran: rekam jangkar waktu sistem sekarang
+            if previous == .finished || event == .restart {
+                songTimeAtAnchor = initialSongTime
+                currentSongTime = initialSongTime
+            } else {
+                songTimeAtAnchor = currentSongTime
+            }
+            hostTimeAnchor = now()
+            startSound()
+
+        case (_, .paused):
+            // Menghentikan pemutaran sementara: bekukan waktu lagu
+            currentSongTime = songTime()
+            hostTimeAnchor = nil
+            stopSound(silence: true)
+
+        case (_, .finished):
+            // Pemutaran selesai: kunci waktu lagu di durasi maksimal dan otomatis kembali ke summary
+            currentSongTime = duration
+            hostTimeAnchor = nil
+            // The last strums ring out.
+            stopSound(silence: false)
+            onDismiss()
+
+        case (_, .dismissed):
+            // Keluar dari replay: hentikan timer dan panggil aksi dismiss
+            hostTimeAnchor = nil
+            stopSound(silence: true)
+            onDismiss()
+
+        default:
+            break
+        }
+    }
+
+    // MARK: - Logika Waktu Playback
+
+    /// Mengembalikan posisi waktu lagu saat ini (dalam detik, di mana 0 adalah ketukan pertama).
+    /// Jika `hostTimeAnchor` aktif (sedang berjalan), waktu dihitung secara dinamis dari selisih `now() - hostTimeAnchor`.
+    func songTime() -> TimeInterval {
+        if let hostTimeAnchor {
+            return ReplayTimeline.songTime(
+                anchor: songTimeAtAnchor,
+                elapsed: now() - hostTimeAnchor,
+                duration: duration
+            )
+        }
+        return currentSongTime
+    }
+
+    /// Jumps to a point on the progress bar. Works before Play, while playing and while paused;
+    /// once finished the screen is already closing, so it is ignored. Nothing is re-judged: the nodes
+    /// before the new position simply show their stored colours.
+    private func seek(toProgress progress: Double) {
+        guard state == .ready || state == .playing || state == .paused else { return }
+        let target = ReplayTimeline.seekTime(progress: progress, duration: duration)
+        currentSongTime = target
+        songTimeAtAnchor = target
+        if hostTimeAnchor != nil {
+            hostTimeAnchor = now()
+            startSound()
+        } else {
+            // Paused or not started: anything still ringing belongs to the old position.
+            guitar?.stopStrums()
+        }
+    }
+
+    /// Memajukan waktu secara manual sejumlah detik tertentu (berguna terutama saat Unit Testing).
+    func advanceTime(by seconds: TimeInterval) {
+        guard seconds > 0 else { return }
+        let target = songTime() + seconds
+        if target >= duration {
+            currentSongTime = duration
+            send(.finish)
+        } else {
+            currentSongTime = target
+            songTimeAtAnchor = target
+            if hostTimeAnchor != nil {
+                hostTimeAnchor = now()
+                startSound()
+            }
+        }
+    }
+
+    // MARK: - Penyedia Data Tampilan (Screen Model)
+
+    /// Menghasilkan representasi snapshot frame layar untuk dirender oleh SwiftUI View.
+    ///
+    /// Fungsi ini mencocokkan waktu lagu (`time`) dengan waktu tiap `BeatEvent`:
+    /// - Node panah yang waktunya sudah terlewati otomatis diberi warna judgement yang tersimpan.
+    /// - Menghitung animasi gelombang/lingkaran hit (`lastJudgement` & `lastStrumTime`).
+    func screenModel() -> PlayScreenModel {
+        let time = songTime()
+        if state == .playing && time >= duration {
+            send(.finish)
+        }
+
+        var nodes = laneNodes
+        var lastJudgement: PlayJudgement?
+        var lastStrumTime: TimeInterval?
+
+        // Iterasi seluruh BeatEvent tersimpan untuk mewarnai node panah yang sudah lewat
+        for event in result.beatEvents where nodes.indices.contains(event.stepIndex) {
+            let nodeTime = Double(event.stepIndex) * stepInterval
+            if time >= nodeTime {
+                let judgement = PlayJudgement(
+                    feedback: PlayFeedback(event.result),
+                    time: nodeTime
+                )
+                nodes[event.stepIndex].judgement = judgement
+                if nodeTime > (lastJudgement?.time ?? -.infinity) {
+                    lastJudgement = judgement
+                }
+            }
+
+            // Jika pada sesi asli user melakukan strumming, catat waktu strum-nya untuk efek pulsa ring
+            if let offsetMs = event.offsetMs {
+                let strumTime = nodeTime + (offsetMs / 1000.0)
+                if time >= strumTime {
+                    if strumTime > (lastStrumTime ?? -.infinity) {
+                        lastStrumTime = strumTime
+                    }
+                }
+            }
+        }
+
+        // Every recorded swipe pulses the ring, and an extra one turns it the Miss colour, as in Play.
+        // Old records without swipes keep the pulses from their judged strums above.
+        for strum in result.strums where strum.time <= time {
+            if strum.time > (lastStrumTime ?? -.infinity) {
+                lastStrumTime = strum.time
+            }
+            if strum.isExtra, strum.time > (lastJudgement?.time ?? -.infinity) {
+                lastJudgement = PlayJudgement(feedback: .miss, time: strum.time)
+            }
+        }
+
+        // Tentukan fase tampilan UI berdasarkan status state machine
+        let phase: PlayScreenPhase = {
+            switch state {
+            case .ready: return .ready
+            case .playing: return .playing
+            case .paused: return .paused
+            case .finished: return .playing
+            case .dismissed: return .playing
+            }
+        }()
+
+        return PlayScreenModel(
+            title: pattern.name,
+            bpm: bpm,
+            duration: duration,
+            slotInterval: stepInterval,
+            songTime: time,
+            phase: phase,
+            nodes: nodes,
+            lastJudgement: lastJudgement,
+            lastStrumTime: lastStrumTime,
+            chordLabels: chordLabels
+        )
+    }
+
+    // MARK: - Sound scheduling
+
+    /// Hands every cue due within the lookahead to the audio engine, timed on the host clock from
+    /// the current song time. Internal so tests can drive it with fake clocks.
+    func scheduleDueSounds() {
+        guard hostTimeAnchor != nil else { return }
+        let songNow = songTime()
+        let hostNow = soundClock()
+        while nextCue < cues.count, cues[nextCue].time < songNow + Self.soundLookahead {
+            let cue = cues[nextCue]
+            let at = hostNow + (cue.time - songNow)
+            switch cue.sound {
+            case let .strum(direction): guitar?.strum(direction, chord: chord(at: cue.time), at: at, accent: 1)
+            case let .click(accent): metronome?.click(at: at, accent: accent)
+            }
+            nextCue += 1
+        }
+    }
+
+    /// Starts (or restarts) the sound from the current song time.
+    private func startSound() {
+        stopSound(silence: true)
+        let songNow = songTime()
+        backingTrack?.play(fromSongTime: songNow, atHostTime: soundClock())
+        guard guitar != nil || metronome != nil else { return }
+        nextCue = cues.firstIndex { $0.time >= songNow } ?? cues.count
+        scheduleDueSounds()
+        soundTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: Self.soundPollInterval)
+                self?.scheduleDueSounds()
+            }
+        }
+    }
+
+    /// - Parameter silence: also cut the strings (pause, restart, leaving), instead of letting the
+    ///   last strums ring out (the end of the replay).
+    private func stopSound(silence: Bool) {
+        soundTask?.cancel()
+        soundTask = nil
+        backingTrack?.stop()
+        metronome?.cancelClicks()
+        if silence { guitar?.stopStrums() }
+    }
+
+    // MARK: - Helper
+
+    /// The chord of the step nearest to a strum's time, as the game picks it. C when there are no
+    /// step chords (Practice).
+    private func chord(at time: TimeInterval) -> GuitarChord {
+        guard let last = stepChords.indices.last else { return .c }
+        let step = Int((time / stepInterval).rounded())
+        return stepChords[min(max(step, 0), last)]
+    }
+
+    /// Mengonversi nilai stroke model gitar (`.down`, `.up`, `.rest`) ke visual panah (`BeatNodeView.Arrow`).
+    private static func arrow(for stroke: Stroke) -> BeatNodeView.Arrow? {
+        switch stroke {
+        case .down: return .down
+        case .up: return .up
+        case .rest: return nil
+        }
+    }
+}

@@ -1,0 +1,17 @@
+{
+  "images" : [
+    {
+      "filename" : "Comp 1_00049.png",
+      "idiom" : "ipad",
+      "scale" : "1x"
+    },
+    {
+      "idiom" : "ipad",
+      "scale" : "2x"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

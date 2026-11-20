@@ -1,0 +1,228 @@
+import SwiftUI
+
+/// Practice-Play screen, edge to edge. The Play_BG artwork provides the header box, the red board and
+/// the lane; on top of it the code draws the pause button, title, BPM, the moving lane contents,
+/// session time and progress. READY?, the count-in, the pause modal and the iPhone-disconnected
+/// notice draw over a veil.
+///
+/// Only the parts that move (lane, time, progress, count-in number) are redrawn every frame; the
+/// artwork, title, BPM and buttons are drawn once and only change with the phase. That keeps each
+/// frame cheap and the buttons' touch handling stable while the lane scrolls.
+struct PracticePlayView: View {
+    /// 60 fps is smooth enough. On a 120 Hz iPad an uncapped timeline draws twice as often, and the
+    /// main thread then handles strums (especially from the iPhone) later. Same cap as the prototype.
+    private static let frameInterval: TimeInterval = 1.0 / 60
+
+    private let bpmColor: Color?
+    private let titleLineSpacing: CGFloat?
+    private let titleFontScale: CGFloat
+    private let backgroundAssetName: String
+    private let liveModel: () -> PlayScreenModel
+    private let isAnimating: Bool
+    private let onReady: () -> Void
+    private let onPause: () -> Void
+    private let onResume: () -> Void
+    private let onRestart: () -> Void
+    private let onBackToMenu: () -> Void
+    private let onBackToListen: () -> Void
+    private let onSetUpDevice: () -> Void
+
+    /// A still frame (previews, the hit-animation gallery, a caller with its own timeline).
+    init(model: PlayScreenModel,
+         backgroundAssetName: String = "Play_BG",
+         titleFontScale: CGFloat = 1,
+         titleLineSpacing: CGFloat? = nil,
+         bpmColor: Color? = nil,
+         onReady: @escaping () -> Void = {},
+         onPause: @escaping () -> Void = {},
+         onResume: @escaping () -> Void = {},
+         onRestart: @escaping () -> Void = {},
+         onBackToMenu: @escaping () -> Void = {},
+         onBackToListen: (() -> Void)? = nil,
+         onSetUpDevice: @escaping () -> Void = {}) {
+        let backToListen = onBackToListen ?? onBackToMenu
+        self.init(isAnimating: false, liveModel: { model }, backgroundAssetName: backgroundAssetName,
+                  titleFontScale: titleFontScale, titleLineSpacing: titleLineSpacing, bpmColor: bpmColor, onReady: onReady,
+                  onPause: onPause, onResume: onResume, onRestart: onRestart, onBackToMenu: onBackToMenu,
+                  onBackToListen: backToListen, onSetUpDevice: onSetUpDevice)
+    }
+
+    /// A live session: `liveModel` is read every frame while `isAnimating`, for the moving parts only.
+    init(isAnimating: Bool,
+         liveModel: @escaping () -> PlayScreenModel,
+         backgroundAssetName: String = "Play_BG",
+         titleFontScale: CGFloat = 1,
+         titleLineSpacing: CGFloat? = nil,
+         bpmColor: Color? = nil,
+         onReady: @escaping () -> Void = {},
+         onPause: @escaping () -> Void = {},
+         onResume: @escaping () -> Void = {},
+         onRestart: @escaping () -> Void = {},
+         onBackToMenu: @escaping () -> Void = {},
+         onBackToListen: (() -> Void)? = nil,
+         onSetUpDevice: @escaping () -> Void = {}) {
+        self.bpmColor = bpmColor
+        self.titleLineSpacing = titleLineSpacing
+        self.titleFontScale = titleFontScale
+        self.backgroundAssetName = backgroundAssetName
+        self.liveModel = liveModel
+        self.isAnimating = isAnimating
+        self.onReady = onReady
+        self.onPause = onPause
+        self.onResume = onResume
+        self.onRestart = onRestart
+        self.onBackToMenu = onBackToMenu
+        self.onBackToListen = onBackToListen ?? onBackToMenu
+        self.onSetUpDevice = onSetUpDevice
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            let layout = PlayScreenLayout(size: geo.size)
+            // Read once per state change (phase, title, BPM), not once per frame.
+            let model = liveModel()
+            ZStack(alignment: .topLeading) {
+                Image(backgroundAssetName)
+                    .resizable()
+                    .frame(width: geo.size.width, height: geo.size.height)
+                TimelineView(.animation(minimumInterval: Self.frameInterval, paused: !isAnimating)) { _ in
+                    board(layout, liveModel())
+                }
+                .transaction { $0.animation = nil }
+                header(layout, model)
+                veil(layout, model)
+            }
+            .frame(width: geo.size.width, height: geo.size.height)
+            .animation(.easeOut(duration: 0.2), value: model.phase)
+        }
+        .ignoresSafeArea()
+        .statusBarHidden()
+        .persistentSystemOverlays(.hidden)
+    }
+
+    // MARK: Header (static)
+
+    private func header(_ layout: PlayScreenLayout, _ model: PlayScreenModel) -> some View {
+        ZStack(alignment: .topLeading) {
+            assetButton("Pause", normal: "Button_Pause_Normal", pressed: "Button_Pause_Pressed",
+                        size: CGSize(width: 90 * layout.unit, height: 98 * layout.unit),
+                        action: onPause)
+                .position(layout.pauseCenter)
+
+            Group {
+                if let spacing = titleLineSpacing, let lines = model.titleLines {
+                    VStack(spacing: spacing * layout.unit) {
+                        ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                            titleText(line.uppercased(), layout: layout)
+                        }
+                    }
+                } else {
+                    titleText(model.title.uppercased(), layout: layout)
+                }
+            }
+            .minimumScaleFactor(0.5)
+            .frame(maxWidth: layout.titleMaxWidth)
+            .position(layout.titleCenter)
+
+            Text("BPM \(model.bpm)")
+                .font(AppFont.mono(layout.bpmFontSize))
+                .foregroundStyle(bpmColor ?? AppColor.ink)
+                .fixedSize()
+                .frame(width: layout.size.width - layout.bpmTrailing, alignment: .trailing)
+                .position(x: (layout.size.width - layout.bpmTrailing) / 2, y: layout.bpmCenterY)
+        }
+    }
+
+    private func titleText(_ text: String, layout: PlayScreenLayout) -> some View {
+        OutlinedText(text: text, font: AppFont.display(layout.titleFontSize * titleFontScale),
+                     foregroundColor: AppColor.titleText, outlineColor: AppColor.ink,
+                     outlineWidth: layout.titleFontSize * 0.07, shadowColor: .clear,
+                     shadowOffset: .zero, alignment: .center)
+    }
+
+    private func assetButton(_ label: String, normal: String, pressed: String, size: CGSize,
+                             action: @escaping () -> Void) -> some View {
+        Button(label, action: action).buttonStyle(AssetButtonStyle(
+            normalAssetName: normal, pressedAssetName: pressed, size: size))
+        .accessibilityLabel(label)
+    }
+
+    // MARK: Board (every frame)
+
+    private func board(_ layout: PlayScreenLayout, _ model: PlayScreenModel) -> some View {
+        let u = layout.unit
+        return ZStack(alignment: .topLeading) {
+            PlayLaneView(model: model, layout: layout)
+                .offset(x: layout.laneRect.minX, y: layout.laneRect.minY)
+
+            Text(PlayTimeline.clockLabel(songTime: model.songTime, duration: model.duration))
+                .font(AppFont.mono(layout.clockFontSize))
+                .foregroundStyle(AppColor.ink)
+                .fixedSize()
+                .offset(x: layout.progressRect.minX + 10 * u, y: layout.clockLabelTop)
+
+            PlayProgressView(progress: PlayTimeline.progress(songTime: model.songTime, duration: model.duration),
+                             strokeWidth: 3 * u)
+                .frame(width: layout.progressRect.width, height: layout.progressRect.height)
+                .offset(x: layout.progressRect.minX, y: layout.progressRect.minY)
+        }
+    }
+
+    // MARK: Veil (READY?, count-in, pause, iPhone disconnected)
+
+    @ViewBuilder
+    private func veil(_ layout: PlayScreenLayout, _ model: PlayScreenModel) -> some View {
+        switch model.phase {
+        case .ready:
+            ZStack(alignment: .topLeading) {
+                AppColor.dim.opacity(0.55)
+                PlayCalloutView(text: "READY?", fontSize: 54 * layout.unit)
+                    .position(layout.calloutCenter)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture(perform: onReady)
+            .transition(.opacity)
+        case .countIn(let number):
+            ZStack(alignment: .topLeading) {
+                AppColor.dim.opacity(0.55)
+                // Only the number's pop animation needs the per-frame time.
+                TimelineView(.animation(minimumInterval: Self.frameInterval, paused: !isAnimating)) { _ in
+                    let frame = liveModel()
+                    let progress = frame.countInBeatProgress ?? (isAnimating ? nil : PlayTimeline.countInBeatProgress(
+                        songTime: frame.songTime,
+                        slotInterval: frame.slotInterval,
+                        leadInSlots: frame.leadInSlots))
+                    if let progress {
+                        PlayCalloutView(
+                            text: "\(number)",
+                            fontSize: 140 * layout.unit,
+                            beatProgress: progress)
+                            .position(layout.calloutCenter)
+                    }
+                }
+            }
+            .allowsHitTesting(false)
+            .transition(.opacity)
+        case .paused:
+            ZStack {
+                AppColors.brownInk.opacity(0.65)
+                PauseMenuOverlay(unit: layout.unit, onResume: onResume, onRestart: onRestart,
+                                 onBackToMenu: onBackToMenu)
+                    .transition(.scale(scale: 0.9).combined(with: .opacity))
+            }
+            .transition(.opacity)
+        case .disconnected(let isReconnected):
+            ZStack {
+                AppColors.brownInk.opacity(0.65)
+                ControllerDisconnectedOverlay(unit: layout.unit, isReconnected: isReconnected,
+                                              backButtonPosition: layout.pauseCenter,
+                                              onBack: onBackToListen,
+                                              onResume: onResume, onSetUpDevice: onSetUpDevice)
+                    .transition(.scale(scale: 0.9).combined(with: .opacity))
+            }
+            .transition(.opacity)
+        case .playing:
+            EmptyView()
+        }
+    }
+}

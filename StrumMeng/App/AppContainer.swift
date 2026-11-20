@@ -1,0 +1,525 @@
+import Foundation
+
+@MainActor
+final class AppContainer {
+
+    private let router: AppRouter
+    private let repository: SessionRepository?
+    /// Showtime reads its song records through its own protocol. It is the same SwiftData object.
+    private let songRecords: (any SongRecordsRepository)?
+    private let sessionHistory: (any SessionHistoryChecking)?
+    private let settings: any SettingsStore
+    private let pairingIntroductionStore: any PairingIntroductionStore
+    /// One menu music and button click player for the whole app, so the music keeps its place
+    /// between screens.
+    private let menuSounds: any MenuSoundService
+    let results = SessionResultStore()
+    private let songCatalog: any SongCatalog
+    private let enablesHomeGuidance: Bool
+    private let homeGuidanceStore: any HomeGuidanceStore
+    private let practiceGuidanceStore: any PracticeGuidanceStore
+    /// The one pattern list of the app, so Retry can hand it the chosen tempo.
+    private weak var patternListViewModel: PatternListViewModel?
+    /// The one song list of the app, so its records can be reloaded after a session.
+    private weak var songListViewModel: SongListViewModel?
+    private var selectedShowtimePatternID: String? = nil
+    private var customShowtimeSongPlayer: (any ShowtimeSongPlayer)?
+    private lazy var showtimeSongPlayer: (any ShowtimeSongPlayer)? = {
+        if let customShowtimeSongPlayer { return customShowtimeSongPlayer }
+        // The song previews are songs, not menu music: the device volume buttons set their level,
+        // not the music or sound setting in Option.
+        return AVShowtimeSongPlayer()
+    }()
+    /// One synthesised guitar for the whole app, made when a screen first needs it. Notes are
+    /// synthesised right away, so they are ready before the first strum.
+    private lazy var guitar: GuitarEngine? = {
+        let engine = GuitarEngine()
+        if let engine { Task { await engine.prepare() } }
+        return engine
+    }()
+    private var guitarSound: any GuitarSound { guitar ?? SilentGuitarSound() }
+    private var metronomeSound: any MetronomeSound { guitar ?? SilentGuitarSound() }
+    /// One link for the whole app session: reconnecting takes seconds, so sessions never restart it.
+    private var controllerLink: (any ControllerLink)?
+    /// What the link last said about the iPhone (nil until it says anything). Handed to each new
+    /// Play, so it does not have to wait for the link's first state before counting in.
+    private var isControllerLinkConnected: Bool?
+    private var controllerStateTask: Task<Void, Never>?
+    /// Inputs to `MenuMusicPolicy` besides the route, kept so either can change on its own.
+    private var isAppActive = true
+    private var isShowingSummary = false
+
+    init(
+        router: AppRouter,
+        inMemory: Bool = false,
+        settings: (any SettingsStore)? = nil,
+        menuSounds: (any MenuSoundService)? = nil,
+        pairingIntroductionStore: (any PairingIntroductionStore)? = nil,
+        homeGuidanceStore: (any HomeGuidanceStore)? = nil,
+        practiceGuidanceStore: (any PracticeGuidanceStore)? = nil,
+        controllerLink: (any ControllerLink)? = nil,
+        songCatalog: (any SongCatalog)? = nil,
+        showtimeSongPlayer: (any ShowtimeSongPlayer)? = nil
+    ) {
+        self.router = router
+        self.homeGuidanceStore = homeGuidanceStore ?? UserDefaultsHomeGuidanceStore()
+        self.practiceGuidanceStore = practiceGuidanceStore ?? (inMemory ? InMemoryPracticeGuidanceStore() : UserDefaultsPracticeGuidanceStore())
+        self.controllerLink = controllerLink
+        self.songCatalog = songCatalog ?? DefaultSongCatalog()
+        self.customShowtimeSongPlayer = showtimeSongPlayer
+        self.pairingIntroductionStore = pairingIntroductionStore ?? UserDefaultsPairingIntroductionStore()
+        let settings = settings ?? UserDefaultsSettingsStore()
+        self.settings = settings
+
+        // The saved volumes apply from launch, before Option is ever opened.
+        let sounds = menuSounds ?? AVMenuSoundService()
+        sounds.setMusicVolume(settings.soundVolume)
+        sounds.setEffectsVolume(settings.sfxVolume)
+        self.menuSounds = sounds
+        self.enablesHomeGuidance = !inMemory || homeGuidanceStore != nil
+
+        do {
+            let modelContainer = try ModelContainerFactory.make(
+                inMemory: inMemory
+            )
+            let sessions = SwiftDataSessionRepository(modelContainer: modelContainer)
+            repository = sessions
+            songRecords = sessions
+            sessionHistory = sessions
+        } catch {
+            // Show a records error when storage cannot be initialized.
+            repository = nil
+            songRecords = nil
+            sessionHistory = nil
+        }
+    }
+
+    /// The UI sounds (clicks, garage, page turns, pop-ups, wheel ticks) for the iPad's views,
+    /// put in the environment by ContentView. They follow the SFX volume like the rest.
+    var soundEffectAction: SoundEffectAction {
+        let sounds = menuSounds
+        return SoundEffectAction { effect in sounds.play(effect) }
+    }
+
+    /// Lets the Practice and Showtime summaries turn the menu music on while they show, and off
+    /// while Replay is open. Put in the environment by ContentView.
+    var summaryMusicAction: SummaryMusicAction {
+        SummaryMusicAction { [weak self] isShowingSummary in
+            self?.setShowingSummary(isShowingSummary)
+        }
+    }
+
+    /// Plays or pauses the menu music for the screen on top. Called whenever the route stack or the
+    /// app's active state changes; `MenuMusicPolicy` decides.
+    func updateMenuMusic(for path: [AppRoute], isAppActive: Bool) {
+        self.isAppActive = isAppActive
+        applyMenuMusic(top: path.last)
+    }
+
+    /// What a summary view reported last; the route alone cannot tell (see `SummaryMusicAction`).
+    func setShowingSummary(_ isShowingSummary: Bool) {
+        guard self.isShowingSummary != isShowingSummary else { return }
+        self.isShowingSummary = isShowingSummary
+        applyMenuMusic(top: router.path.last)
+    }
+
+    private func applyMenuMusic(top: AppRoute?) {
+        if MenuMusicPolicy.playsMusic(on: top, isAppActive: isAppActive, isShowingSummary: isShowingSummary) {
+            menuSounds.startMusic()
+        } else {
+            menuSounds.pauseMusic()
+        }
+    }
+
+    func makePairingIntroductionViewModel(isEnabled: Bool = true) -> PairingIntroductionViewModel {
+        PairingIntroductionViewModel(
+            store: pairingIntroductionStore,
+            state: isEnabled ? .idle : .finished,
+            onSetupRequested: { [weak router] in router?.push(.deviceSetup) }
+        )
+    }
+
+    func makeHomeViewModel() -> HomeViewModel {
+        HomeViewModel(
+            guidance: enablesHomeGuidance ? HomeGuidanceViewModel(store: homeGuidanceStore) : nil,
+            onPracticeRequested: { [weak router] in
+                router?.push(.practiceList)
+            },
+            onShowtimeRequested: {
+                [weak router] in router?.push(.showtimeList)
+            }
+        )
+    }
+
+    func makeSongListViewModel() -> SongListViewModel {
+        let records: [String: ShowtimeRecordsViewModel] = songRecords.map { repository in
+            var dict: [String: ShowtimeRecordsViewModel] = [:]
+            for song in songCatalog.songs {
+                dict[song.id] = ShowtimeRecordsViewModel(songID: song.id, repository: repository)
+                let patterns = ShowtimePatternCatalog.patterns(forSongID: song.id)
+                for pattern in patterns {
+                    let key = SongListViewModel.recordsKey(songID: song.id, patternID: pattern.id)
+                    dict[key] = ShowtimeRecordsViewModel(songID: song.id, patternID: pattern.id, repository: repository)
+                }
+            }
+            return dict
+        } ?? [:]
+        let viewModel = SongListViewModel(
+            songs: songCatalog.songs,
+            player: showtimeSongPlayer,
+            recordsViewModels: records,
+            recordsFallbackState: songRecords == nil ? .failed : .empty,
+            onSongSelected: { [weak router] songID in
+                router?.push(.showtime(songID: songID))
+            },
+            onBackRequested: { [weak router] in
+                router?.pop()
+            }
+        )
+        viewModel.onSongWithPatternSelected = { [weak self, weak router] (songID: String, patternID: String) in
+            self?.selectedShowtimePatternID = patternID
+            router?.push(.showtime(songID: songID))
+        }
+        viewModel.onRecordRequested = { [weak self] result in
+            self?.showSummary(for: result)
+        }
+        songListViewModel = viewModel
+        return viewModel
+    }
+
+    func makeShowtimeViewModel(songID: String) -> ShowtimeViewModel? {
+        guard var song = songCatalog.songs.first(where: { $0.id == songID }) else { return nil }
+        let patternID = selectedShowtimePatternID
+            ?? songListViewModel?.activePatternID(for: song.id)
+            ?? song.patternID
+        if let chosenPattern = PatternCatalog.pattern(forID: patternID) {
+            song.patternID = chosenPattern.id
+            song.strokes = chosenPattern.strokes
+        }
+        let timeline = SongTimeline(song: song)
+        let link = sharedControllerLink()
+        let gameplay = PlayViewModel(pattern: timeline.sessionPattern, bpm: song.bpm, songID: song.id,
+            clock: AudioBeatClock(), input: link, touchInput: nil, controller: link,
+            knownControllerConnection: isControllerLinkConnected,
+            requiresController: true, guitar: guitarSound, metronome: metronomeSound,
+            // Calibration is not exposed by SettingsStore yet; same zero offset as Practice.
+            latencyOffset: 0,
+            strumArrivalGrace: PlayViewModel.controllerStrumArrivalGrace,
+            // Default lead-in before the first node and the 2 s break after the last, as Practice.
+            repetitions: 1, finishesAtDurationBoundary: true,
+            // Every strum sounds the chord at its place in the song.
+            stepChords: timeline.stepChords,
+            // The song's recording; the player sets its level with the device volume, not Option.
+            backingTrack: AVSongBackingTrack(),
+            now: HostClock.now,
+            waitUntil: { time in
+                let delay = time - HostClock.now()
+                if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
+            })
+        return ShowtimeViewModel(
+            song: song,
+            demo: PatternStrumDemoPlayer(clock: AudioBeatClock(), sound: guitarSound, now: HostClock.now),
+            gameplay: gameplay,
+            repository: repository ?? UnavailableSessionRepository(),
+            onSetUpDevice: { [weak router] in router?.presentSessionDeviceSetup() },
+            onBack: { [weak router, weak self] in
+                Task { [weak self] in
+                    await self?.songListViewModel?.reloadRecords()
+                }
+                router?.popTo(.showtimeList)
+            }
+        )
+    }
+
+    /// Replay of a finished Showtime run, as in Practice: the stored colours, every recorded swipe on
+    /// the chord it sounded in the game, the metronome and the song's recording. nil for an unknown song.
+    func makeShowtimeReplayViewModel(result: SessionResult) -> ReplayViewModel? {
+        guard var song = songCatalog.songs.first(where: { $0.id == result.songID }) else { return nil }
+        if let chosenPattern = PatternCatalog.pattern(forID: result.patternID) {
+            song.patternID = chosenPattern.id
+            song.strokes = chosenPattern.strokes
+        }
+        let timeline = SongTimeline(song: song)
+        let backingTrack = AVSongBackingTrack()
+        // The same ending as the game, so Replay fades and stops the song on the last node too.
+        backingTrack.prepare(songID: song.id,
+                             ending: SongBackingTrackEnding.forChart(
+                                 strokes: timeline.sessionPattern.strokes,
+                                 stepInterval: AudioBeatClock.stepInterval(bpm: song.bpm)))
+        return ReplayViewModel(result: result, pattern: timeline.sessionPattern, repetitions: 1,
+            guitar: guitarSound, metronome: metronomeSound,
+            stepChords: timeline.stepChords, chordLabels: timeline.chordLabels,
+            backingTrack: backingTrack)
+    }
+
+    func makeListenViewModel(pattern: StrumPattern, bpm: Int) -> ListenViewModel {
+        ListenViewModel(
+            pattern: pattern,
+            bpm: bpm,
+            player: SynthListenPlayer(sound: guitarSound),
+            history: sessionHistory ?? UnavailableSessionRepository(),
+            guidanceStore: practiceGuidanceStore,
+            controller: sharedControllerLink(),
+            onSetUpDevice: { [weak router] in router?.presentSessionDeviceSetup() },
+            onReady: { [weak router] in router?.push(.play(patternID: pattern.id, bpm: bpm)) },
+            onBack: { [weak router] in router?.popTo(.practiceList) }
+        )
+    }
+
+    func makePlayViewModel(
+        pattern: StrumPattern,
+        bpm: Int,
+        onFinished: ((SessionResult) -> Void)? = nil
+    ) -> PlayViewModel {
+        // The iPhone is the only input, as in Showtime: swipes on the iPad screen are not strums.
+        let link = sharedControllerLink()
+        return PlayViewModel(
+            pattern: pattern,
+            bpm: bpm,
+            clock: AudioBeatClock(),
+            input: link,
+            touchInput: nil,
+            controller: link,
+            knownControllerConnection: isControllerLinkConnected,
+            requiresController: true,
+            guitar: guitarSound,
+            metronome: metronomeSound,
+            strumArrivalGrace: PlayViewModel.controllerStrumArrivalGrace,
+            now: HostClock.now,
+            waitUntil: { time in
+                let delay = time - HostClock.now()
+                if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
+            },
+            onFinished: onFinished ?? { [weak self] result in self?.sessionFinished(result) },
+            onExit: { [weak router] in router?.popTo(.practiceList) },
+            onBackToListen: { [weak router] in router?.pop() },
+            onSetUpDevice: { [weak router] in router?.presentSessionDeviceSetup() }
+        )
+    }
+
+    /// Play becomes Summary, so Back from Summary never returns to the finished session.
+    func sessionFinished(_ result: SessionResult) {
+        results.add(result)
+        router.replaceLast(with: .summary(sessionID: result.id))
+    }
+
+    func sessionResult(for id: UUID) -> SessionResult? {
+        results.result(for: id)
+    }
+
+    /// Opens the Summary screen for a clicked record directly, without the intro overlay and without retry.
+    func showSummary(for result: SessionResult) {
+        results.add(result)
+        router.push(.summary(sessionID: result.id, showIntroOverlay: false, canRetry: false))
+    }
+
+    /// nil if the session is unknown (it never finished in this app session).
+    func makeSummaryViewModel(sessionID: UUID) -> SummaryViewModel? {
+        guard let result = results.result(for: sessionID) else { return nil }
+        return SummaryViewModel(
+            result: result,
+            repository: repository ?? UnavailableSessionRepository(),
+            onNavigate: { [weak self] destination in
+                self?.navigate(from: result, to: destination)
+            },
+            makeReplayViewModel: { [guitar = guitarSound, metronome = metronomeSound] result in
+                let pattern = PatternCatalog.pattern(forID: result.patternID)
+                return ReplayViewModel(result: result, pattern: pattern, guitar: guitar, metronome: metronome)
+            }
+        )
+    }
+
+    private func navigate(from result: SessionResult, to destination: SummaryDestination) {
+        switch destination {
+        case let .retry(bpm):
+            // The chosen tempo becomes the list's tempo too, then the pattern is listened to again.
+            patternListViewModel?.send(.setBPM(bpm))
+            router.popTo(.practiceList)
+            router.push(.listen(patternID: result.patternID, bpm: bpm))
+            reloadRecords()
+        case .backToMain:
+            router.popTo(.practiceList)
+            reloadRecords()
+        case .replay:
+            // Shown inside SummaryView.
+            break
+        }
+    }
+
+    func showtimeSongInfo(for result: SessionResult) -> ShowtimeSongInfo {
+        if let songID = result.songID, let song = songCatalog.songs.first(where: { $0.id == songID }) {
+            return ShowtimeSongInfo(song: song)
+        }
+        return .fallback(for: result)
+    }
+
+    /// nil if the session is unknown (it never finished in this app session).
+    func makeShowtimeSummaryViewModel(sessionID: UUID) -> ShowtimeSummaryViewModel? {
+        guard let result = results.result(for: sessionID) else { return nil }
+        return ShowtimeSummaryViewModel(
+            result: result,
+            repository: repository ?? UnavailableSessionRepository(),
+            onNavigate: { [weak self] destination in
+                self?.navigateShowtime(from: result, to: destination)
+            }
+        )
+    }
+
+    private func navigateShowtime(from result: SessionResult, to destination: ShowtimeSummaryDestination) {
+        switch destination {
+        case .retry:
+            if let songID = result.songID {
+                router.popTo(.showtimeList)
+                router.push(.showtime(songID: songID))
+                reloadShowtimeRecords()
+            }
+        case .backToMain:
+            router.popTo(.showtimeList)
+            reloadShowtimeRecords()
+        case .replay:
+            break
+        }
+    }
+
+    /// Summary waits for the save before navigating, so the new session is already stored here.
+    private func reloadRecords() {
+        Task { await patternListViewModel?.reloadRecords() }
+    }
+
+    /// For the Showtime Summary: reloads the song records once a Showtime session is saved.
+    func reloadShowtimeRecords() {
+        Task { await songListViewModel?.reloadRecords() }
+    }
+
+    func makePatternListViewModel() -> PatternListViewModel {
+        let records = repository.map { repository in
+            Dictionary(uniqueKeysWithValues: PatternCatalog.all.map { pattern in
+                (pattern.id, RecordsViewModel(patternID: pattern.id, repository: repository))
+            })
+        } ?? [:]
+        let viewModel = PatternListViewModel(
+            recordsViewModels: records,
+            recordsFallbackState: repository == nil ? .failed : .empty,
+            lastPlayedBPM: { [repository] patternID in
+                guard let repository else { return nil }
+                return try? await repository.lastPracticeBPM(forPattern: patternID)
+            },
+            onListenRequested: { [weak router] patternID, bpm in
+                router?.push(.listen(patternID: patternID, bpm: bpm))
+            },
+            onBackRequested: { [weak router] in
+                router?.pop()
+            },
+            onRecordRequested: { [weak self] result in
+                self?.showSummary(for: result)
+            }
+        )
+        patternListViewModel = viewModel
+        return viewModel
+    }
+
+
+    /// Option is an overlay on Home, so whoever shows it decides what "back" means
+    /// (close the overlay), instead of popping the router.
+    func makeOptionViewModel(onBackRequested: @escaping () -> Void) -> OptionViewModel {
+        OptionViewModel(
+            settings: settings,
+            sounds: menuSounds,
+            onBackRequested: onBackRequested,
+            onSetUpDeviceRequested: { [weak router] in router?.push(.deviceSetup) }
+        )
+    }
+
+    /// Static because the iPhone needs none of the iPad's storage, audio or routes.
+    static func makeCompanionViewModel(deviceName: String) -> CompanionViewModel {
+        CompanionViewModel(
+            client: BonjourControllerClient(deviceName: deviceName),
+            pairCodes: UserDefaultsPairCodeStore(),
+            makeGuitar: { GuitarEngine() },
+            makeSounds: { AVMenuSoundService(files: .controller) }
+        )
+    }
+
+    func makeDeviceSetupViewModel(isSessionRecovery: Bool = false) -> DeviceSetupViewModel {
+        let guidanceStore = homeGuidanceStore
+        return DeviceSetupViewModel(
+            link: sharedControllerLink(),
+            onClose: { [weak router] in
+                if isSessionRecovery {
+                    router?.dismissSessionDeviceSetup()
+                } else {
+                    // Home onboarding is separate from recovering a paused session.
+                    guidanceStore.scheduleAfterSetup()
+                    router?.pop()
+                }
+            }
+        )
+    }
+
+    /// Made on first use, so an AppContainer that never needs the iPhone never opens the network.
+    private func sharedControllerLink() -> any ControllerLink {
+        if let controllerLink { return controllerLink }
+        let link = BonjourControllerLink(pairCode: UserDefaultsPairCodeStore().hostPairCode())
+        controllerLink = link
+        return link
+    }
+
+    /// Up from launch, so a paired iPhone reconnects before the player reaches Play. A failure stays
+    /// quiet here: on-screen swipes still work, and Set Up Device tries again and explains it.
+    func startControllerLink() async {
+        let link = sharedControllerLink()
+        if controllerStateTask == nil {
+            controllerStateTask = Task { [weak self, states = link.connectionStates] in
+                for await state in states {
+                    if case .connected = state { self?.isControllerLinkConnected = true }
+                    else { self?.isControllerLinkConnected = false }
+                }
+            }
+        }
+        try? await link.start()
+    }
+
+    /// Back in the foreground: iOS may have stopped the link's listener while the app was away.
+    /// Never during a session: the session pauses when the app leaves the foreground.
+    func refreshControllerLink() async {
+        try? await controllerLink?.refreshIfNeeded()
+    }
+
+    func stopControllerLink() {
+        guard let link = controllerLink else { return }
+        controllerStateTask?.cancel()
+        controllerStateTask = nil
+        isControllerLinkConnected = nil
+        controllerLink = nil
+        Task { await link.stop() }
+    }
+
+    /// Guidebook is an overlay on Home, so whoever shows it decides what "back" means
+    /// (close the overlay), instead of popping the router.
+    func makeGuidebookViewModel(onBackRequested: @escaping () -> Void) -> GuidebookViewModel {
+        GuidebookViewModel(
+            player: SynthListenPlayer(sound: guitarSound, metronome: metronomeSound),
+            onBackRequested: onBackRequested
+        )
+    }
+#if DEBUG
+    /// Canvas-only flow: no persistence and no network; unplayed nodes are judged Miss normally.
+    static func makeShowtimePreviewViewModel() -> ShowtimeViewModel {
+        let song = DummySongCatalog().songs[0]
+        let timeline = SongTimeline(song: song)
+        let sound = SilentGuitarSound()
+        let gameplay = PlayViewModel(pattern: timeline.sessionPattern, bpm: song.bpm, songID: song.id,
+            clock: AudioBeatClock(), input: TouchStrumInputService(), touchInput: nil,
+            requiresController: false, metronome: sound, leadInSteps: 0, repetitions: 1,
+            finishBreak: 0, finishesAtDurationBoundary: true, now: HostClock.now,
+            waitUntil: { deadline in
+                let delay = deadline - HostClock.now()
+                if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
+            })
+        return ShowtimeViewModel(song: song,
+            demo: PatternStrumDemoPlayer(clock: AudioBeatClock(), sound: sound, now: HostClock.now), gameplay: gameplay,
+            repository: UnavailableSessionRepository(), onBack: {})
+    }
+#endif
+
+}

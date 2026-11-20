@@ -1,0 +1,42 @@
+#if DEBUG
+import SwiftUI
+
+@MainActor
+enum ListenPreviewFactory {
+    static func make(
+        events: [ListenEvent],
+        elapsed: TimeInterval = 0,
+        guidanceStore: (any PracticeGuidanceStore)? = nil
+    ) -> ListenView {
+        AppFontRegistrar.registerFonts()
+        let store = guidanceStore ?? InMemoryPracticeGuidanceStore(hasCompletedGuidance: true)
+        let model = ListenViewModel(
+            pattern: PatternCatalog.all[1],
+            bpm: 80,
+            player: ListenPreviewPlayer(elapsed: elapsed),
+            history: ListenPreviewHistory(),
+            guidanceStore: store,
+            onReady: {},
+            onBack: {}
+        )
+        for event in events { model.send(event) }
+        model.refreshProgress()
+        return ListenView(viewModel: model)
+    }
+}
+
+@MainActor
+private final class ListenPreviewPlayer: ListenPatternPlayer {
+    let elapsed: TimeInterval
+    init(elapsed: TimeInterval) { self.elapsed = elapsed }
+    func start(pattern: StrumPattern, bpm: Int) throws {}
+    func pause() {}
+    func resume() {}
+    func stop() {}
+}
+
+private struct ListenPreviewHistory: SessionHistoryChecking {
+    func hasSavedSessions() async throws -> Bool { false }
+}
+
+#endif

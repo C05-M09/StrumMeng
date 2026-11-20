@@ -147,14 +147,14 @@ Rules:
 
 - Judgement results: Perfect, Too Early, Miss\. A strum that is too late counts as Miss\. There is<br>no "Too Late" state\.
 - Feedback is colour only, in real time and in Replay\. Do not add icons, shapes or text to the<br>beat nodes unless the team decides to\.
-- We judge timing only, not chords\. Each strum message carries its direction \(down/up\) from the<br>swipe, but direction is not judged in the MVP unless the team decides otherwise\.
+- We judge timing and strum direction, not chords\. Each strum carries its direction \(down/up\) from<br>the swipe; a strum in the wrong direction inside a step's window makes that step a Miss, even if a<br>right one follows \(ARCHITECTURE\.md decision 18\)\. There is still no separate "wrong direction" result\.
 - A strum's time is when the finger moved on the iPhone, converted to iPad clock time using the<br>clock offset measured by the link's ping/pong\. Never judge by the time the message arrived on the<br>iPad: network delay would count against the player\.
 - Strums may be sent more than once \(redundant UDP\) and must be de\-duplicated inside the link,<br>before they reach TimingJudge\. One strum is one StrumEvent\.
 - TimingJudge is a pure function\. One strum can satisfy only one beat\. Tolerance values live in one<br>ToleranceConfig, never hard\-coded inside the judge\.
 - FeedbackEngine emits each BeatEvent as soon as that beat's window closes, not at the end of the<br>session\.
 - Latency offset \(from calibration, stored in SettingsStore\) is applied inside TimingJudge\. Do not<br>apply it anywhere else\. It compensates for audio output delay \(for example Bluetooth headphones\)<br>and how the player perceives the beat, not for network delay \(that is handled by the clock offset\)\.
 - The metronome and the pattern example are scheduled by the same BeatClock, never by a second clock\.
-- The guitar sound and metronome play on the iPad only\. The iPhone controller is silent\.
+- During a session, from the count\-in on, the guitar sound and metronome play on the iPad only and<br>the iPhone is silent\. Outside a session the iPhone plays its own strums \(ARCHITECTURE\.md decision 20\)\.<br>The metronome never plays on the iPhone\.
 - Wi\-Fi Aware publishing has a time limit\. When the session is old, the link is refreshed before<br>the count\-in, never during playing\.
 - Contracts are shared between developers and must not change unilaterally: BeatResult, BeatEvent,<br>StrumEvent, SessionResult, ControllerLink, BeatClock, SessionRepository, SettingsStore\. If one must<br>change, discuss it first and update ARCHITECTURE\.md\.
 - Replay does not take controller input and does not re\-judge\. It re\-plays stored \[BeatEvent\]<br>visually and audibly\. The colour sequence must match the original session exactly\.
@@ -176,9 +176,7 @@ Rules:
 
 - Showtime \(song selection, scrolling chords, star ratings\)\. Its button exists on Home and must have<br>no action: no navigation, no "Coming Soon" message\.
 - A separate History screen\. History is the records on pattern cards\.
-- Judging up/down strum direction \(the data is available, the rule is not decided\)\.
 - Microphone input or audio strum detection\.
-- Guitar sound on the iPhone controller\.
 - Any backend, internet call, account, or cloud sync\.
 - Chord recognition\. Practice never requires playing a chord\.
 - Locking patterns behind progress\. All patterns are open\.
