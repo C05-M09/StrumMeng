@@ -20,14 +20,17 @@ struct CompanionTouchpadView: View {
 
     var body: some View {
         ZStack {
-            // The neck runs up the screen and the sound hole sits at the bottom, so strumming crosses
-            // the strings left and right. Flipped horizontally when the left edge faces the floor so
-            // the thick bass strings always stay on the UP (ceiling) side and thin treble strings on
-            // the DOWN (floor) side.
+            // The neck runs up the screen and the sound hole sits at the bottom in the asset.
+            // Flipped so that in both landscape holds, the guitar neck/frets always stay on the
+            // player's left, the thick bass strings stay on top (UP), and the thin treble strings
+            // stay on the bottom (DOWN).
             Image("Companion_Guitar")
                 .resizable()
                 .scaledToFill()
-                .scaleEffect(x: viewModel.isLeftEdgeDown ? -1 : 1)
+                .scaleEffect(
+                    x: viewModel.isLeftEdgeDown ? -1 : 1,
+                    y: viewModel.isLeftEdgeDown ? -1 : 1
+                )
                 .ignoresSafeArea()
                 .accessibilityHidden(true)
 
