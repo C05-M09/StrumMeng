@@ -35,6 +35,15 @@ enum OptionCardLayout {
     static let iconColumnWidth: CGFloat = 130
     static let iconToSliderSpacing: CGFloat = 40
     static let sliderWidth: CGFloat = 386
+    /// The slider artwork is drawn at `sliderWidth`; the pick uses the same scale as the track.
+    private static let sliderArtScale: CGFloat = sliderWidth / 450.34
+    static let sliderTrackHeight: CGFloat = 35.74 * sliderArtScale
+    static let sliderThumbSize = CGSize(width: 53.45 * sliderArtScale, height: 60.34 * sliderArtScale)
+    /// Keeps the white fill inside the track's dark outline.
+    static let sliderFillInset: CGFloat = 4
+    /// Dark border inside the white fill. With the track's own outline it leaves about a quarter of
+    /// the track's height dark above and below the white, as in the design.
+    static let sliderFillBorderWidth: CGFloat = 3.5
     static let labelFontSize: CGFloat = 40
     static let deviceButtonFontSize: CGFloat = 32
     static let deviceButtonHeight: CGFloat = 76

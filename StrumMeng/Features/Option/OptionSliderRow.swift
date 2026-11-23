@@ -21,11 +21,18 @@ struct OptionSliderRow: View {
                     .font(AppTypography.dmMono(size: OptionCardLayout.labelFontSize))
                     .foregroundStyle(AppColors.brownInk)
 
-                Slider(value: $value, in: VolumeConfig.range, step: VolumeConfig.step)
-                    .frame(width: OptionCardLayout.sliderWidth)
-                    .accessibilityLabel(title)
-                    .accessibilityValue(Text(value, format: .percent.precision(.fractionLength(0))))
+                OptionVolumeSlider(title: title, value: $value)
             }
         }
     }
+}
+
+#Preview("Volume 0, 0.5 and 1") {
+    VStack(alignment: .leading, spacing: AppSpacing.xl) {
+        OptionSliderRow(symbolName: "speaker.wave.2.fill", title: "Music", value: .constant(0))
+        OptionSliderRow(symbolName: "speaker.wave.2.fill", title: "Music", value: .constant(0.5))
+        OptionSliderRow(symbolName: "speaker.wave.2.fill", title: "Music", value: .constant(1))
+    }
+    .padding(60)
+    .background(AppColor.practiceBackground)
 }
