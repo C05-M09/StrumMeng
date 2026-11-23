@@ -14,21 +14,21 @@ struct RecordRowView: View {
     private enum Layout {
         static let leadingPadding: CGFloat = 8  // Space before #1 (indents from left edge of divider)
         static let trailingPadding: CGFloat = 8 // Space after '>' (indents from right edge of divider)
-        static let rankWidth: CGFloat = 50 // Width of the rank column (#1, #2, etc.)
-        static let rankToStatsSpacing: CGFloat = 10 // Gap between '#1' and the Accuracy column
-        static let accuracyWidth: CGFloat = 112 // Fixed width for Accuracy column to accommodate 100%
-        static let perfectWidth: CGFloat = 72 // Fixed width for Perfect column
-        static let missWidth: CGFloat = 50 // Fixed width for Miss column
-        static let statSpacing: CGFloat = 18  // Gap between Accuracy, Perfect, and Miss columns
+        static let rankWidth: CGFloat = 42 // Width of the rank column (#1, #2, etc.)
+        static let rankToStatsSpacing: CGFloat = 12 // Gap between '#1' and the Accuracy column
+        static let accuracyWidth: CGFloat = 92 // Fixed width for Accuracy column
+        static let perfectWidth: CGFloat = 68 // Fixed width for Perfect column
+        static let missWidth: CGFloat = 52 // Fixed width for Miss column
+        static let minColumnSpacing: CGFloat = 16 // Minimum gap between columns
         static let labelSpacing: CGFloat = -2 // Vertical spacing between number and label
-        static let rankSize: CGFloat = 30 // Font size of '#1'
-        static let valueSize: CGFloat = 30 // Font size of counts (1, 4) and 'BPM 80'
-        static let accuracySize: CGFloat = 40 // Font size of '90%'
-        static let labelSize: CGFloat = 17 // Font size of 'Accuracy', 'Perfect', 'Miss'
+        static let rankSize: CGFloat = 28 // Font size of '#1'
+        static let valueSize: CGFloat = 28 // Font size of counts (1, 4) and 'BPM 80'
+        static let accuracySize: CGFloat = 38 // Font size of '90%'
+        static let labelSize: CGFloat = 16 // Font size of 'Accuracy', 'Perfect', 'Miss'
         static let mutedOpacity: Double = 0.75 // Transparency of the labels
-        static let valueAreaHeight: CGFloat = 40 // Height box ensuring numbers share a baseline
-        static let arrowSize: CGFloat = 30  // Size of the '>' chevron
-        static let arrowSpacing: CGFloat = 14  // Gap between 'BPM 80' and '>'
+        static let valueAreaHeight: CGFloat = 38 // Height box ensuring numbers share a baseline
+        static let arrowSize: CGFloat = 24 // Size of the '>' chevron
+        static let arrowSpacing: CGFloat = 8 // Gap between 'BPM 80' and '>'
     }
 
     var body: some View {
@@ -41,26 +41,30 @@ struct RecordRowView: View {
 
             Spacer().frame(width: Layout.rankToStatsSpacing)
 
-            HStack(spacing: Layout.statSpacing) {
-                statColumn(
-                    value: "\(model.accuracyPercent)%",
-                    label: "Accuracy",
-                    valueFont: AppTypography.bungee(size: Layout.accuracySize),
-                    width: Layout.accuracyWidth
-                )
-                statColumn(
-                    value: "\(model.perfectCount)",
-                    label: "Perfect",
-                    width: Layout.perfectWidth
-                )
-                statColumn(
-                    value: "\(model.missCount)",
-                    label: "Miss",
-                    width: Layout.missWidth
-                )
-            }
+            statColumn(
+                value: "\(model.accuracyPercent)%",
+                label: "Accuracy",
+                valueFont: AppTypography.bungee(size: Layout.accuracySize),
+                width: Layout.accuracyWidth
+            )
 
-            Spacer(minLength: 8)
+            Spacer(minLength: Layout.minColumnSpacing)
+
+            statColumn(
+                value: "\(model.perfectCount)",
+                label: "Perfect",
+                width: Layout.perfectWidth
+            )
+
+            Spacer(minLength: Layout.minColumnSpacing)
+
+            statColumn(
+                value: "\(model.missCount)",
+                label: "Miss",
+                width: Layout.missWidth
+            )
+
+            Spacer(minLength: Layout.minColumnSpacing)
 
             HStack(spacing: Layout.arrowSpacing) {
                 Text("BPM \(model.bpm)")
