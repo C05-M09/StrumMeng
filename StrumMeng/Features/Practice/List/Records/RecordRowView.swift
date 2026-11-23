@@ -14,16 +14,16 @@ struct RecordRowView: View {
     private enum Layout {
         static let leadingPadding: CGFloat = 8  // Space before #1 (indents from left edge of divider)
         static let trailingPadding: CGFloat = 8 // Space after '>' (indents from right edge of divider)
-        static let rankWidth: CGFloat = 42 // Width of the rank column (#1, #2, etc.)
-        static let rankToStatsSpacing: CGFloat = 12 // Gap between '#1' and the Accuracy column
-        static let accuracyWidth: CGFloat = 92 // Fixed width for Accuracy column
-        static let perfectWidth: CGFloat = 68 // Fixed width for Perfect column
-        static let missWidth: CGFloat = 52 // Fixed width for Miss column
+        static let rankWidth: CGFloat = 38 // Width of the rank column (#1, #2, etc.)
+        static let rankToStatsSpacing: CGFloat = 8 // Gap between '#1' and the Accuracy column
+        static let accuracyWidth: CGFloat = 104 // Fixed width for Accuracy column to accommodate 100%
+        static let perfectWidth: CGFloat = 66 // Fixed width for Perfect column
+        static let missWidth: CGFloat = 48 // Fixed width for Miss column
         static let minColumnSpacing: CGFloat = 16 // Minimum gap between columns
         static let labelSpacing: CGFloat = -2 // Vertical spacing between number and label
         static let rankSize: CGFloat = 28 // Font size of '#1'
         static let valueSize: CGFloat = 28 // Font size of counts (1, 4) and 'BPM 80'
-        static let accuracySize: CGFloat = 38 // Font size of '90%'
+        static let accuracySize: CGFloat = 34 // Font size of '100%', '90%'
         static let labelSize: CGFloat = 16 // Font size of 'Accuracy', 'Perfect', 'Miss'
         static let mutedOpacity: Double = 0.75 // Transparency of the labels
         static let valueAreaHeight: CGFloat = 38 // Height box ensuring numbers share a baseline
@@ -97,13 +97,15 @@ struct RecordRowView: View {
             Text(value)
                 .font(valueFont ?? AppTypography.dmMono(size: Layout.valueSize))
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                .minimumScaleFactor(0.65)
+                .frame(width: width)
                 .frame(height: Layout.valueAreaHeight)
             Text(label)
                 .font(AppTypography.dmMono(size: Layout.labelSize))
                 .opacity(Layout.mutedOpacity)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
+                .frame(width: width)
         }
         .frame(width: width)
     }
