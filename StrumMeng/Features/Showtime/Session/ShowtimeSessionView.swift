@@ -91,8 +91,8 @@ struct ShowtimeSessionView: View {
         } else if case .finished = viewModel.state, isSummaryReady, let summary = viewModel.summary {
             ShowtimeSummaryView(viewModel: summary, songInfo: viewModel.songInfo, makeReplayView: makeReplayView)
         } else {
-            PracticePlayView(model: viewModel.playFrame(), backgroundAssetName: "Showtime_Assets/Showtime_BG", titleFontScale: 0.8,
-                titleLineSpacing: ShowtimeLayout.titleLineSpacing, bpmColor: AppColors.white,
+            PracticePlayView(model: viewModel.playFrame(), backgroundAssetName: "Showtime_Assets/Showtime_BG",
+                bpmColor: AppColors.white,
                 onPause: { send(.pause(.user)) }, onResume: { send(.resume) },
                 onRestart: { send(.restart) }, onBackToMenu: { send(.back) },
                 onBackToListen: { send(.backToListen) },

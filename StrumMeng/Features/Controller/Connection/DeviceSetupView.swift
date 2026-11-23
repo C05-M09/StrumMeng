@@ -17,15 +17,15 @@ struct DeviceSetupView: View {
                 BackButton { viewModel.send(.tapBack) }
                     .position(BackButton.referenceCenter)
                 lane.position(x: size.width / 2, y: 540)
-                ChunkyButton(title: "Done", fontSize: 44, width: 294, height: 96, hasDropShadow: true) {
+                assetButton("Done", normal: "Button_Done_Normal", pressed: "Button_Done_Pressed") {
                     viewModel.send(.tapDone)
                 }
+                // Dimmed, not hidden, while searching or reconnecting: the player sees where to finish.
                 .disabled(!viewModel.canFinish)
-                .opacity(viewModel.canFinish ? 1 : 0.45)
+                .opacity(viewModel.canFinish ? 1 : Self.disabledOpacity)
                 .position(x: 1140, y: 884)
                 if viewModel.canRefresh {
-                    ChunkyButton(title: "Refresh", style: .secondary, fontSize: 44, width: 294, height: 96,
-                                 hasDropShadow: true) {
+                    assetButton("Refresh", normal: "Button_Refresh_Normal", pressed: "Button_Refresh_Pressed") {
                         viewModel.send(.tapRefresh)
                     }
                     .position(x: 822, y: 884)
@@ -41,6 +41,18 @@ struct DeviceSetupView: View {
         .statusBarHidden()
         .onAppear { viewModel.appear() }
         .onDisappear { viewModel.disappear() }
+    }
+
+    /// Same size as Ready on the Listen board, so the bottom-right button lines up across screens.
+    private static let buttonSize = CGSize(width: 294, height: 116)
+    private static let disabledOpacity = 0.45
+
+    private func assetButton(_ label: String, normal: String, pressed: String,
+                             action: @escaping () -> Void) -> some View {
+        Button(label, action: action)
+            .buttonStyle(AssetButtonStyle(normalAssetName: normal, pressedAssetName: pressed,
+                                          size: Self.buttonSize))
+            .accessibilityLabel(label)
     }
 
     private var title: some View {

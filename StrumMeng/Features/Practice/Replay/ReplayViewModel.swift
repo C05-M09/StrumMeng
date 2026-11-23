@@ -345,7 +345,8 @@ final class ReplayViewModel {
             nodes: nodes,
             lastJudgement: lastJudgement,
             lastStrumTime: lastStrumTime,
-            chordLabels: chordLabels
+            chordLabels: chordLabels,
+            titleLines: TitleLineWrapping.headerLines(for: pattern.name)
         )
     }
 

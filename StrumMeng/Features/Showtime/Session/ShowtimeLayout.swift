@@ -10,8 +10,9 @@ enum ShowtimeLayout {
     static let railY: CGFloat = 548
     static let chordY: CGFloat = 416
     static let countY: CGFloat = 666
-    static let titleLineSpacing: CGFloat = -12
-    static let titleSize: CGFloat = 52
+    static let titleLineSpacing: CGFloat = -20
+    static let titleSize: CGFloat = 66
+    static let titleOutlineWidth: CGFloat = 6
     static let monoSize: CGFloat = 32
     static let patternSelectorCenter = CGPoint(x: 280, y: 884)
     static let readyCenter = CGPoint(x: 1140, y: 884)

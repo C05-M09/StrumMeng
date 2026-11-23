@@ -53,7 +53,7 @@ struct ContentView: View {
                         if let pattern = PatternCatalog.all.first(where: { $0.id == patternID }) {
                             // A screen per route value: at the same stack position, SwiftUI would
                             // otherwise keep the previous Listen and its finished view model.
-                            ListenRoute(pattern: pattern, bpm: bpm, container: container)
+                            ListenRoute(pattern: pattern, bpm: bpm, route: route, router: router, container: container)
                                 .id(route)
                         }
 
@@ -128,13 +128,24 @@ struct ContentView: View {
 /// Without this, every redraw of `ContentView` would build a new view model and restart the screen.
 private struct ListenRoute: View {
     @State private var viewModel: ListenViewModel
+    private let route: AppRoute
+    private let router: AppRouter
 
-    init(pattern: StrumPattern, bpm: Int, container: AppContainer) {
+    init(pattern: StrumPattern, bpm: Int, route: AppRoute, router: AppRouter, container: AppContainer) {
+        self.route = route
+        self.router = router
         _viewModel = State(initialValue: container.makeListenViewModel(pattern: pattern, bpm: bpm))
     }
 
     var body: some View {
-        ListenView(viewModel: viewModel)
+        ListenView(viewModel: viewModel, isCurrentScreen: router.path.last == route)
+            .onChange(of: router.path) { _, path in
+                if path.last != route {
+                    viewModel.stop()
+                } else if path.last == route && viewModel.state == .departed {
+                    viewModel.appear()
+                }
+            }
     }
 }
 

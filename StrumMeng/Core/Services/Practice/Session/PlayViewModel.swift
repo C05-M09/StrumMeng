@@ -519,7 +519,8 @@ final class PlayViewModel {
                                slotInterval: stepInterval, songTime: songTime, phase: phase,
                                nodes: nodes, lastJudgement: last, lastStrumTime: lastStrumSongTime,
                                readyLeadTime: leadInTime, leadInSlots: leadInSteps,
-                               countInBeatProgress: currentCountInBeatProgress())
+                               countInBeatProgress: currentCountInBeatProgress(),
+                               titleLines: TitleLineWrapping.headerLines(for: pattern.name))
     }
 
     private func currentCountInBeatProgress() -> Double? {
