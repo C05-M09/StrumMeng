@@ -44,13 +44,13 @@ final class SongTimelineTests: XCTestCase {
         }
     }
     func test_stepChords_changeMidBar_onTheChartsSlot() {
-        // Riverside changes D -> D7 -> G inside one bar (slots 48, 52, 54).
+        // Riverside changes D -> D7 mid-bar at slot 52, then to G at slot 56.
         guard let song = DefaultSongCatalog.song(forID: "down-by-the-riverside") else { return XCTFail() }
         let chords = SongTimeline(song: song).stepChords
         XCTAssertEqual(chords[51], .d)
         XCTAssertEqual(chords[52], .d7)
-        XCTAssertEqual(chords[53], .d7)
-        XCTAssertEqual(chords[54], .g)
+        XCTAssertEqual(chords[55], .d7)
+        XCTAssertEqual(chords[56], .g)
     }
     func test_stepChords_unknownChordName_playsC() {
         var song = DummySongCatalog().songs[0]
